@@ -495,8 +495,8 @@ function Show-AboutDialog {
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Deployment Helper"
 $form.StartPosition = "CenterScreen"
-$form.Size = New-Object System.Drawing.Size(900, 820)
-$form.MinimumSize = New-Object System.Drawing.Size(780, 720)
+$form.Size = New-Object System.Drawing.Size(900, 920)
+$form.MinimumSize = New-Object System.Drawing.Size(780, 820)
 $form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
 $form.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
 $form.BackColor = $clrFormBg
@@ -734,7 +734,7 @@ $form.Controls.Add($pnlSep1)
 
 $pnlForm = New-Object System.Windows.Forms.Panel
 $pnlForm.Dock = [System.Windows.Forms.DockStyle]::Top
-$pnlForm.Height = 340
+$pnlForm.Height = 430
 $pnlForm.BackColor = $clrPanelBg
 $form.Controls.Add($pnlForm)
 
@@ -758,52 +758,72 @@ $txtTicket.ForeColor = $clrText
 $txtTicket.BorderStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms.BorderStyle]::None } else { [System.Windows.Forms.BorderStyle]::FixedSingle }
 $pnlForm.Controls.Add($txtTicket)
 
-# Row 2: Application
+# Row 2: Deployment Type
+$lblDeployType = New-Object System.Windows.Forms.Label
+$lblDeployType.Text = "Type:"
+$lblDeployType.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$lblDeployType.ForeColor = $clrText
+$lblDeployType.Location = New-Object System.Drawing.Point(14, 46)
+$lblDeployType.AutoSize = $true
+$pnlForm.Controls.Add($lblDeployType)
+
+$cboDeployType = New-Object System.Windows.Forms.ComboBox
+$cboDeployType.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+$cboDeployType.SetBounds(160, 43, 220, 24)
+$cboDeployType.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$cboDeployType.BackColor = $clrDetailBg
+$cboDeployType.ForeColor = $clrText
+$cboDeployType.FlatStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms.FlatStyle]::Flat } else { [System.Windows.Forms.FlatStyle]::Standard }
+[void]$cboDeployType.Items.AddRange(@('Application', 'Software Update Group'))
+$cboDeployType.SelectedIndex = 0
+$pnlForm.Controls.Add($cboDeployType)
+
+# Row 3: Application / SUG Name
 $lblAppName = New-Object System.Windows.Forms.Label
 $lblAppName.Text = "Application:"
 $lblAppName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblAppName.ForeColor = $clrText
-$lblAppName.Location = New-Object System.Drawing.Point(14, 46)
+$lblAppName.Location = New-Object System.Drawing.Point(14, 78)
 $lblAppName.AutoSize = $true
 $pnlForm.Controls.Add($lblAppName)
 
 $txtAppName = New-Object System.Windows.Forms.TextBox
-$txtAppName.SetBounds(160, 43, 300, 24)
+$txtAppName.SetBounds(160, 75, 300, 24)
 $txtAppName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $txtAppName.BackColor = $clrDetailBg
 $txtAppName.ForeColor = $clrText
 $txtAppName.BorderStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms.BorderStyle]::None } else { [System.Windows.Forms.BorderStyle]::FixedSingle }
 $pnlForm.Controls.Add($txtAppName)
 
-# Row 3: Collection
+# Row 4: Collection
 $lblCollName = New-Object System.Windows.Forms.Label
 $lblCollName.Text = "Collection:"
 $lblCollName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblCollName.ForeColor = $clrText
-$lblCollName.Location = New-Object System.Drawing.Point(14, 78)
+$lblCollName.Location = New-Object System.Drawing.Point(14, 110)
 $lblCollName.AutoSize = $true
 $pnlForm.Controls.Add($lblCollName)
 
 $txtCollName = New-Object System.Windows.Forms.TextBox
-$txtCollName.SetBounds(160, 75, 300, 24)
+$txtCollName.SetBounds(160, 107, 300, 24)
 $txtCollName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $txtCollName.BackColor = $clrDetailBg
 $txtCollName.ForeColor = $clrText
 $txtCollName.BorderStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms.BorderStyle]::None } else { [System.Windows.Forms.BorderStyle]::FixedSingle }
 $pnlForm.Controls.Add($txtCollName)
 
-# Row 4: Template
+# Row 5: Template
 $lblTemplate = New-Object System.Windows.Forms.Label
 $lblTemplate.Text = "Template:"
 $lblTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblTemplate.ForeColor = $clrText
-$lblTemplate.Location = New-Object System.Drawing.Point(14, 110)
+$lblTemplate.Location = New-Object System.Drawing.Point(14, 142)
 $lblTemplate.AutoSize = $true
 $pnlForm.Controls.Add($lblTemplate)
 
 $cboTemplate = New-Object System.Windows.Forms.ComboBox
 $cboTemplate.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$cboTemplate.SetBounds(160, 107, 220, 24)
+$cboTemplate.SetBounds(160, 139, 220, 24)
 $cboTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $cboTemplate.BackColor = $clrDetailBg
 $cboTemplate.ForeColor = $clrText
@@ -813,12 +833,12 @@ foreach ($tmpl in $script:Templates) { [void]$cboTemplate.Items.Add($tmpl.Name) 
 $cboTemplate.SelectedIndex = 0
 $pnlForm.Controls.Add($cboTemplate)
 
-# Row 5: Purpose
+# Row 6: Purpose
 $lblPurpose = New-Object System.Windows.Forms.Label
 $lblPurpose.Text = "Purpose:"
 $lblPurpose.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblPurpose.ForeColor = $clrText
-$lblPurpose.Location = New-Object System.Drawing.Point(14, 142)
+$lblPurpose.Location = New-Object System.Drawing.Point(14, 174)
 $lblPurpose.AutoSize = $true
 $pnlForm.Controls.Add($lblPurpose)
 
@@ -827,7 +847,7 @@ $radAvailable.Text = "Available"
 $radAvailable.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $radAvailable.ForeColor = $clrText
 $radAvailable.BackColor = $clrPanelBg
-$radAvailable.Location = New-Object System.Drawing.Point(160, 140)
+$radAvailable.Location = New-Object System.Drawing.Point(160, 172)
 $radAvailable.AutoSize = $true
 $radAvailable.Checked = $true
 if ($script:Prefs.DarkMode) { $radAvailable.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $radAvailable.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
@@ -838,39 +858,39 @@ $radRequired.Text = "Required"
 $radRequired.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $radRequired.ForeColor = $clrText
 $radRequired.BackColor = $clrPanelBg
-$radRequired.Location = New-Object System.Drawing.Point(270, 140)
+$radRequired.Location = New-Object System.Drawing.Point(270, 172)
 $radRequired.AutoSize = $true
 if ($script:Prefs.DarkMode) { $radRequired.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $radRequired.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($radRequired)
 
-# Row 6: Available date
+# Row 7: Available date
 $lblAvailable = New-Object System.Windows.Forms.Label
 $lblAvailable.Text = "Available:"
 $lblAvailable.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblAvailable.ForeColor = $clrText
-$lblAvailable.Location = New-Object System.Drawing.Point(14, 174)
+$lblAvailable.Location = New-Object System.Drawing.Point(14, 206)
 $lblAvailable.AutoSize = $true
 $pnlForm.Controls.Add($lblAvailable)
 
 $dtpAvailable = New-Object System.Windows.Forms.DateTimePicker
-$dtpAvailable.SetBounds(160, 171, 200, 24)
+$dtpAvailable.SetBounds(160, 203, 200, 24)
 $dtpAvailable.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $dtpAvailable.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
 $dtpAvailable.CustomFormat = "yyyy-MM-dd HH:mm"
 $dtpAvailable.Value = Get-Date
 $pnlForm.Controls.Add($dtpAvailable)
 
-# Row 7: Deadline date
+# Row 8: Deadline date
 $lblDeadline = New-Object System.Windows.Forms.Label
 $lblDeadline.Text = "Deadline:"
 $lblDeadline.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblDeadline.ForeColor = $clrText
-$lblDeadline.Location = New-Object System.Drawing.Point(14, 206)
+$lblDeadline.Location = New-Object System.Drawing.Point(14, 238)
 $lblDeadline.AutoSize = $true
 $pnlForm.Controls.Add($lblDeadline)
 
 $dtpDeadline = New-Object System.Windows.Forms.DateTimePicker
-$dtpDeadline.SetBounds(160, 203, 200, 24)
+$dtpDeadline.SetBounds(160, 235, 200, 24)
 $dtpDeadline.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $dtpDeadline.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
 $dtpDeadline.CustomFormat = "yyyy-MM-dd HH:mm"
@@ -878,18 +898,18 @@ $dtpDeadline.Value = (Get-Date).AddHours(24)
 $dtpDeadline.Enabled = $false
 $pnlForm.Controls.Add($dtpDeadline)
 
-# Row 8: Notification
+# Row 9: Notification
 $lblNotification = New-Object System.Windows.Forms.Label
 $lblNotification.Text = "Notification:"
 $lblNotification.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblNotification.ForeColor = $clrText
-$lblNotification.Location = New-Object System.Drawing.Point(14, 238)
+$lblNotification.Location = New-Object System.Drawing.Point(14, 270)
 $lblNotification.AutoSize = $true
 $pnlForm.Controls.Add($lblNotification)
 
 $cboNotification = New-Object System.Windows.Forms.ComboBox
 $cboNotification.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$cboNotification.SetBounds(160, 235, 260, 24)
+$cboNotification.SetBounds(160, 267, 260, 24)
 $cboNotification.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $cboNotification.BackColor = $clrDetailBg
 $cboNotification.ForeColor = $clrText
@@ -898,13 +918,13 @@ $cboNotification.FlatStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms
 $cboNotification.SelectedIndex = 0
 $pnlForm.Controls.Add($cboNotification)
 
-# Row 9: Maintenance window overrides
+# Row 10: Maintenance window overrides
 $chkOverrideMW = New-Object System.Windows.Forms.CheckBox
 $chkOverrideMW.Text = "Allow outside maintenance window"
 $chkOverrideMW.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkOverrideMW.ForeColor = $clrText
 $chkOverrideMW.BackColor = $clrPanelBg
-$chkOverrideMW.Location = New-Object System.Drawing.Point(160, 268)
+$chkOverrideMW.Location = New-Object System.Drawing.Point(160, 298)
 $chkOverrideMW.AutoSize = $true
 if ($script:Prefs.DarkMode) { $chkOverrideMW.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkOverrideMW.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkOverrideMW)
@@ -914,17 +934,28 @@ $chkRebootOutside.Text = "Reboot outside maintenance window"
 $chkRebootOutside.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkRebootOutside.ForeColor = $clrText
 $chkRebootOutside.BackColor = $clrPanelBg
-$chkRebootOutside.Location = New-Object System.Drawing.Point(160, 292)
+$chkRebootOutside.Location = New-Object System.Drawing.Point(160, 320)
 $chkRebootOutside.AutoSize = $true
 if ($script:Prefs.DarkMode) { $chkRebootOutside.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkRebootOutside.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkRebootOutside)
 
-# Row 10: Validate + Deploy buttons
+# Row 11: Metered connection
+$chkMetered = New-Object System.Windows.Forms.CheckBox
+$chkMetered.Text = "Allow download past deadline (metered connections)"
+$chkMetered.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$chkMetered.ForeColor = $clrText
+$chkMetered.BackColor = $clrPanelBg
+$chkMetered.Location = New-Object System.Drawing.Point(160, 342)
+$chkMetered.AutoSize = $true
+if ($script:Prefs.DarkMode) { $chkMetered.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkMetered.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
+$pnlForm.Controls.Add($chkMetered)
+
+# Row 12: Validate + Deploy + Save Template buttons
 $btnValidate = New-Object System.Windows.Forms.Button
 $btnValidate.Text = "Validate"
 $btnValidate.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnValidate.Size = New-Object System.Drawing.Size(120, 32)
-$btnValidate.Location = New-Object System.Drawing.Point(160, 302)
+$btnValidate.Location = New-Object System.Drawing.Point(160, 372)
 Set-ModernButtonStyle -Button $btnValidate -BackColor $clrAccent
 $pnlForm.Controls.Add($btnValidate)
 
@@ -932,10 +963,22 @@ $btnDeploy = New-Object System.Windows.Forms.Button
 $btnDeploy.Text = "Deploy"
 $btnDeploy.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnDeploy.Size = New-Object System.Drawing.Size(120, 32)
-$btnDeploy.Location = New-Object System.Drawing.Point(290, 302)
+$btnDeploy.Location = New-Object System.Drawing.Point(290, 372)
 $btnDeploy.Enabled = $false
 Set-ModernButtonStyle -Button $btnDeploy -BackColor ([System.Drawing.Color]::FromArgb(34, 139, 34))
 $pnlForm.Controls.Add($btnDeploy)
+
+$btnSaveTemplate = New-Object System.Windows.Forms.Button
+$btnSaveTemplate.Text = "Save Template"
+$btnSaveTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$btnSaveTemplate.Size = New-Object System.Drawing.Size(130, 32)
+$btnSaveTemplate.Location = New-Object System.Drawing.Point(420, 372)
+$btnSaveTemplate.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnSaveTemplate.FlatAppearance.BorderColor = $clrSepLine
+$btnSaveTemplate.ForeColor = $clrText
+$btnSaveTemplate.BackColor = $clrFormBg
+$btnSaveTemplate.Cursor = [System.Windows.Forms.Cursors]::Hand
+$pnlForm.Controls.Add($btnSaveTemplate)
 
 # Separator below deployment form
 $pnlSep2 = New-Object System.Windows.Forms.Panel
@@ -1006,6 +1049,20 @@ function Add-ValidationLine {
 
 $radRequired.Add_CheckedChanged({
     $dtpDeadline.Enabled = $radRequired.Checked
+    # Auto-check metered for Required deployments
+    if ($radRequired.Checked) { $chkMetered.Checked = $true }
+})
+
+# ---------------------------------------------------------------------------
+# Event: Deployment type change
+# ---------------------------------------------------------------------------
+
+$cboDeployType.Add_SelectedIndexChanged({
+    if ($cboDeployType.SelectedIndex -eq 1) {
+        $lblAppName.Text = "SUG Name:"
+    } else {
+        $lblAppName.Text = "Application:"
+    }
 })
 
 # ---------------------------------------------------------------------------
@@ -1023,9 +1080,104 @@ $cboTemplate.Add_SelectedIndexChanged({
     }
     $chkOverrideMW.Checked = [bool]$tmpl.OverrideServiceWindow
     $chkRebootOutside.Checked = [bool]$tmpl.RebootOutsideServiceWindow
+    if ($null -ne $tmpl.AllowMeteredConnection) { $chkMetered.Checked = [bool]$tmpl.AllowMeteredConnection }
     if ($tmpl.DefaultDeadlineOffsetHours -and $tmpl.DefaultDeadlineOffsetHours -gt 0) {
         $dtpDeadline.Value = (Get-Date).AddHours($tmpl.DefaultDeadlineOffsetHours)
     }
+})
+
+# ---------------------------------------------------------------------------
+# Event: Save Template
+# ---------------------------------------------------------------------------
+
+$btnSaveTemplate.Add_Click({
+    $inputDlg = New-Object System.Windows.Forms.Form
+    $inputDlg.Text = "Save Template"
+    $inputDlg.Size = New-Object System.Drawing.Size(360, 160)
+    $inputDlg.MinimumSize = $inputDlg.Size
+    $inputDlg.MaximumSize = $inputDlg.Size
+    $inputDlg.StartPosition = "CenterParent"
+    $inputDlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $inputDlg.MaximizeBox = $false
+    $inputDlg.MinimizeBox = $false
+    $inputDlg.ShowInTaskbar = $false
+    $inputDlg.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
+    $inputDlg.BackColor = $clrFormBg
+
+    $lblTmplName = New-Object System.Windows.Forms.Label
+    $lblTmplName.Text = "Template name:"
+    $lblTmplName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $lblTmplName.ForeColor = $clrText
+    $lblTmplName.Location = New-Object System.Drawing.Point(16, 20)
+    $lblTmplName.AutoSize = $true
+    $inputDlg.Controls.Add($lblTmplName)
+
+    $txtTmplName = New-Object System.Windows.Forms.TextBox
+    $txtTmplName.SetBounds(130, 17, 200, 24)
+    $txtTmplName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $txtTmplName.BackColor = $clrDetailBg
+    $txtTmplName.ForeColor = $clrText
+    $inputDlg.Controls.Add($txtTmplName)
+
+    $btnTmplOK = New-Object System.Windows.Forms.Button
+    $btnTmplOK.Text = "Save"
+    $btnTmplOK.Size = New-Object System.Drawing.Size(90, 32)
+    $btnTmplOK.Location = New-Object System.Drawing.Point(150, 70)
+    $btnTmplOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    Set-ModernButtonStyle -Button $btnTmplOK -BackColor $clrAccent
+    $inputDlg.Controls.Add($btnTmplOK)
+    $inputDlg.AcceptButton = $btnTmplOK
+
+    $btnTmplCancel = New-Object System.Windows.Forms.Button
+    $btnTmplCancel.Text = "Cancel"
+    $btnTmplCancel.Size = New-Object System.Drawing.Size(90, 32)
+    $btnTmplCancel.Location = New-Object System.Drawing.Point(248, 70)
+    $btnTmplCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $btnTmplCancel.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $btnTmplCancel.FlatAppearance.BorderColor = $clrSepLine
+    $btnTmplCancel.ForeColor = $clrText
+    $btnTmplCancel.BackColor = $clrFormBg
+    $inputDlg.Controls.Add($btnTmplCancel)
+    $inputDlg.CancelButton = $btnTmplCancel
+
+    if ($inputDlg.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
+        $tmplName = $txtTmplName.Text.Trim()
+        if ([string]::IsNullOrWhiteSpace($tmplName)) {
+            [System.Windows.Forms.MessageBox]::Show("Enter a template name.", "Missing Name", "OK", "Warning") | Out-Null
+            $inputDlg.Dispose()
+            return
+        }
+
+        $notifMap = @('DisplayAll', 'DisplaySoftwareCenterOnly', 'HideAll')
+        $purpose = if ($radRequired.Checked) { 'Required' } else { 'Available' }
+
+        $deadlineOffset = 0
+        if ($radRequired.Checked) {
+            $diff = $dtpDeadline.Value - (Get-Date)
+            $deadlineOffset = [Math]::Max(0, [Math]::Round($diff.TotalHours))
+        }
+
+        $tmplPath = Join-Path (Join-Path $PSScriptRoot "Templates") "$($tmplName -replace '[^\w\s-]','').json"
+
+        Save-DeploymentTemplate -TemplatePath $tmplPath -TemplateName $tmplName -Config @{
+            DeployPurpose              = $purpose
+            UserNotification           = $notifMap[$cboNotification.SelectedIndex]
+            OverrideServiceWindow      = $chkOverrideMW.Checked
+            RebootOutsideServiceWindow = $chkRebootOutside.Checked
+            AllowMeteredConnection     = $chkMetered.Checked
+            DefaultDeadlineOffsetHours = $deadlineOffset
+        }
+
+        # Reload templates into combobox
+        $script:Templates = Get-DeploymentTemplates -TemplatePath (Join-Path $PSScriptRoot "Templates")
+        $cboTemplate.Items.Clear()
+        [void]$cboTemplate.Items.Add("(None)")
+        foreach ($t in $script:Templates) { [void]$cboTemplate.Items.Add($t.Name) }
+        $cboTemplate.SelectedIndex = 0
+
+        Add-LogLine -TextBox $txtLog -Message "Template saved: $tmplName"
+    }
+    $inputDlg.Dispose()
 })
 
 # ---------------------------------------------------------------------------
@@ -1075,7 +1227,8 @@ $btnValidate.Add_Click({
         return
     }
     if ([string]::IsNullOrWhiteSpace($txtAppName.Text)) {
-        [System.Windows.Forms.MessageBox]::Show("Enter an application name.", "Missing Input", "OK", "Warning") | Out-Null
+        $typeLabel = if ($cboDeployType.SelectedIndex -eq 1) { 'SUG name' } else { 'application name' }
+        [System.Windows.Forms.MessageBox]::Show("Enter an $typeLabel.", "Missing Input", "OK", "Warning") | Out-Null
         return
     }
     if ([string]::IsNullOrWhiteSpace($txtCollName.Text)) {
@@ -1083,37 +1236,58 @@ $btnValidate.Add_Click({
         return
     }
 
+    $isSUG = ($cboDeployType.SelectedIndex -eq 1)
     $rtbValidation.Clear()
     $btnDeploy.Enabled = $false
     $script:ValidatedApp = $null
     $script:ValidatedCol = $null
     $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
-    Add-LogLine -TextBox $txtLog -Message "Validating deployment..."
+    Add-LogLine -TextBox $txtLog -Message ("Validating {0} deployment..." -f $(if ($isSUG) { 'SUG' } else { 'application' }))
     [System.Windows.Forms.Application]::DoEvents()
 
     $allPassed = $true
+    $targetObj = $null
 
-    # Check 1: Application exists
-    $app = Test-ApplicationExists -ApplicationName $txtAppName.Text.Trim()
-    if ($null -ne $app) {
-        Add-ValidationLine -Icon "[PASS]" -Message ("Application found: {0} v{1}" -f $app.LocalizedDisplayName, $app.SoftwareVersion) -Color $clrOkText
-    } else {
-        Add-ValidationLine -Icon "[FAIL]" -Message ("Application not found: {0}" -f $txtAppName.Text.Trim()) -Color $clrErrText
-        $allPassed = $false
-    }
-    [System.Windows.Forms.Application]::DoEvents()
-
-    # Check 2: Content distributed (only if app found)
-    if ($null -ne $app) {
-        $distStatus = Test-ContentDistributed -Application $app
-        if ($distStatus.IsFullyDistributed) {
-            Add-ValidationLine -Icon "[PASS]" -Message ("Content distributed: {0}/{1} DPs" -f $distStatus.NumberSuccess, $distStatus.Targeted) -Color $clrOkText
+    if ($isSUG) {
+        # Check 1: SUG exists
+        $targetObj = Test-SUGExists -SUGName $txtAppName.Text.Trim()
+        if ($null -ne $targetObj) {
+            Add-ValidationLine -Icon "[PASS]" -Message ("SUG found: {0} ({1} updates)" -f $targetObj.LocalizedDisplayName, $targetObj.NumberOfUpdates) -Color $clrOkText
+            if ($targetObj.NumberOfUpdates -eq 0) {
+                Add-ValidationLine -Icon "[WARN]" -Message "SUG contains 0 updates" -Color $clrErrText
+            }
         } else {
-            Add-ValidationLine -Icon "[FAIL]" -Message ("Content NOT fully distributed: {0}/{1} success, {2} errors" -f $distStatus.NumberSuccess, $distStatus.Targeted, $distStatus.NumberErrors) -Color $clrErrText
+            Add-ValidationLine -Icon "[FAIL]" -Message ("Software Update Group not found: {0}" -f $txtAppName.Text.Trim()) -Color $clrErrText
             $allPassed = $false
         }
+        [System.Windows.Forms.Application]::DoEvents()
+
+        # Check 2: Skipped for SUG (no content distribution check)
+        Add-ValidationLine -Icon "[SKIP]" -Message "Content distribution check not applicable for SUGs" -Color $clrText
+        [System.Windows.Forms.Application]::DoEvents()
+    } else {
+        # Check 1: Application exists
+        $targetObj = Test-ApplicationExists -ApplicationName $txtAppName.Text.Trim()
+        if ($null -ne $targetObj) {
+            Add-ValidationLine -Icon "[PASS]" -Message ("Application found: {0} v{1}" -f $targetObj.LocalizedDisplayName, $targetObj.SoftwareVersion) -Color $clrOkText
+        } else {
+            Add-ValidationLine -Icon "[FAIL]" -Message ("Application not found: {0}" -f $txtAppName.Text.Trim()) -Color $clrErrText
+            $allPassed = $false
+        }
+        [System.Windows.Forms.Application]::DoEvents()
+
+        # Check 2: Content distributed (only if app found)
+        if ($null -ne $targetObj) {
+            $distStatus = Test-ContentDistributed -Application $targetObj
+            if ($distStatus.IsFullyDistributed) {
+                Add-ValidationLine -Icon "[PASS]" -Message ("Content distributed: {0}/{1} DPs" -f $distStatus.NumberSuccess, $distStatus.Targeted) -Color $clrOkText
+            } else {
+                Add-ValidationLine -Icon "[FAIL]" -Message ("Content NOT fully distributed: {0}/{1} success, {2} errors" -f $distStatus.NumberSuccess, $distStatus.Targeted, $distStatus.NumberErrors) -Color $clrErrText
+                $allPassed = $false
+            }
+        }
+        [System.Windows.Forms.Application]::DoEvents()
     }
-    [System.Windows.Forms.Application]::DoEvents()
 
     # Check 3: Collection valid
     $col = Test-CollectionValid -CollectionName $txtCollName.Text.Trim()
@@ -1137,8 +1311,8 @@ $btnValidate.Add_Click({
     }
     [System.Windows.Forms.Application]::DoEvents()
 
-    # Check 5: Duplicate deployment
-    if ($null -ne $app -and $null -ne $col) {
+    # Check 5: Duplicate deployment (skip for SUG)
+    if (-not $isSUG -and $null -ne $targetObj -and $null -ne $col) {
         $dupe = Test-DuplicateDeployment -ApplicationName $txtAppName.Text.Trim() -CollectionName $txtCollName.Text.Trim()
         if ($null -eq $dupe) {
             Add-ValidationLine -Icon "[PASS]" -Message "No duplicate deployment exists" -Color $clrOkText
@@ -1146,16 +1320,19 @@ $btnValidate.Add_Click({
             Add-ValidationLine -Icon "[FAIL]" -Message "Duplicate deployment already exists for this app/collection" -Color $clrErrText
             $allPassed = $false
         }
+    } elseif ($isSUG) {
+        Add-ValidationLine -Icon "[SKIP]" -Message "Duplicate check not applicable for SUGs" -Color $clrText
     }
     [System.Windows.Forms.Application]::DoEvents()
 
     # Summary
-    if ($allPassed -and $null -ne $app -and $null -ne $col) {
-        $preview = Get-DeploymentPreview -Application $app -Collection $col
+    if ($allPassed -and $null -ne $targetObj -and $null -ne $col) {
+        $deployType = if ($isSUG) { 'SUG' } else { 'Application' }
+        $preview = Get-DeploymentPreview -TargetObject $targetObj -Collection $col -DeploymentType $deployType
         Add-ValidationLine -Icon "" -Message "" -Color $clrText
-        Add-ValidationLine -Icon "[INFO]" -Message ("Impact: {0} v{1} -> {2} ({3} devices)" -f $preview.ApplicationName, $preview.ApplicationVersion, $preview.CollectionName, $preview.MemberCount) -Color $clrAccent
+        Add-ValidationLine -Icon "[INFO]" -Message ("Impact: {0} {1} -> {2} ({3} devices)" -f $preview.ApplicationName, $preview.ApplicationVersion, $preview.CollectionName, $preview.MemberCount) -Color $clrAccent
         $btnDeploy.Enabled = $true
-        $script:ValidatedApp = $app
+        $script:ValidatedApp = $targetObj
         $script:ValidatedCol = $col
         Add-LogLine -TextBox $txtLog -Message "Validation PASSED - Deploy button enabled"
     } else {
@@ -1174,8 +1351,10 @@ $btnValidate.Add_Click({
 $btnDeploy.Add_Click({
     if ($null -eq $script:ValidatedApp -or $null -eq $script:ValidatedCol) { return }
 
+    $isSUG = ($cboDeployType.SelectedIndex -eq 1)
     $purpose = if ($radRequired.Checked) { 'Required' } else { 'Available' }
-    $preview = Get-DeploymentPreview -Application $script:ValidatedApp -Collection $script:ValidatedCol
+    $deployType = if ($isSUG) { 'SUG' } else { 'Application' }
+    $preview = Get-DeploymentPreview -TargetObject $script:ValidatedApp -Collection $script:ValidatedCol -DeploymentType $deployType
 
     # Map notification combobox to parameter value
     $notifMap = @('DisplayAll', 'DisplaySoftwareCenterOnly', 'HideAll')
@@ -1183,10 +1362,11 @@ $btnDeploy.Add_Click({
 
     # Confirmation dialog
     $deadlineStr = if ($radRequired.Checked) { "`nDeadline: $($dtpDeadline.Value.ToString('yyyy-MM-dd HH:mm'))" } else { '' }
-    $confirmMsg = ("Deploy {0} v{1} to {2} ({3} devices) as {4}?{5}" -f
+    $meteredStr = if ($chkMetered.Checked) { "`nMetered connection: Allowed" } else { '' }
+    $confirmMsg = ("Deploy {0} {1} to {2} ({3} devices) as {4}?{5}{6}" -f
         $preview.ApplicationName, $preview.ApplicationVersion,
         $preview.CollectionName, $preview.MemberCount,
-        $purpose, $deadlineStr)
+        $purpose, $deadlineStr, $meteredStr)
 
     $confirm = [System.Windows.Forms.MessageBox]::Show(
         $confirmMsg, "Confirm Deployment",
@@ -1196,24 +1376,42 @@ $btnDeploy.Add_Click({
     if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
 
     $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
-    Add-LogLine -TextBox $txtLog -Message "Executing deployment..."
+    Add-LogLine -TextBox $txtLog -Message ("Executing {0} deployment..." -f $deployType)
     [System.Windows.Forms.Application]::DoEvents()
 
-    $deployParams = @{
-        Application                 = $script:ValidatedApp
-        Collection                  = $script:ValidatedCol
-        DeployPurpose               = $purpose
-        AvailableDateTime           = $dtpAvailable.Value
-        UserNotification            = $notifValue
-        OverrideServiceWindow       = $chkOverrideMW.Checked
-        RebootOutsideServiceWindow  = $chkRebootOutside.Checked
-        Comment                     = $txtTicket.Text.Trim()
+    if ($isSUG) {
+        $deployParams = @{
+            SUG                    = $script:ValidatedApp
+            Collection             = $script:ValidatedCol
+            DeployPurpose          = $purpose
+            AvailableDateTime      = $dtpAvailable.Value
+            UserNotification       = $notifValue
+            SoftwareInstallation   = $chkOverrideMW.Checked
+            AllowRestart           = $chkRebootOutside.Checked
+            AllowUseMeteredNetwork = $chkMetered.Checked
+            Comment                = $txtTicket.Text.Trim()
+        }
+        if ($radRequired.Checked) {
+            $deployParams['DeadlineDateTime'] = $dtpDeadline.Value
+        }
+        $result = Invoke-SUGDeployment @deployParams
+    } else {
+        $deployParams = @{
+            Application                 = $script:ValidatedApp
+            Collection                  = $script:ValidatedCol
+            DeployPurpose               = $purpose
+            AvailableDateTime           = $dtpAvailable.Value
+            UserNotification            = $notifValue
+            OverrideServiceWindow       = $chkOverrideMW.Checked
+            RebootOutsideServiceWindow  = $chkRebootOutside.Checked
+            AllowMeteredConnection      = $chkMetered.Checked
+            Comment                     = $txtTicket.Text.Trim()
+        }
+        if ($radRequired.Checked) {
+            $deployParams['DeadlineDateTime'] = $dtpDeadline.Value
+        }
+        $result = Invoke-ApplicationDeployment @deployParams
     }
-    if ($radRequired.Checked) {
-        $deployParams['DeadlineDateTime'] = $dtpDeadline.Value
-    }
-
-    $result = Invoke-ApplicationDeployment @deployParams
 
     # Resolve deployment log path
     $logPath = if ($script:Prefs.DeploymentLogPath) {
@@ -1230,6 +1428,7 @@ $btnDeploy.Add_Click({
 
         Write-DeploymentLog -LogPath $logPath -Record @{
             ChangeTicket       = $txtTicket.Text.Trim()
+            DeploymentType     = $deployType
             ApplicationName    = $preview.ApplicationName
             ApplicationVersion = $preview.ApplicationVersion
             CollectionName     = $preview.CollectionName
@@ -1248,6 +1447,7 @@ $btnDeploy.Add_Click({
 
         Write-DeploymentLog -LogPath $logPath -Record @{
             ChangeTicket       = $txtTicket.Text.Trim()
+            DeploymentType     = $deployType
             ApplicationName    = $txtAppName.Text.Trim()
             ApplicationVersion = ''
             CollectionName     = $txtCollName.Text.Trim()

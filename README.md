@@ -1,15 +1,18 @@
 # Deployment Helper
 
-Safe, fast MECM application deployment with pre-execution validation, safety guardrails, and immutable audit logging.
+Safe, fast MECM application and software update group deployment with pre-execution validation, safety guardrails, and immutable audit logging.
 
 ![Deployment Helper](screenshot.png)
 
 ## Features
 
-- **Single-pane deployment workflow** - Enter change ticket, application, collection, and deploy
-- **5-check validation engine** - Application exists, content distributed, collection valid, collection safe (blocks built-in system collections), no duplicate deployment
+- **Single-pane deployment workflow** - Enter change ticket, application or SUG, collection, and deploy
+- **Application + SUG support** - Deploy applications or software update groups from the same interface
+- **5-check validation engine** - Application/SUG exists, content distributed, collection valid, collection safe (blocks built-in system collections), no duplicate deployment
 - **Safety guardrails** - All `SMS000*` built-in collections blocked, deploy button disabled until validation passes, confirmation dialog before execution
-- **Deployment templates** - Predefined configs (Workstation Pilot/Production, Server Pilot/Production) eliminate configuration mistakes
+- **Required SUG auto-config** - Required SUG deployments auto-set download fallback from default site boundary group DP
+- **Metered connection handling** - Auto-checked for Required deployments (app and SUG)
+- **Deployment templates** - Predefined and user-saved configs, Save Template button in GUI
 - **Immutable audit log** - JSONL format (one JSON object per line), append-only, records every deployment attempt (success and failure)
 - **Export** - CSV and HTML history reports
 - **Dark mode** - Full theme support with 16 color variables
@@ -45,7 +48,7 @@ Safe, fast MECM application deployment with pre-execution validation, safety gua
 deploymenthelper/
     start-deploymenthelper.ps1          Main GUI application
     Module/
-        DeploymentHelperCommon.psd1     Module manifest (17 functions)
+        DeploymentHelperCommon.psd1     Module manifest (20 functions)
         DeploymentHelperCommon.psm1     Core module
     Templates/
         WorkstationPilot.json           Deployment template
@@ -67,6 +70,7 @@ Templates are JSON files in the `Templates\` folder:
     "UserNotification": "DisplayAll",
     "OverrideServiceWindow": false,
     "RebootOutsideServiceWindow": false,
+    "AllowMeteredConnection": false,
     "DefaultDeadlineOffsetHours": 0
 }
 ```

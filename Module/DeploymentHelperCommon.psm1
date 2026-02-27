@@ -296,16 +296,52 @@ function Test-DuplicateDeployment {
 
 function Get-DeploymentPreview {
     param(
-        [Parameter(Mandatory)]$Application,
-        [Parameter(Mandatory)]$Collection
+        [Parameter(Mandatory)]$TargetObject,
+        [Parameter(Mandatory)]$Collection,
+        [string]$DeploymentType = 'Application'
     )
 
-    return @{
-        ApplicationName    = $Application.LocalizedDisplayName
-        ApplicationVersion = $Application.SoftwareVersion
-        CollectionName     = $Collection.Name
-        CollectionID       = $Collection.CollectionID
-        MemberCount        = $Collection.MemberCount
+    if ($DeploymentType -eq 'SUG') {
+        return @{
+            ApplicationName    = $TargetObject.LocalizedDisplayName
+            ApplicationVersion = "($($TargetObject.NumberOfUpdates) updates)"
+            CollectionName     = $Collection.Name
+            CollectionID       = $Collection.CollectionID
+            MemberCount        = $Collection.MemberCount
+        }
+    } else {
+        return @{
+            ApplicationName    = $TargetObject.LocalizedDisplayName
+            ApplicationVersion = $TargetObject.SoftwareVersion
+            CollectionName     = $Collection.Name
+            CollectionID       = $Collection.CollectionID
+            MemberCount        = $Collection.MemberCount
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# SUG Validation
+# ---------------------------------------------------------------------------
+
+function Test-SUGExists {
+    param([Parameter(Mandatory)][string]$SUGName)
+
+    try {
+        $sug = Get-CMSoftwareUpdateGroup -Name $SUGName -ErrorAction Stop
+        if ($null -eq $sug) {
+            Write-Log "Software Update Group not found: $SUGName" -Level WARN
+            return $null
+        }
+        Write-Log "SUG found: $SUGName ($($sug.NumberOfUpdates) updates, $($sug.NumberOfExpiredUpdates) expired)"
+        if ($sug.NumberOfUpdates -eq 0) {
+            Write-Log "SUG '$SUGName' contains 0 updates" -Level WARN
+        }
+        return $sug
+    }
+    catch {
+        Write-Log "Error querying SUG '$SUGName': $_" -Level ERROR
+        return $null
     }
 }
 
@@ -324,6 +360,7 @@ function Invoke-ApplicationDeployment {
         [string]$UserNotification = 'DisplayAll',
         [bool]$OverrideServiceWindow = $false,
         [bool]$RebootOutsideServiceWindow = $false,
+        [bool]$AllowMeteredConnection = $false,
         [string]$Comment = ''
     )
 
@@ -345,6 +382,9 @@ function Invoke-ApplicationDeployment {
     }
     if ($Comment) {
         $params['Comment'] = $Comment
+    }
+    if ($AllowMeteredConnection) {
+        $params['AllowMeteredConnection'] = $true
     }
 
     try {
@@ -369,6 +409,101 @@ function Invoke-ApplicationDeployment {
             Error        = $_.ToString()
         }
     }
+}
+
+function Invoke-SUGDeployment {
+    param(
+        [Parameter(Mandatory)]$SUG,
+        [Parameter(Mandatory)]$Collection,
+        [Parameter(Mandatory)][ValidateSet('Required','Available')][string]$DeployPurpose,
+        [Parameter(Mandatory)][datetime]$AvailableDateTime,
+        [datetime]$DeadlineDateTime,
+        [ValidateSet('DisplayAll','DisplaySoftwareCenterOnly','HideAll')]
+        [string]$UserNotification = 'DisplayAll',
+        [bool]$SoftwareInstallation = $false,
+        [bool]$AllowRestart = $false,
+        [bool]$AllowUseMeteredNetwork = $false,
+        [string]$Comment = ''
+    )
+
+    $params = @{
+        SoftwareUpdateGroupName = $SUG.LocalizedDisplayName
+        CollectionName          = $Collection.Name
+        DeploymentType          = $DeployPurpose
+        AvailableDateTime       = $AvailableDateTime
+        TimeBasedOn             = 'LocalTime'
+        UserNotification        = $UserNotification
+        SoftwareInstallation    = $SoftwareInstallation
+        AllowRestart            = $AllowRestart
+        ErrorAction             = 'Stop'
+    }
+
+    if ($DeployPurpose -eq 'Required' -and $DeadlineDateTime) {
+        $params['DeadlineDateTime'] = $DeadlineDateTime
+    }
+    if ($Comment) {
+        $params['DeploymentName'] = $Comment
+    }
+
+    # Required SUG: force download fallback settings
+    if ($DeployPurpose -eq 'Required') {
+        $params['ProtectedType']    = 'RemoteDistributionPoint'
+        $params['UnprotectedType']  = 'UnprotectedDistributionPoint'
+    }
+
+    if ($AllowUseMeteredNetwork) {
+        $params['UseBranchCache'] = $true
+        $params['AllowUseMeteredNetwork'] = $true
+    }
+
+    try {
+        Write-Log ("Executing SUG deployment: {0} ({1} updates) -> {2} ({3} devices) as {4}" -f
+            $SUG.LocalizedDisplayName, $SUG.NumberOfUpdates,
+            $Collection.Name, $Collection.MemberCount, $DeployPurpose)
+
+        $deployment = New-CMSoftwareUpdateDeployment @params
+
+        Write-Log "SUG deployment created successfully (ID: $($deployment.AssignmentID))"
+        return @{
+            Success      = $true
+            DeploymentID = $deployment.AssignmentID
+            Error        = $null
+        }
+    }
+    catch {
+        Write-Log "SUG deployment FAILED: $_" -Level ERROR
+        return @{
+            Success      = $false
+            DeploymentID = $null
+            Error        = $_.ToString()
+        }
+    }
+}
+
+function Save-DeploymentTemplate {
+    param(
+        [Parameter(Mandatory)][string]$TemplatePath,
+        [Parameter(Mandatory)][string]$TemplateName,
+        [Parameter(Mandatory)][hashtable]$Config
+    )
+
+    $parentDir = Split-Path -Path $TemplatePath -Parent
+    if ($parentDir -and -not (Test-Path -LiteralPath $parentDir)) {
+        New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+    }
+
+    $template = [ordered]@{
+        Name                        = $TemplateName
+        DeployPurpose               = $Config.DeployPurpose
+        UserNotification            = $Config.UserNotification
+        OverrideServiceWindow       = $Config.OverrideServiceWindow
+        RebootOutsideServiceWindow  = $Config.RebootOutsideServiceWindow
+        AllowMeteredConnection      = $Config.AllowMeteredConnection
+        DefaultDeadlineOffsetHours  = $Config.DefaultDeadlineOffsetHours
+    }
+
+    $template | ConvertTo-Json | Set-Content -LiteralPath $TemplatePath -Encoding UTF8
+    Write-Log "Saved deployment template '$TemplateName' to $TemplatePath"
 }
 
 # ---------------------------------------------------------------------------

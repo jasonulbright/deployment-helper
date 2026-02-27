@@ -2,6 +2,42 @@
 
 All notable changes to the Deployment Helper are documented in this file.
 
+## [1.1.0] - 2026-02-27
+
+### Added
+
+- **Software Update Group (SUG) deployment support**
+  - Deployment type selector (Application / Software Update Group) in form
+  - `Test-SUGExists` validation using `Get-CMSoftwareUpdateGroup`
+  - `Invoke-SUGDeployment` execution using `New-CMSoftwareUpdateDeployment`
+  - Required SUGs auto-set download fallback: allow from default site boundary group DP and unprotected DP
+  - Validate/deploy handlers dispatch between Application and SUG based on type selector
+  - SUG validation skips content distribution and duplicate deployment checks (not applicable)
+
+- **Metered connection checkbox**
+  - "Allow download past deadline (metered connections)" checkbox in deployment form
+  - Auto-checked when Required purpose is selected (both Application and SUG)
+  - Passed to `Invoke-ApplicationDeployment` (`-AllowMeteredConnection`) and `Invoke-SUGDeployment` (`-AllowUseMeteredNetwork`)
+
+- **Save Template from GUI**
+  - Save Template button alongside Validate and Deploy
+  - Prompts for template name, saves current form configuration as JSON
+  - Reloads template ComboBox after save
+  - `Save-DeploymentTemplate` module function
+
+- **Deployment log includes deployment type**
+  - JSONL records now include `DeploymentType` field (`Application` or `SUG`)
+
+### Changed
+
+- `Get-DeploymentPreview` accepts `$TargetObject` + `$DeploymentType` instead of `$Application` (supports both app and SUG objects)
+- Module manifest exports expanded from 17 to 20 functions
+
+### Fixed
+
+- Window height increased 100px (820 -> 920) to prevent form overlap
+- Reboot/MW checkboxes no longer overlap validate/deploy buttons (form panel height 340 -> 430, row positions adjusted)
+
 ## [1.0.0] - 2026-02-27
 
 ### Added

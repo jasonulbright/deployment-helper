@@ -24,15 +24,20 @@
         'Test-DuplicateDeployment'
         'Get-DeploymentPreview'
 
+        # SUG Validation
+        'Test-SUGExists'
+
         # Execution
         'Invoke-ApplicationDeployment'
+        'Invoke-SUGDeployment'
+
+        # Templates
+        'Get-DeploymentTemplates'
+        'Save-DeploymentTemplate'
 
         # Deployment Log
         'Write-DeploymentLog'
         'Get-DeploymentHistory'
-
-        # Templates
-        'Get-DeploymentTemplates'
 
         # Export
         'Export-DeploymentHistoryCsv'
