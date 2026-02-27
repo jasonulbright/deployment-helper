@@ -1,0 +1,8 @@
+{
+    "Name": "Server Production",
+    "DeployPurpose": "Required",
+    "UserNotification": "HideAll",
+    "OverrideServiceWindow": false,
+    "RebootOutsideServiceWindow": false,
+    "DefaultDeadlineOffsetHours": 168
+}

@@ -1,0 +1,8 @@
+{
+    "Name": "Workstation Production",
+    "DeployPurpose": "Required",
+    "UserNotification": "DisplayAll",
+    "OverrideServiceWindow": false,
+    "RebootOutsideServiceWindow": false,
+    "DefaultDeadlineOffsetHours": 168
+}

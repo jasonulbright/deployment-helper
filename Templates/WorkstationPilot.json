@@ -1,0 +1,8 @@
+{
+    "Name": "Workstation Pilot",
+    "DeployPurpose": "Available",
+    "UserNotification": "DisplayAll",
+    "OverrideServiceWindow": false,
+    "RebootOutsideServiceWindow": false,
+    "DefaultDeadlineOffsetHours": 0
+}

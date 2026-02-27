@@ -1,0 +1,8 @@
+{
+    "Name": "Server Pilot",
+    "DeployPurpose": "Available",
+    "UserNotification": "HideAll",
+    "OverrideServiceWindow": false,
+    "RebootOutsideServiceWindow": false,
+    "DefaultDeadlineOffsetHours": 0
+}
