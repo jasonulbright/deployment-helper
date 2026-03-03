@@ -356,6 +356,7 @@ function Invoke-ApplicationDeployment {
         [Parameter(Mandatory)][ValidateSet('Required','Available')][string]$DeployPurpose,
         [Parameter(Mandatory)][datetime]$AvailableDateTime,
         [datetime]$DeadlineDateTime,
+        [ValidateSet('LocalTime','UTC')][string]$TimeBasedOn = 'LocalTime',
         [ValidateSet('DisplayAll','DisplaySoftwareCenterOnly','HideAll')]
         [string]$UserNotification = 'DisplayAll',
         [bool]$OverrideServiceWindow = $false,
@@ -370,7 +371,7 @@ function Invoke-ApplicationDeployment {
         DeployPurpose               = $DeployPurpose
         DeployAction                = 'Install'
         AvailableDateTime           = $AvailableDateTime
-        TimeBaseOn                  = 'LocalTime'
+        TimeBaseOn                  = $TimeBasedOn
         UserNotification            = $UserNotification
         OverrideServiceWindow       = $OverrideServiceWindow
         RebootOutsideServiceWindow  = $RebootOutsideServiceWindow
@@ -418,24 +419,29 @@ function Invoke-SUGDeployment {
         [Parameter(Mandatory)][ValidateSet('Required','Available')][string]$DeployPurpose,
         [Parameter(Mandatory)][datetime]$AvailableDateTime,
         [datetime]$DeadlineDateTime,
+        [ValidateSet('LocalTime','UTC')][string]$TimeBasedOn = 'LocalTime',
         [ValidateSet('DisplayAll','DisplaySoftwareCenterOnly','HideAll')]
         [string]$UserNotification = 'DisplayAll',
         [bool]$SoftwareInstallation = $false,
         [bool]$AllowRestart = $false,
         [bool]$AllowUseMeteredNetwork = $false,
+        [bool]$AllowBoundaryFallback = $true,
+        [bool]$AllowWUMU = $false,
+        [bool]$RequirePostRebootFullScan = $true,
         [string]$Comment = ''
     )
 
     $params = @{
-        SoftwareUpdateGroupName = $SUG.LocalizedDisplayName
-        CollectionName          = $Collection.Name
-        DeploymentType          = $DeployPurpose
-        AvailableDateTime       = $AvailableDateTime
-        TimeBasedOn             = 'LocalTime'
-        UserNotification        = $UserNotification
-        SoftwareInstallation    = $SoftwareInstallation
-        AllowRestart            = $AllowRestart
-        ErrorAction             = 'Stop'
+        SoftwareUpdateGroupName    = $SUG.LocalizedDisplayName
+        CollectionName             = $Collection.Name
+        DeploymentType             = $DeployPurpose
+        AvailableDateTime          = $AvailableDateTime
+        TimeBasedOn                = $TimeBasedOn
+        UserNotification           = $UserNotification
+        SoftwareInstallation       = $SoftwareInstallation
+        AllowRestart               = $AllowRestart
+        RequirePostRebootFullScan  = $RequirePostRebootFullScan
+        ErrorAction                = 'Stop'
     }
 
     if ($DeployPurpose -eq 'Required' -and $DeadlineDateTime) {
@@ -445,15 +451,18 @@ function Invoke-SUGDeployment {
         $params['DeploymentName'] = $Comment
     }
 
-    # Required SUG: force download fallback settings
+    # Required SUG: download fallback settings
     if ($DeployPurpose -eq 'Required') {
-        $params['ProtectedType']    = 'RemoteDistributionPoint'
-        $params['UnprotectedType']  = 'UnprotectedDistributionPoint'
+        $params['ProtectedType']   = 'RemoteDistributionPoint'
+        $params['UnprotectedType'] = if ($AllowBoundaryFallback) { 'UnprotectedDistributionPoint' } else { 'NoInstall' }
     }
 
     if ($AllowUseMeteredNetwork) {
         $params['UseBranchCache'] = $true
         $params['AllowUseMeteredNetwork'] = $true
+    }
+    if ($AllowWUMU) {
+        $params['AllowWUMU'] = $true
     }
 
     try {
@@ -496,9 +505,13 @@ function Save-DeploymentTemplate {
         Name                        = $TemplateName
         DeployPurpose               = $Config.DeployPurpose
         UserNotification            = $Config.UserNotification
+        TimeBasedOn                 = if ($Config.TimeBasedOn) { $Config.TimeBasedOn } else { 'LocalTime' }
         OverrideServiceWindow       = $Config.OverrideServiceWindow
         RebootOutsideServiceWindow  = $Config.RebootOutsideServiceWindow
         AllowMeteredConnection      = $Config.AllowMeteredConnection
+        AllowBoundaryFallback       = if ($null -ne $Config.AllowBoundaryFallback) { $Config.AllowBoundaryFallback } else { $true }
+        AllowMicrosoftUpdate        = if ($null -ne $Config.AllowMicrosoftUpdate) { $Config.AllowMicrosoftUpdate } else { $false }
+        RequirePostRebootFullScan   = if ($null -ne $Config.RequirePostRebootFullScan) { $Config.RequirePostRebootFullScan } else { $true }
         DefaultDeadlineOffsetHours  = $Config.DefaultDeadlineOffsetHours
     }
 
