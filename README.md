@@ -10,7 +10,8 @@ Safe, fast MECM application and software update group deployment with pre-execut
 - **Application + SUG support** - Deploy applications or software update groups from the same interface
 - **5-check validation engine** - Application/SUG exists, content distributed, collection valid, collection safe (blocks built-in system collections), no duplicate deployment
 - **Safety guardrails** - All `SMS000*` built-in collections blocked, deploy button disabled until validation passes, confirmation dialog before execution
-- **Required SUG auto-config** - Required SUG deployments auto-set download fallback from default site boundary group DP
+- **Time basis** - Choose UTC or Client Local Time for Available/Deadline scheduling (both App and SUG)
+- **SUG download settings** - Allow download from default site boundary group, Microsoft Update, and post-reboot full scan (enabled by default)
 - **Metered connection handling** - Auto-checked for Required deployments (app and SUG)
 - **Deployment templates** - Predefined and user-saved configs, Save Template button in GUI
 - **Immutable audit log** - JSONL format (one JSON object per line), append-only, records every deployment attempt (success and failure)
@@ -68,12 +69,18 @@ Templates are JSON files in the `Templates\` folder:
     "Name": "Workstation Pilot",
     "DeployPurpose": "Available",
     "UserNotification": "DisplayAll",
+    "TimeBasedOn": "LocalTime",
     "OverrideServiceWindow": false,
     "RebootOutsideServiceWindow": false,
     "AllowMeteredConnection": false,
+    "AllowBoundaryFallback": true,
+    "AllowMicrosoftUpdate": false,
+    "RequirePostRebootFullScan": true,
     "DefaultDeadlineOffsetHours": 0
 }
 ```
+
+New fields (`TimeBasedOn`, `AllowBoundaryFallback`, `AllowMicrosoftUpdate`, `RequirePostRebootFullScan`) are optional for backwards compatibility with older templates.
 
 ## License
 

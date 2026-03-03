@@ -2,6 +2,25 @@
 
 All notable changes to the Deployment Helper are documented in this file.
 
+## [1.2.0] - 2026-03-03
+
+### Added
+
+- **Time basis selector** -- UTC or Client Local Time for Available/Deadline scheduling (applies to both Application and SUG deployments)
+- **Allow download from default site boundary group** -- Checkbox for SUG deployments, controls `UnprotectedType` parameter (default: checked)
+- **Allow download from Microsoft Update** -- Checkbox for SUG deployments, passes `-AllowWUMU` (default: unchecked)
+- **Require post-reboot full scan** -- Checkbox for SUG deployments, passes `-RequirePostRebootFullScan` (default: checked)
+- SUG-specific controls auto-enable/disable based on deployment type selector
+- Template schema extended with `TimeBasedOn`, `AllowBoundaryFallback`, `AllowMicrosoftUpdate`, `RequirePostRebootFullScan` (backwards compatible)
+
+### Changed
+
+- `Invoke-SUGDeployment` accepts new parameters: `-TimeBasedOn`, `-AllowBoundaryFallback`, `-AllowWUMU`, `-RequirePostRebootFullScan`
+- `Invoke-ApplicationDeployment` accepts new parameter: `-TimeBasedOn`
+- `Save-DeploymentTemplate` persists all new fields
+- Confirmation dialog shows time basis (UTC) when selected
+- Form panel height increased from 430 to 530 to accommodate new controls
+
 ## [1.1.0] - 2026-02-27
 
 ### Added
