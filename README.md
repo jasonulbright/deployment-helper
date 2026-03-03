@@ -77,4 +77,8 @@ Templates are JSON files in the `Templates\` folder:
 
 ## License
 
-[GPL-3.0](LICENSE)
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
+
+## Author
+
+Jason Ulbright
