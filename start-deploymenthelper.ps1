@@ -7,7 +7,7 @@
     and immutable deployment audit logging.
 
     Features:
-      - Enter change ticket, application, collection
+      - Enter application or SUG, collection
       - 5-check validation engine (app exists, content distributed, collection valid,
         collection safe, no duplicate deployment)
       - Deployment templates for consistent configurations
@@ -735,42 +735,25 @@ $form.Controls.Add($pnlSep1)
 
 $pnlForm = New-Object System.Windows.Forms.Panel
 $pnlForm.Dock = [System.Windows.Forms.DockStyle]::Top
-$pnlForm.Height = 530
+$pnlForm.Height = 498
 $pnlForm.BackColor = $clrPanelBg
 $form.Controls.Add($pnlForm)
 
 # Load templates
 $script:Templates = Get-DeploymentTemplates -TemplatePath (Join-Path $PSScriptRoot "Templates")
 
-# Row 1: Change Ticket #
-$lblTicket = New-Object System.Windows.Forms.Label
-$lblTicket.Text = "Change Ticket #:"
-$lblTicket.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-$lblTicket.ForeColor = $clrText
-$lblTicket.Location = New-Object System.Drawing.Point(14, 14)
-$lblTicket.AutoSize = $true
-$pnlForm.Controls.Add($lblTicket)
-
-$txtTicket = New-Object System.Windows.Forms.TextBox
-$txtTicket.SetBounds(160, 11, 200, 24)
-$txtTicket.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-$txtTicket.BackColor = $clrDetailBg
-$txtTicket.ForeColor = $clrText
-$txtTicket.BorderStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms.BorderStyle]::None } else { [System.Windows.Forms.BorderStyle]::FixedSingle }
-$pnlForm.Controls.Add($txtTicket)
-
-# Row 2: Deployment Type
+# Row 1: Deployment Type
 $lblDeployType = New-Object System.Windows.Forms.Label
 $lblDeployType.Text = "Type:"
 $lblDeployType.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblDeployType.ForeColor = $clrText
-$lblDeployType.Location = New-Object System.Drawing.Point(14, 46)
+$lblDeployType.Location = New-Object System.Drawing.Point(14, 14)
 $lblDeployType.AutoSize = $true
 $pnlForm.Controls.Add($lblDeployType)
 
 $cboDeployType = New-Object System.Windows.Forms.ComboBox
 $cboDeployType.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$cboDeployType.SetBounds(160, 43, 220, 24)
+$cboDeployType.SetBounds(160, 11, 220, 24)
 $cboDeployType.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $cboDeployType.BackColor = $clrDetailBg
 $cboDeployType.ForeColor = $clrText
@@ -784,12 +767,12 @@ $lblAppName = New-Object System.Windows.Forms.Label
 $lblAppName.Text = "Application:"
 $lblAppName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblAppName.ForeColor = $clrText
-$lblAppName.Location = New-Object System.Drawing.Point(14, 78)
+$lblAppName.Location = New-Object System.Drawing.Point(14, 46)
 $lblAppName.AutoSize = $true
 $pnlForm.Controls.Add($lblAppName)
 
 $txtAppName = New-Object System.Windows.Forms.TextBox
-$txtAppName.SetBounds(160, 75, 300, 24)
+$txtAppName.SetBounds(160, 43, 300, 24)
 $txtAppName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $txtAppName.BackColor = $clrDetailBg
 $txtAppName.ForeColor = $clrText
@@ -801,12 +784,12 @@ $lblCollName = New-Object System.Windows.Forms.Label
 $lblCollName.Text = "Collection:"
 $lblCollName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblCollName.ForeColor = $clrText
-$lblCollName.Location = New-Object System.Drawing.Point(14, 110)
+$lblCollName.Location = New-Object System.Drawing.Point(14, 78)
 $lblCollName.AutoSize = $true
 $pnlForm.Controls.Add($lblCollName)
 
 $txtCollName = New-Object System.Windows.Forms.TextBox
-$txtCollName.SetBounds(160, 107, 300, 24)
+$txtCollName.SetBounds(160, 75, 300, 24)
 $txtCollName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $txtCollName.BackColor = $clrDetailBg
 $txtCollName.ForeColor = $clrText
@@ -818,13 +801,13 @@ $lblTemplate = New-Object System.Windows.Forms.Label
 $lblTemplate.Text = "Template:"
 $lblTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblTemplate.ForeColor = $clrText
-$lblTemplate.Location = New-Object System.Drawing.Point(14, 142)
+$lblTemplate.Location = New-Object System.Drawing.Point(14, 110)
 $lblTemplate.AutoSize = $true
 $pnlForm.Controls.Add($lblTemplate)
 
 $cboTemplate = New-Object System.Windows.Forms.ComboBox
 $cboTemplate.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$cboTemplate.SetBounds(160, 139, 220, 24)
+$cboTemplate.SetBounds(160, 107, 220, 24)
 $cboTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $cboTemplate.BackColor = $clrDetailBg
 $cboTemplate.ForeColor = $clrText
@@ -839,7 +822,7 @@ $lblPurpose = New-Object System.Windows.Forms.Label
 $lblPurpose.Text = "Purpose:"
 $lblPurpose.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblPurpose.ForeColor = $clrText
-$lblPurpose.Location = New-Object System.Drawing.Point(14, 174)
+$lblPurpose.Location = New-Object System.Drawing.Point(14, 142)
 $lblPurpose.AutoSize = $true
 $pnlForm.Controls.Add($lblPurpose)
 
@@ -848,7 +831,7 @@ $radAvailable.Text = "Available"
 $radAvailable.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $radAvailable.ForeColor = $clrText
 $radAvailable.BackColor = $clrPanelBg
-$radAvailable.Location = New-Object System.Drawing.Point(160, 172)
+$radAvailable.Location = New-Object System.Drawing.Point(160, 140)
 $radAvailable.AutoSize = $true
 $radAvailable.Checked = $true
 if ($script:Prefs.DarkMode) { $radAvailable.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $radAvailable.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
@@ -859,7 +842,7 @@ $radRequired.Text = "Required"
 $radRequired.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $radRequired.ForeColor = $clrText
 $radRequired.BackColor = $clrPanelBg
-$radRequired.Location = New-Object System.Drawing.Point(270, 172)
+$radRequired.Location = New-Object System.Drawing.Point(270, 140)
 $radRequired.AutoSize = $true
 if ($script:Prefs.DarkMode) { $radRequired.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $radRequired.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($radRequired)
@@ -869,12 +852,12 @@ $lblAvailable = New-Object System.Windows.Forms.Label
 $lblAvailable.Text = "Available:"
 $lblAvailable.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblAvailable.ForeColor = $clrText
-$lblAvailable.Location = New-Object System.Drawing.Point(14, 206)
+$lblAvailable.Location = New-Object System.Drawing.Point(14, 174)
 $lblAvailable.AutoSize = $true
 $pnlForm.Controls.Add($lblAvailable)
 
 $dtpAvailable = New-Object System.Windows.Forms.DateTimePicker
-$dtpAvailable.SetBounds(160, 203, 200, 24)
+$dtpAvailable.SetBounds(160, 171, 200, 24)
 $dtpAvailable.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $dtpAvailable.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
 $dtpAvailable.CustomFormat = "yyyy-MM-dd HH:mm"
@@ -886,12 +869,12 @@ $lblDeadline = New-Object System.Windows.Forms.Label
 $lblDeadline.Text = "Deadline:"
 $lblDeadline.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblDeadline.ForeColor = $clrText
-$lblDeadline.Location = New-Object System.Drawing.Point(14, 238)
+$lblDeadline.Location = New-Object System.Drawing.Point(14, 206)
 $lblDeadline.AutoSize = $true
 $pnlForm.Controls.Add($lblDeadline)
 
 $dtpDeadline = New-Object System.Windows.Forms.DateTimePicker
-$dtpDeadline.SetBounds(160, 235, 200, 24)
+$dtpDeadline.SetBounds(160, 203, 200, 24)
 $dtpDeadline.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $dtpDeadline.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
 $dtpDeadline.CustomFormat = "yyyy-MM-dd HH:mm"
@@ -904,13 +887,13 @@ $lblNotification = New-Object System.Windows.Forms.Label
 $lblNotification.Text = "Notification:"
 $lblNotification.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblNotification.ForeColor = $clrText
-$lblNotification.Location = New-Object System.Drawing.Point(14, 270)
+$lblNotification.Location = New-Object System.Drawing.Point(14, 238)
 $lblNotification.AutoSize = $true
 $pnlForm.Controls.Add($lblNotification)
 
 $cboNotification = New-Object System.Windows.Forms.ComboBox
 $cboNotification.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$cboNotification.SetBounds(160, 267, 260, 24)
+$cboNotification.SetBounds(160, 235, 260, 24)
 $cboNotification.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $cboNotification.BackColor = $clrDetailBg
 $cboNotification.ForeColor = $clrText
@@ -924,13 +907,13 @@ $lblTimeBasis = New-Object System.Windows.Forms.Label
 $lblTimeBasis.Text = "Time basis:"
 $lblTimeBasis.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblTimeBasis.ForeColor = $clrText
-$lblTimeBasis.Location = New-Object System.Drawing.Point(14, 298)
+$lblTimeBasis.Location = New-Object System.Drawing.Point(14, 266)
 $lblTimeBasis.AutoSize = $true
 $pnlForm.Controls.Add($lblTimeBasis)
 
 $cboTimeBasis = New-Object System.Windows.Forms.ComboBox
 $cboTimeBasis.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$cboTimeBasis.SetBounds(160, 295, 180, 24)
+$cboTimeBasis.SetBounds(160, 263, 180, 24)
 $cboTimeBasis.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $cboTimeBasis.BackColor = $clrDetailBg
 $cboTimeBasis.ForeColor = $clrText
@@ -945,7 +928,7 @@ $chkOverrideMW.Text = "Allow outside maintenance window"
 $chkOverrideMW.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkOverrideMW.ForeColor = $clrText
 $chkOverrideMW.BackColor = $clrPanelBg
-$chkOverrideMW.Location = New-Object System.Drawing.Point(160, 326)
+$chkOverrideMW.Location = New-Object System.Drawing.Point(160, 294)
 $chkOverrideMW.AutoSize = $true
 if ($script:Prefs.DarkMode) { $chkOverrideMW.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkOverrideMW.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkOverrideMW)
@@ -955,7 +938,7 @@ $chkRebootOutside.Text = "Reboot outside maintenance window"
 $chkRebootOutside.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkRebootOutside.ForeColor = $clrText
 $chkRebootOutside.BackColor = $clrPanelBg
-$chkRebootOutside.Location = New-Object System.Drawing.Point(160, 348)
+$chkRebootOutside.Location = New-Object System.Drawing.Point(160, 316)
 $chkRebootOutside.AutoSize = $true
 if ($script:Prefs.DarkMode) { $chkRebootOutside.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkRebootOutside.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkRebootOutside)
@@ -966,7 +949,7 @@ $chkMetered.Text = "Allow download past deadline (metered connections)"
 $chkMetered.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkMetered.ForeColor = $clrText
 $chkMetered.BackColor = $clrPanelBg
-$chkMetered.Location = New-Object System.Drawing.Point(160, 370)
+$chkMetered.Location = New-Object System.Drawing.Point(160, 338)
 $chkMetered.AutoSize = $true
 if ($script:Prefs.DarkMode) { $chkMetered.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkMetered.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkMetered)
@@ -977,7 +960,7 @@ $chkBoundaryFallback.Text = "Allow download from default site boundary group"
 $chkBoundaryFallback.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkBoundaryFallback.ForeColor = $clrText
 $chkBoundaryFallback.BackColor = $clrPanelBg
-$chkBoundaryFallback.Location = New-Object System.Drawing.Point(160, 392)
+$chkBoundaryFallback.Location = New-Object System.Drawing.Point(160, 360)
 $chkBoundaryFallback.AutoSize = $true
 $chkBoundaryFallback.Checked = $true
 $chkBoundaryFallback.Enabled = $false
@@ -989,7 +972,7 @@ $chkMicrosoftUpdate.Text = "Allow download from Microsoft Update"
 $chkMicrosoftUpdate.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkMicrosoftUpdate.ForeColor = $clrText
 $chkMicrosoftUpdate.BackColor = $clrPanelBg
-$chkMicrosoftUpdate.Location = New-Object System.Drawing.Point(160, 414)
+$chkMicrosoftUpdate.Location = New-Object System.Drawing.Point(160, 382)
 $chkMicrosoftUpdate.AutoSize = $true
 $chkMicrosoftUpdate.Enabled = $false
 if ($script:Prefs.DarkMode) { $chkMicrosoftUpdate.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkMicrosoftUpdate.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
@@ -1000,7 +983,7 @@ $chkPostRebootScan.Text = "Require post-reboot full scan"
 $chkPostRebootScan.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkPostRebootScan.ForeColor = $clrText
 $chkPostRebootScan.BackColor = $clrPanelBg
-$chkPostRebootScan.Location = New-Object System.Drawing.Point(160, 436)
+$chkPostRebootScan.Location = New-Object System.Drawing.Point(160, 404)
 $chkPostRebootScan.AutoSize = $true
 $chkPostRebootScan.Checked = $true
 $chkPostRebootScan.Enabled = $false
@@ -1012,7 +995,7 @@ $btnValidate = New-Object System.Windows.Forms.Button
 $btnValidate.Text = "Validate"
 $btnValidate.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnValidate.Size = New-Object System.Drawing.Size(120, 32)
-$btnValidate.Location = New-Object System.Drawing.Point(160, 472)
+$btnValidate.Location = New-Object System.Drawing.Point(160, 440)
 Set-ModernButtonStyle -Button $btnValidate -BackColor $clrAccent
 $pnlForm.Controls.Add($btnValidate)
 
@@ -1020,7 +1003,7 @@ $btnDeploy = New-Object System.Windows.Forms.Button
 $btnDeploy.Text = "Deploy"
 $btnDeploy.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnDeploy.Size = New-Object System.Drawing.Size(120, 32)
-$btnDeploy.Location = New-Object System.Drawing.Point(290, 472)
+$btnDeploy.Location = New-Object System.Drawing.Point(290, 440)
 $btnDeploy.Enabled = $false
 Set-ModernButtonStyle -Button $btnDeploy -BackColor ([System.Drawing.Color]::FromArgb(34, 139, 34))
 $pnlForm.Controls.Add($btnDeploy)
@@ -1029,7 +1012,7 @@ $btnSaveTemplate = New-Object System.Windows.Forms.Button
 $btnSaveTemplate.Text = "Save Template"
 $btnSaveTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $btnSaveTemplate.Size = New-Object System.Drawing.Size(130, 32)
-$btnSaveTemplate.Location = New-Object System.Drawing.Point(420, 472)
+$btnSaveTemplate.Location = New-Object System.Drawing.Point(420, 440)
 $btnSaveTemplate.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnSaveTemplate.FlatAppearance.BorderColor = $clrSepLine
 $btnSaveTemplate.ForeColor = $clrText
@@ -1466,7 +1449,6 @@ $btnDeploy.Add_Click({
             AllowBoundaryFallback     = $chkBoundaryFallback.Checked
             AllowWUMU                 = $chkMicrosoftUpdate.Checked
             RequirePostRebootFullScan = $chkPostRebootScan.Checked
-            Comment                   = $txtTicket.Text.Trim()
         }
         if ($radRequired.Checked) {
             $deployParams['DeadlineDateTime'] = $dtpDeadline.Value
@@ -1483,7 +1465,6 @@ $btnDeploy.Add_Click({
             OverrideServiceWindow       = $chkOverrideMW.Checked
             RebootOutsideServiceWindow  = $chkRebootOutside.Checked
             AllowMeteredConnection      = $chkMetered.Checked
-            Comment                     = $txtTicket.Text.Trim()
         }
         if ($radRequired.Checked) {
             $deployParams['DeadlineDateTime'] = $dtpDeadline.Value
@@ -1505,7 +1486,6 @@ $btnDeploy.Add_Click({
         $statusLabel.Text = ("Last deployment: {0} -> {1} (ID: {2})" -f $preview.ApplicationName, $preview.CollectionName, $result.DeploymentID)
 
         Write-DeploymentLog -LogPath $logPath -Record @{
-            ChangeTicket       = $txtTicket.Text.Trim()
             DeploymentType     = $deployType
             ApplicationName    = $preview.ApplicationName
             ApplicationVersion = $preview.ApplicationVersion
@@ -1516,7 +1496,6 @@ $btnDeploy.Add_Click({
             DeadlineDateTime   = if ($radRequired.Checked) { $dtpDeadline.Value.ToString('yyyy-MM-ddTHH:mm:ss') } else { '' }
             DeploymentID       = $result.DeploymentID
             Result             = 'Success'
-            Comment            = $txtTicket.Text.Trim()
         }
     } else {
         Add-ValidationLine -Icon "" -Message "" -Color $clrText
@@ -1524,7 +1503,6 @@ $btnDeploy.Add_Click({
         Add-LogLine -TextBox $txtLog -Message ("Deployment FAILED: {0}" -f $result.Error)
 
         Write-DeploymentLog -LogPath $logPath -Record @{
-            ChangeTicket       = $txtTicket.Text.Trim()
             DeploymentType     = $deployType
             ApplicationName    = $txtAppName.Text.Trim()
             ApplicationVersion = ''
@@ -1535,7 +1513,6 @@ $btnDeploy.Add_Click({
             DeadlineDateTime   = ''
             DeploymentID       = ''
             Result             = "Failed: $($result.Error)"
-            Comment            = $txtTicket.Text.Trim()
         }
     }
 

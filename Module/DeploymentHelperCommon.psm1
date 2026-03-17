@@ -361,8 +361,7 @@ function Invoke-ApplicationDeployment {
         [string]$UserNotification = 'DisplayAll',
         [bool]$OverrideServiceWindow = $false,
         [bool]$RebootOutsideServiceWindow = $false,
-        [bool]$AllowMeteredConnection = $false,
-        [string]$Comment = ''
+        [bool]$AllowMeteredConnection = $false
     )
 
     $params = @{
@@ -380,9 +379,6 @@ function Invoke-ApplicationDeployment {
 
     if ($DeployPurpose -eq 'Required' -and $DeadlineDateTime) {
         $params['DeadlineDateTime'] = $DeadlineDateTime
-    }
-    if ($Comment) {
-        $params['Comment'] = $Comment
     }
     if ($AllowMeteredConnection) {
         $params['AllowMeteredConnection'] = $true
@@ -427,8 +423,7 @@ function Invoke-SUGDeployment {
         [bool]$AllowUseMeteredNetwork = $false,
         [bool]$AllowBoundaryFallback = $true,
         [bool]$AllowWUMU = $false,
-        [bool]$RequirePostRebootFullScan = $true,
-        [string]$Comment = ''
+        [bool]$RequirePostRebootFullScan = $true
     )
 
     $params = @{
@@ -446,9 +441,6 @@ function Invoke-SUGDeployment {
 
     if ($DeployPurpose -eq 'Required' -and $DeadlineDateTime) {
         $params['DeadlineDateTime'] = $DeadlineDateTime
-    }
-    if ($Comment) {
-        $params['DeploymentName'] = $Comment
     }
 
     # Required SUG: download fallback settings
@@ -537,7 +529,6 @@ function Write-DeploymentLog {
     $entry = [ordered]@{
         Timestamp          = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
         User               = "$env:USERDOMAIN\$env:USERNAME"
-        ChangeTicket       = $Record.ChangeTicket
         ApplicationName    = $Record.ApplicationName
         ApplicationVersion = $Record.ApplicationVersion
         CollectionName     = $Record.CollectionName
@@ -548,7 +539,6 @@ function Write-DeploymentLog {
         DeadlineDateTime   = $Record.DeadlineDateTime
         DeploymentID       = $Record.DeploymentID
         Result             = $Record.Result
-        Comment            = $Record.Comment
     }
 
     $json = $entry | ConvertTo-Json -Compress
@@ -654,7 +644,7 @@ function Export-DeploymentHistoryHtml {
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     $headerHtml = "<h1>Deployment History Report</h1><div class='subtitle'>Generated: $timestamp</div>"
 
-    $columns = @('Timestamp','User','ChangeTicket','ApplicationName','ApplicationVersion','CollectionName','MemberCount','DeployPurpose','DeadlineDateTime','DeploymentID','Result')
+    $columns = @('Timestamp','User','ApplicationName','ApplicationVersion','CollectionName','MemberCount','DeployPurpose','DeadlineDateTime','DeploymentID','Result')
     $thRow = ($columns | ForEach-Object { "<th>$_</th>" }) -join ""
 
     $bodyRows = foreach ($rec in $Records) {
