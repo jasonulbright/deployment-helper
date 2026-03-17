@@ -6,7 +6,7 @@ Safe, fast MECM application and software update group deployment with pre-execut
 
 ## Features
 
-- **Single-pane deployment workflow** - Enter change ticket, application or SUG, collection, and deploy
+- **Single-pane deployment workflow** - Enter application or SUG, collection, and deploy
 - **Application + SUG support** - Deploy applications or software update groups from the same interface
 - **5-check validation engine** - Application/SUG exists, content distributed, collection valid, collection safe (blocks built-in system collections), no duplicate deployment
 - **Safety guardrails** - All `SMS000*` built-in collections blocked, deploy button disabled until validation passes, confirmation dialog before execution
@@ -30,7 +30,7 @@ Safe, fast MECM application and software update group deployment with pre-execut
 1. Launch: `powershell -ExecutionPolicy Bypass -File start-deploymenthelper.ps1`
 2. File > Preferences: Set Site Code and SMS Provider
 3. Click **Connect** to establish CM connection
-4. Enter change ticket number, application name, and collection name
+4. Enter application name and collection name
 5. Click **Validate** to run the 5-check validation engine
 6. If all checks pass, click **Deploy**
 

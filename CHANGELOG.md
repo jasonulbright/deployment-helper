@@ -2,6 +2,16 @@
 
 All notable changes to the Deployment Helper are documented in this file.
 
+## [1.2.2] - 2026-03-17
+
+### Removed
+- Change Ticket # field from GUI form (was never functional in MECM deployments)
+- `$Comment` parameter from `Invoke-ApplicationDeployment` (New-CMApplicationDeployment has no -Comment parameter)
+- `$Comment` parameter from `Invoke-SUGDeployment` (was incorrectly mapped to -DeploymentName)
+- `ChangeTicket` and `Comment` fields from JSONL deployment log records and HTML export columns
+
+---
+
 ## [1.2.1] - 2026-03-04
 
 ### Fixed
@@ -71,7 +81,7 @@ All notable changes to the Deployment Helper are documented in this file.
 - **GUI application** (`start-deploymenthelper.ps1`) with WinForms interface
   - Header panel with title and subtitle
   - Connection bar with site code, SMS provider, status, and Connect button
-  - 10-row deployment form: change ticket, application, collection, template, purpose, available date, deadline, notification, maintenance window overrides, validate/deploy buttons
+  - 9-row deployment form: application, collection, template, purpose, available date, deadline, notification, maintenance window overrides, validate/deploy buttons
   - Validation results panel with colored `[PASS]`/`[FAIL]`/`[INFO]` output
   - Live log console with timestamped progress messages
   - Status bar with connection and deployment status
@@ -95,7 +105,7 @@ All notable changes to the Deployment Helper are documented in this file.
 
 - **Immutable deployment audit log** (JSONL format)
   - One JSON object per line, append-only
-  - Records: timestamp, user, change ticket, app name/version, collection, member count, purpose, deadline, deployment ID, result
+  - Records: timestamp, user, app name/version, collection, member count, purpose, deadline, deployment ID, result
   - Both success and failure outcomes logged
   - Configurable log path via Preferences (default: local `Logs\deployment-log.jsonl`)
 
