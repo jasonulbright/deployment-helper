@@ -3,5 +3,5 @@
   "Status": "active",
   "Category": "MECM",
   "ValidationSchedule": "monthly",
-  "Notes": "Application and SUG deployment tool. Stable."
+  "Notes": "Application and SUG deployment tool. Stable. Pending: C# + Fluent UI conversion."
 }
