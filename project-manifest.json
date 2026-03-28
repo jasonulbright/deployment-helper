@@ -1,0 +1,7 @@
+{
+  "ProjectType": "mecm-tool",
+  "Status": "active",
+  "Category": "MECM",
+  "ValidationSchedule": "monthly",
+  "Notes": "Application and SUG deployment tool. Stable."
+}
