@@ -88,6 +88,158 @@ function Enable-DoubleBuffer {
     if ($prop) { $prop.SetValue($Control, $true, $null) | Out-Null }
 }
 
+function Show-SearchDialog {
+    param(
+        [string]$Title = "Search",
+        [string]$SearchLabel = "Search:",
+        [string[]]$ColumnNames,
+        [string]$NameColumn,
+        [scriptblock]$SearchAction
+    )
+
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = $Title
+    $dlg.Size = New-Object System.Drawing.Size(600, 450)
+    $dlg.MinimumSize = $dlg.Size
+    $dlg.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterParent
+    $dlg.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
+    $dlg.BackColor = if ($script:Prefs.DarkMode) { [System.Drawing.Color]::FromArgb(30, 30, 30) } else { [System.Drawing.Color]::FromArgb(245, 246, 248) }
+    $dlg.ForeColor = if ($script:Prefs.DarkMode) { [System.Drawing.Color]::FromArgb(220, 220, 220) } else { [System.Drawing.Color]::Black }
+
+    $pnlTop = New-Object System.Windows.Forms.Panel
+    $pnlTop.Dock = [System.Windows.Forms.DockStyle]::Top
+    $pnlTop.Height = 40
+    $pnlTop.Padding = New-Object System.Windows.Forms.Padding(8, 8, 8, 4)
+    $dlg.Controls.Add($pnlTop)
+
+    $txtSearch = New-Object System.Windows.Forms.TextBox
+    $txtSearch.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $txtSearch.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    $txtSearch.BackColor = if ($script:Prefs.DarkMode) { [System.Drawing.Color]::FromArgb(45, 45, 45) } else { [System.Drawing.Color]::FromArgb(250, 250, 250) }
+    $txtSearch.ForeColor = $dlg.ForeColor
+    $txtSearch.BorderStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms.BorderStyle]::None } else { [System.Windows.Forms.BorderStyle]::FixedSingle }
+    $pnlTop.Controls.Add($txtSearch)
+
+    $btnSearch = New-Object System.Windows.Forms.Button
+    $btnSearch.Text = "Search"
+    $btnSearch.Dock = [System.Windows.Forms.DockStyle]::Right
+    $btnSearch.Width = 80
+    $btnSearch.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $btnSearch.FlatAppearance.BorderSize = 0
+    $btnSearch.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
+    $btnSearch.ForeColor = [System.Drawing.Color]::White
+    $btnSearch.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $pnlTop.Controls.Add($btnSearch)
+
+    $lblHint = New-Object System.Windows.Forms.Label
+    $lblHint.Dock = [System.Windows.Forms.DockStyle]::Left
+    $lblHint.Text = $SearchLabel
+    $lblHint.Width = 60
+    $lblHint.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+    $pnlTop.Controls.Add($lblHint)
+
+    $dgv = New-Object System.Windows.Forms.DataGridView
+    $dgv.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $dgv.ReadOnly = $true
+    $dgv.AllowUserToAddRows = $false
+    $dgv.AllowUserToDeleteRows = $false
+    $dgv.SelectionMode = [System.Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
+    $dgv.MultiSelect = $false
+    $dgv.RowHeadersVisible = $false
+    $dgv.AutoSizeColumnsMode = [System.Windows.Forms.DataGridViewAutoSizeColumnsMode]::Fill
+    $dgv.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $dgv.BackgroundColor = if ($script:Prefs.DarkMode) { [System.Drawing.Color]::FromArgb(40, 40, 40) } else { [System.Drawing.Color]::White }
+    $dgv.DefaultCellStyle.BackColor = $dgv.BackgroundColor
+    $dgv.DefaultCellStyle.ForeColor = $dlg.ForeColor
+    $dgv.DefaultCellStyle.SelectionBackColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
+    $dgv.DefaultCellStyle.SelectionForeColor = [System.Drawing.Color]::White
+    $dgv.AlternatingRowsDefaultCellStyle.BackColor = if ($script:Prefs.DarkMode) { [System.Drawing.Color]::FromArgb(48, 48, 48) } else { [System.Drawing.Color]::FromArgb(248, 250, 252) }
+    $dgv.ColumnHeadersDefaultCellStyle.BackColor = if ($script:Prefs.DarkMode) { [System.Drawing.Color]::FromArgb(50, 50, 50) } else { [System.Drawing.Color]::FromArgb(240, 240, 240) }
+    $dgv.ColumnHeadersDefaultCellStyle.ForeColor = $dlg.ForeColor
+    $dgv.EnableHeadersVisualStyles = $false
+    $dgv.GridColor = if ($script:Prefs.DarkMode) { [System.Drawing.Color]::FromArgb(60, 60, 60) } else { [System.Drawing.Color]::FromArgb(230, 230, 230) }
+    $dgv.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+    $dlg.Controls.Add($dgv)
+
+    $pnlBottom = New-Object System.Windows.Forms.Panel
+    $pnlBottom.Dock = [System.Windows.Forms.DockStyle]::Bottom
+    $pnlBottom.Height = 44
+    $dlg.Controls.Add($pnlBottom)
+
+    $btnOK = New-Object System.Windows.Forms.Button
+    $btnOK.Text = "OK"
+    $btnOK.Size = New-Object System.Drawing.Size(90, 30)
+    $btnOK.Location = New-Object System.Drawing.Point(([int]($dlg.ClientSize.Width / 2 - 100)), 7)
+    $btnOK.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom
+    $btnOK.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $btnOK.FlatAppearance.BorderSize = 0
+    $btnOK.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
+    $btnOK.ForeColor = [System.Drawing.Color]::White
+    $btnOK.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $btnOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $pnlBottom.Controls.Add($btnOK)
+
+    $btnCancel = New-Object System.Windows.Forms.Button
+    $btnCancel.Text = "Cancel"
+    $btnCancel.Size = New-Object System.Drawing.Size(90, 30)
+    $btnCancel.Location = New-Object System.Drawing.Point(([int]($dlg.ClientSize.Width / 2 + 10)), 7)
+    $btnCancel.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom
+    $btnCancel.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $btnCancel.FlatAppearance.BorderColor = if ($script:Prefs.DarkMode) { [System.Drawing.Color]::FromArgb(70, 70, 70) } else { [System.Drawing.Color]::FromArgb(200, 200, 200) }
+    $btnCancel.BackColor = $dlg.BackColor
+    $btnCancel.ForeColor = $dlg.ForeColor
+    $btnCancel.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $pnlBottom.Controls.Add($btnCancel)
+
+    $dlg.AcceptButton = $btnOK
+    $dlg.CancelButton = $btnCancel
+
+    # Column setup
+    foreach ($col in $ColumnNames) {
+        [void]$dgv.Columns.Add($col, $col)
+    }
+
+    # Search handler
+    $doSearch = {
+        $term = $txtSearch.Text.Trim()
+        if ($term.Length -lt 2) { return }
+        $dlg.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+        $dgv.Rows.Clear()
+        $results = & $SearchAction $term
+        foreach ($item in $results) {
+            $row = @()
+            foreach ($col in $ColumnNames) { $row += [string]$item.$col }
+            [void]$dgv.Rows.Add($row)
+        }
+        $dlg.Cursor = [System.Windows.Forms.Cursors]::Default
+    }
+
+    $btnSearch.Add_Click($doSearch)
+    $txtSearch.Add_KeyDown({
+        if ($_.KeyCode -eq [System.Windows.Forms.Keys]::Enter) {
+            $_.SuppressKeyPress = $true
+            & $doSearch
+        }
+    })
+
+    # Double-click row = OK
+    $dgv.Add_CellDoubleClick({ $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK; $dlg.Close() })
+
+    # Z-order
+    $dgv.BringToFront()
+
+    # Focus search box
+    $dlg.Add_Shown({ $txtSearch.Focus() })
+
+    $result = $dlg.ShowDialog()
+    if ($result -eq [System.Windows.Forms.DialogResult]::OK -and $dgv.SelectedRows.Count -gt 0) {
+        $nameIdx = $ColumnNames.IndexOf($NameColumn)
+        if ($nameIdx -ge 0) { return $dgv.SelectedRows[0].Cells[$nameIdx].Value }
+    }
+    return $null
+}
+
 function Add-LogLine {
     param(
         [Parameter(Mandatory)][System.Windows.Forms.TextBox]$TextBox,
@@ -129,7 +281,9 @@ function Restore-WindowState {
             $form.WindowState = [System.Windows.Forms.FormWindowState]::Maximized
         } else {
             $form.Location = New-Object System.Drawing.Point($state.X, $state.Y)
-            $form.Size = New-Object System.Drawing.Size($state.Width, $state.Height)
+            $w = [Math]::Max($state.Width, $form.MinimumSize.Width)
+            $h = [Math]::Max($state.Height, $form.MinimumSize.Height)
+            $form.Size = New-Object System.Drawing.Size($w, $h)
         }
     } catch { }
 }
@@ -496,8 +650,8 @@ function Show-AboutDialog {
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Deployment Helper"
 $form.StartPosition = "CenterScreen"
-$form.Size = New-Object System.Drawing.Size(900, 920)
-$form.MinimumSize = New-Object System.Drawing.Size(780, 820)
+$form.Size = New-Object System.Drawing.Size(900, 988)
+$form.MinimumSize = New-Object System.Drawing.Size(780, 900)
 $form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
 $form.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
 $form.BackColor = $clrFormBg
@@ -735,7 +889,7 @@ $form.Controls.Add($pnlSep1)
 
 $pnlForm = New-Object System.Windows.Forms.Panel
 $pnlForm.Dock = [System.Windows.Forms.DockStyle]::Top
-$pnlForm.Height = 498
+$pnlForm.Height = 550
 $pnlForm.BackColor = $clrPanelBg
 $form.Controls.Add($pnlForm)
 
@@ -772,12 +926,24 @@ $lblAppName.AutoSize = $true
 $pnlForm.Controls.Add($lblAppName)
 
 $txtAppName = New-Object System.Windows.Forms.TextBox
-$txtAppName.SetBounds(160, 43, 300, 24)
+$txtAppName.SetBounds(160, 43, 250, 24)
 $txtAppName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $txtAppName.BackColor = $clrDetailBg
 $txtAppName.ForeColor = $clrText
 $txtAppName.BorderStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms.BorderStyle]::None } else { [System.Windows.Forms.BorderStyle]::FixedSingle }
 $pnlForm.Controls.Add($txtAppName)
+
+$btnBrowseApp = New-Object System.Windows.Forms.Button
+$btnBrowseApp.Text = "Browse"
+$btnBrowseApp.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+$btnBrowseApp.Size = New-Object System.Drawing.Size(56, 24)
+$btnBrowseApp.Location = New-Object System.Drawing.Point(414, 43)
+$btnBrowseApp.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnBrowseApp.FlatAppearance.BorderColor = $clrSepLine
+$btnBrowseApp.ForeColor = $clrText
+$btnBrowseApp.BackColor = $clrFormBg
+$btnBrowseApp.Cursor = [System.Windows.Forms.Cursors]::Hand
+$pnlForm.Controls.Add($btnBrowseApp)
 
 # Row 4: Collection
 $lblCollName = New-Object System.Windows.Forms.Label
@@ -789,25 +955,56 @@ $lblCollName.AutoSize = $true
 $pnlForm.Controls.Add($lblCollName)
 
 $txtCollName = New-Object System.Windows.Forms.TextBox
-$txtCollName.SetBounds(160, 75, 300, 24)
+$txtCollName.SetBounds(160, 75, 250, 24)
 $txtCollName.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $txtCollName.BackColor = $clrDetailBg
 $txtCollName.ForeColor = $clrText
 $txtCollName.BorderStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms.BorderStyle]::None } else { [System.Windows.Forms.BorderStyle]::FixedSingle }
 $pnlForm.Controls.Add($txtCollName)
 
-# Row 5: Template
+$btnBrowseColl = New-Object System.Windows.Forms.Button
+$btnBrowseColl.Text = "Browse"
+$btnBrowseColl.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+$btnBrowseColl.Size = New-Object System.Drawing.Size(56, 24)
+$btnBrowseColl.Location = New-Object System.Drawing.Point(414, 75)
+$btnBrowseColl.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnBrowseColl.FlatAppearance.BorderColor = $clrSepLine
+$btnBrowseColl.ForeColor = $clrText
+$btnBrowseColl.BackColor = $clrFormBg
+$btnBrowseColl.Cursor = [System.Windows.Forms.Cursors]::Hand
+$pnlForm.Controls.Add($btnBrowseColl)
+
+# Row 5: Distribute To (DP Groups)
+$lblDPGroups = New-Object System.Windows.Forms.Label
+$lblDPGroups.Text = "Distribute to:"
+$lblDPGroups.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$lblDPGroups.ForeColor = $clrText
+$lblDPGroups.Location = New-Object System.Drawing.Point(14, 110)
+$lblDPGroups.AutoSize = $true
+$pnlForm.Controls.Add($lblDPGroups)
+
+$clbDPGroups = New-Object System.Windows.Forms.CheckedListBox
+$clbDPGroups.SetBounds(160, 107, 300, 56)
+$clbDPGroups.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$clbDPGroups.BackColor = $clrDetailBg
+$clbDPGroups.ForeColor = $clrText
+$clbDPGroups.BorderStyle = if ($script:Prefs.DarkMode) { [System.Windows.Forms.BorderStyle]::None } else { [System.Windows.Forms.BorderStyle]::FixedSingle }
+$clbDPGroups.CheckOnClick = $true
+$clbDPGroups.Enabled = $false
+$pnlForm.Controls.Add($clbDPGroups)
+
+# Row 6: Template
 $lblTemplate = New-Object System.Windows.Forms.Label
 $lblTemplate.Text = "Template:"
 $lblTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblTemplate.ForeColor = $clrText
-$lblTemplate.Location = New-Object System.Drawing.Point(14, 110)
+$lblTemplate.Location = New-Object System.Drawing.Point(14, 178)
 $lblTemplate.AutoSize = $true
 $pnlForm.Controls.Add($lblTemplate)
 
 $cboTemplate = New-Object System.Windows.Forms.ComboBox
 $cboTemplate.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$cboTemplate.SetBounds(160, 107, 220, 24)
+$cboTemplate.SetBounds(160, 175, 220, 24)
 $cboTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $cboTemplate.BackColor = $clrDetailBg
 $cboTemplate.ForeColor = $clrText
@@ -817,12 +1014,12 @@ foreach ($tmpl in $script:Templates) { [void]$cboTemplate.Items.Add($tmpl.Name) 
 $cboTemplate.SelectedIndex = 0
 $pnlForm.Controls.Add($cboTemplate)
 
-# Row 6: Purpose
+# Row 7: Purpose
 $lblPurpose = New-Object System.Windows.Forms.Label
 $lblPurpose.Text = "Purpose:"
 $lblPurpose.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblPurpose.ForeColor = $clrText
-$lblPurpose.Location = New-Object System.Drawing.Point(14, 142)
+$lblPurpose.Location = New-Object System.Drawing.Point(14, 210)
 $lblPurpose.AutoSize = $true
 $pnlForm.Controls.Add($lblPurpose)
 
@@ -831,7 +1028,7 @@ $radAvailable.Text = "Available"
 $radAvailable.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $radAvailable.ForeColor = $clrText
 $radAvailable.BackColor = $clrPanelBg
-$radAvailable.Location = New-Object System.Drawing.Point(160, 140)
+$radAvailable.Location = New-Object System.Drawing.Point(160, 208)
 $radAvailable.AutoSize = $true
 $radAvailable.Checked = $true
 if ($script:Prefs.DarkMode) { $radAvailable.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $radAvailable.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
@@ -842,7 +1039,7 @@ $radRequired.Text = "Required"
 $radRequired.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $radRequired.ForeColor = $clrText
 $radRequired.BackColor = $clrPanelBg
-$radRequired.Location = New-Object System.Drawing.Point(270, 140)
+$radRequired.Location = New-Object System.Drawing.Point(270, 208)
 $radRequired.AutoSize = $true
 if ($script:Prefs.DarkMode) { $radRequired.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $radRequired.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($radRequired)
@@ -852,12 +1049,12 @@ $lblAvailable = New-Object System.Windows.Forms.Label
 $lblAvailable.Text = "Available:"
 $lblAvailable.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblAvailable.ForeColor = $clrText
-$lblAvailable.Location = New-Object System.Drawing.Point(14, 174)
+$lblAvailable.Location = New-Object System.Drawing.Point(14, 242)
 $lblAvailable.AutoSize = $true
 $pnlForm.Controls.Add($lblAvailable)
 
 $dtpAvailable = New-Object System.Windows.Forms.DateTimePicker
-$dtpAvailable.SetBounds(160, 171, 200, 24)
+$dtpAvailable.SetBounds(160, 239, 200, 24)
 $dtpAvailable.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $dtpAvailable.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
 $dtpAvailable.CustomFormat = "yyyy-MM-dd HH:mm"
@@ -869,12 +1066,12 @@ $lblDeadline = New-Object System.Windows.Forms.Label
 $lblDeadline.Text = "Deadline:"
 $lblDeadline.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblDeadline.ForeColor = $clrText
-$lblDeadline.Location = New-Object System.Drawing.Point(14, 206)
+$lblDeadline.Location = New-Object System.Drawing.Point(14, 274)
 $lblDeadline.AutoSize = $true
 $pnlForm.Controls.Add($lblDeadline)
 
 $dtpDeadline = New-Object System.Windows.Forms.DateTimePicker
-$dtpDeadline.SetBounds(160, 203, 200, 24)
+$dtpDeadline.SetBounds(160, 271, 200, 24)
 $dtpDeadline.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $dtpDeadline.Format = [System.Windows.Forms.DateTimePickerFormat]::Custom
 $dtpDeadline.CustomFormat = "yyyy-MM-dd HH:mm"
@@ -887,13 +1084,13 @@ $lblNotification = New-Object System.Windows.Forms.Label
 $lblNotification.Text = "Notification:"
 $lblNotification.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblNotification.ForeColor = $clrText
-$lblNotification.Location = New-Object System.Drawing.Point(14, 238)
+$lblNotification.Location = New-Object System.Drawing.Point(14, 306)
 $lblNotification.AutoSize = $true
 $pnlForm.Controls.Add($lblNotification)
 
 $cboNotification = New-Object System.Windows.Forms.ComboBox
 $cboNotification.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$cboNotification.SetBounds(160, 235, 260, 24)
+$cboNotification.SetBounds(160, 303, 260, 24)
 $cboNotification.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $cboNotification.BackColor = $clrDetailBg
 $cboNotification.ForeColor = $clrText
@@ -907,13 +1104,13 @@ $lblTimeBasis = New-Object System.Windows.Forms.Label
 $lblTimeBasis.Text = "Time basis:"
 $lblTimeBasis.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblTimeBasis.ForeColor = $clrText
-$lblTimeBasis.Location = New-Object System.Drawing.Point(14, 266)
+$lblTimeBasis.Location = New-Object System.Drawing.Point(14, 334)
 $lblTimeBasis.AutoSize = $true
 $pnlForm.Controls.Add($lblTimeBasis)
 
 $cboTimeBasis = New-Object System.Windows.Forms.ComboBox
 $cboTimeBasis.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-$cboTimeBasis.SetBounds(160, 263, 180, 24)
+$cboTimeBasis.SetBounds(160, 331, 180, 24)
 $cboTimeBasis.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $cboTimeBasis.BackColor = $clrDetailBg
 $cboTimeBasis.ForeColor = $clrText
@@ -928,7 +1125,7 @@ $chkOverrideMW.Text = "Allow outside maintenance window"
 $chkOverrideMW.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkOverrideMW.ForeColor = $clrText
 $chkOverrideMW.BackColor = $clrPanelBg
-$chkOverrideMW.Location = New-Object System.Drawing.Point(160, 294)
+$chkOverrideMW.Location = New-Object System.Drawing.Point(160, 362)
 $chkOverrideMW.AutoSize = $true
 if ($script:Prefs.DarkMode) { $chkOverrideMW.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkOverrideMW.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkOverrideMW)
@@ -938,7 +1135,7 @@ $chkRebootOutside.Text = "Reboot outside maintenance window"
 $chkRebootOutside.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkRebootOutside.ForeColor = $clrText
 $chkRebootOutside.BackColor = $clrPanelBg
-$chkRebootOutside.Location = New-Object System.Drawing.Point(160, 316)
+$chkRebootOutside.Location = New-Object System.Drawing.Point(160, 384)
 $chkRebootOutside.AutoSize = $true
 if ($script:Prefs.DarkMode) { $chkRebootOutside.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkRebootOutside.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkRebootOutside)
@@ -949,7 +1146,7 @@ $chkMetered.Text = "Allow download past deadline (metered connections)"
 $chkMetered.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkMetered.ForeColor = $clrText
 $chkMetered.BackColor = $clrPanelBg
-$chkMetered.Location = New-Object System.Drawing.Point(160, 338)
+$chkMetered.Location = New-Object System.Drawing.Point(160, 406)
 $chkMetered.AutoSize = $true
 if ($script:Prefs.DarkMode) { $chkMetered.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkMetered.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkMetered)
@@ -960,7 +1157,7 @@ $chkBoundaryFallback.Text = "Allow download from default site boundary group"
 $chkBoundaryFallback.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkBoundaryFallback.ForeColor = $clrText
 $chkBoundaryFallback.BackColor = $clrPanelBg
-$chkBoundaryFallback.Location = New-Object System.Drawing.Point(160, 360)
+$chkBoundaryFallback.Location = New-Object System.Drawing.Point(160, 428)
 $chkBoundaryFallback.AutoSize = $true
 $chkBoundaryFallback.Checked = $true
 $chkBoundaryFallback.Enabled = $false
@@ -972,7 +1169,7 @@ $chkMicrosoftUpdate.Text = "Allow download from Microsoft Update"
 $chkMicrosoftUpdate.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkMicrosoftUpdate.ForeColor = $clrText
 $chkMicrosoftUpdate.BackColor = $clrPanelBg
-$chkMicrosoftUpdate.Location = New-Object System.Drawing.Point(160, 382)
+$chkMicrosoftUpdate.Location = New-Object System.Drawing.Point(160, 450)
 $chkMicrosoftUpdate.AutoSize = $true
 $chkMicrosoftUpdate.Enabled = $false
 if ($script:Prefs.DarkMode) { $chkMicrosoftUpdate.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkMicrosoftUpdate.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
@@ -983,7 +1180,7 @@ $chkPostRebootScan.Text = "Require post-reboot full scan"
 $chkPostRebootScan.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkPostRebootScan.ForeColor = $clrText
 $chkPostRebootScan.BackColor = $clrPanelBg
-$chkPostRebootScan.Location = New-Object System.Drawing.Point(160, 404)
+$chkPostRebootScan.Location = New-Object System.Drawing.Point(160, 472)
 $chkPostRebootScan.AutoSize = $true
 $chkPostRebootScan.Checked = $true
 $chkPostRebootScan.Enabled = $false
@@ -995,7 +1192,7 @@ $btnValidate = New-Object System.Windows.Forms.Button
 $btnValidate.Text = "Validate"
 $btnValidate.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnValidate.Size = New-Object System.Drawing.Size(120, 32)
-$btnValidate.Location = New-Object System.Drawing.Point(160, 440)
+$btnValidate.Location = New-Object System.Drawing.Point(160, 508)
 Set-ModernButtonStyle -Button $btnValidate -BackColor $clrAccent
 $pnlForm.Controls.Add($btnValidate)
 
@@ -1003,7 +1200,7 @@ $btnDeploy = New-Object System.Windows.Forms.Button
 $btnDeploy.Text = "Deploy"
 $btnDeploy.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnDeploy.Size = New-Object System.Drawing.Size(120, 32)
-$btnDeploy.Location = New-Object System.Drawing.Point(290, 440)
+$btnDeploy.Location = New-Object System.Drawing.Point(290, 508)
 $btnDeploy.Enabled = $false
 Set-ModernButtonStyle -Button $btnDeploy -BackColor ([System.Drawing.Color]::FromArgb(34, 139, 34))
 $pnlForm.Controls.Add($btnDeploy)
@@ -1012,7 +1209,7 @@ $btnSaveTemplate = New-Object System.Windows.Forms.Button
 $btnSaveTemplate.Text = "Save Template"
 $btnSaveTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $btnSaveTemplate.Size = New-Object System.Drawing.Size(130, 32)
-$btnSaveTemplate.Location = New-Object System.Drawing.Point(420, 440)
+$btnSaveTemplate.Location = New-Object System.Drawing.Point(420, 508)
 $btnSaveTemplate.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnSaveTemplate.FlatAppearance.BorderColor = $clrSepLine
 $btnSaveTemplate.ForeColor = $clrText
@@ -1257,6 +1454,13 @@ $btnConnect.Add_Click({
         $lblConnStatus.ForeColor = $clrOkText
         $statusLabel.Text = "Connected to site $($script:Prefs.SiteCode)"
         Add-LogLine -TextBox $txtLog -Message "Connected to site $($script:Prefs.SiteCode) on $($script:Prefs.SMSProvider)"
+
+        # Populate DP groups
+        $clbDPGroups.Items.Clear()
+        $dpGroups = Get-DPGroupList
+        foreach ($g in $dpGroups) { [void]$clbDPGroups.Items.Add($g.Name, $false) }
+        $clbDPGroups.Enabled = ($dpGroups.Count -gt 0)
+        Add-LogLine -TextBox $txtLog -Message "$($dpGroups.Count) DP group(s) loaded"
     } else {
         $lblConnStatus.Text = "Failed"
         $lblConnStatus.ForeColor = $clrErrText
@@ -1264,6 +1468,50 @@ $btnConnect.Add_Click({
     }
 
     $form.Cursor = [System.Windows.Forms.Cursors]::Default
+})
+
+# ---------------------------------------------------------------------------
+# Event: Browse Application
+# ---------------------------------------------------------------------------
+
+$btnBrowseApp.Add_Click({
+    if (-not (Test-CMConnection)) {
+        [System.Windows.Forms.MessageBox]::Show("Connect to a site first.", "Not Connected", "OK", "Warning") | Out-Null
+        return
+    }
+
+    $isSUG = ($cboDeployType.SelectedIndex -eq 1)
+    if ($isSUG) {
+        $selected = Show-SearchDialog -Title "Search Software Update Groups" -SearchLabel "SUG:" `
+            -ColumnNames @('LocalizedDisplayName', 'NumberOfUpdates') `
+            -NameColumn 'LocalizedDisplayName' `
+            -SearchAction { param($term) Get-CMSoftwareUpdateGroup -Name "*$term*" -ErrorAction SilentlyContinue | Select-Object LocalizedDisplayName, NumberOfUpdates | Sort-Object LocalizedDisplayName }
+    } else {
+        $selected = Show-SearchDialog -Title "Search Applications" -SearchLabel "App:" `
+            -ColumnNames @('LocalizedDisplayName', 'SoftwareVersion', 'PackageID') `
+            -NameColumn 'LocalizedDisplayName' `
+            -SearchAction { param($term) Search-CMApplicationByName -SearchText $term }
+    }
+
+    if ($selected) { $txtAppName.Text = $selected }
+})
+
+# ---------------------------------------------------------------------------
+# Event: Browse Collection
+# ---------------------------------------------------------------------------
+
+$btnBrowseColl.Add_Click({
+    if (-not (Test-CMConnection)) {
+        [System.Windows.Forms.MessageBox]::Show("Connect to a site first.", "Not Connected", "OK", "Warning") | Out-Null
+        return
+    }
+
+    $selected = Show-SearchDialog -Title "Search Device Collections" -SearchLabel "Collection:" `
+        -ColumnNames @('Name', 'CollectionID', 'MemberCount') `
+        -NameColumn 'Name' `
+        -SearchAction { param($term) Search-CMCollectionByName -SearchText $term }
+
+    if ($selected) { $txtCollName.Text = $selected }
 })
 
 # ---------------------------------------------------------------------------
@@ -1432,6 +1680,27 @@ $btnDeploy.Add_Click({
     if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
 
     $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+
+    # Distribute content to selected DP groups (if any checked)
+    $selectedDPGroups = @()
+    for ($i = 0; $i -lt $clbDPGroups.Items.Count; $i++) {
+        if ($clbDPGroups.GetItemChecked($i)) { $selectedDPGroups += $clbDPGroups.Items[$i] }
+    }
+    if ($selectedDPGroups.Count -gt 0 -and -not $isSUG) {
+        Add-LogLine -TextBox $txtLog -Message ("Distributing content to {0} DP group(s)..." -f $selectedDPGroups.Count)
+        [System.Windows.Forms.Application]::DoEvents()
+        $distResults = Start-ContentDistributionToGroups -Application $script:ValidatedApp -DPGroupNames $selectedDPGroups
+        foreach ($r in $distResults) {
+            if ($r.AlreadyTargeted) {
+                Add-LogLine -TextBox $txtLog -Message "  $($r.Group): already targeted"
+            } elseif ($r.Success) {
+                Add-LogLine -TextBox $txtLog -Message "  $($r.Group): distribution started"
+            } else {
+                Add-LogLine -TextBox $txtLog -Message "  $($r.Group): FAILED - $($r.Error)"
+            }
+        }
+    }
+
     Add-LogLine -TextBox $txtLog -Message ("Executing {0} deployment..." -f $deployType)
     [System.Windows.Forms.Application]::DoEvents()
 

@@ -6,8 +6,10 @@ Safe, fast MECM application and software update group deployment with pre-execut
 
 ## Features
 
-- **Single-pane deployment workflow** - Enter application or SUG, collection, and deploy
+- **Single-pane deployment workflow** - Search or enter application/SUG, select collection, distribute to DP groups, and deploy
 - **Application + SUG support** - Deploy applications or software update groups from the same interface
+- **Search dialogs** - Browse buttons for Application and Collection fields open search dialogs with filtered DataGridView results
+- **DP group distribution** - CheckedListBox of all DP groups, distribute content to selected groups before deployment
 - **5-check validation engine** - Application/SUG exists, content distributed, collection valid, collection safe (blocks built-in system collections), no duplicate deployment
 - **Safety guardrails** - All `SMS000*` built-in collections blocked, deploy button disabled until validation passes, confirmation dialog before execution
 - **Time basis** - Choose UTC or Client Local Time for Available/Deadline scheduling (both App and SUG)

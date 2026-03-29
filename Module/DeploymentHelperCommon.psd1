@@ -16,6 +16,14 @@
         'Disconnect-CMSite'
         'Test-CMConnection'
 
+        # Search
+        'Search-CMApplicationByName'
+        'Search-CMCollectionByName'
+
+        # DP Groups
+        'Get-DPGroupList'
+        'Start-ContentDistributionToGroups'
+
         # Validation
         'Test-ApplicationExists'
         'Test-ContentDistributed'
