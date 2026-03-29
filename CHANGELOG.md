@@ -2,6 +2,16 @@
 
 All notable changes to the Deployment Helper are documented in this file.
 
+## [1.3.0] - 2026-03-29
+
+### Added
+- **DP group distribution** -- CheckedListBox populated on Connect with all DP groups. Check groups to distribute content before deployment. Handles "already targeted" gracefully.
+- **Application search dialog** -- Browse button next to Application field opens a search dialog with DataGridView results (name, version, PackageID). Supports Enter key, double-click to select. Works for both Applications and SUGs.
+- **Collection search dialog** -- Browse button next to Collection field opens a search dialog filtered to Device collections (name, ID, member count).
+- **Module functions** -- `Search-CMApplicationByName`, `Search-CMCollectionByName`, `Get-DPGroupList`, `Start-ContentDistributionToGroups`
+
+---
+
 ## [1.2.2] - 2026-03-17
 
 ### Removed

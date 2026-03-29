@@ -7,6 +7,7 @@
       - Structured logging (Initialize-Logging, Write-Log)
       - CM site connection management (Connect-CMSite, Disconnect-CMSite, Test-CMConnection)
       - Pre-execution validation (Test-ApplicationExists, Test-ContentDistributed, Test-CollectionValid, Test-CollectionSafe, Test-DuplicateDeployment)
+      - DP group management (Get-DPGroupList, Start-ContentDistributionToGroups)
       - Deployment preview and execution (Get-DeploymentPreview, Invoke-ApplicationDeployment)
       - Immutable deployment audit log (Write-DeploymentLog, Get-DeploymentHistory)
       - Deployment templates (Get-DeploymentTemplates)
@@ -205,6 +206,38 @@ function Test-ApplicationExists {
     }
 }
 
+function Search-CMApplicationByName {
+    param([Parameter(Mandatory)][string]$SearchText)
+
+    try {
+        $apps = Get-CMApplication -Name "*$SearchText*" -Fast -ErrorAction Stop |
+            Select-Object LocalizedDisplayName, SoftwareVersion, PackageID, DateLastModified |
+            Sort-Object LocalizedDisplayName
+        Write-Log "Application search '$SearchText': $($apps.Count) result(s)"
+        return $apps
+    }
+    catch {
+        Write-Log "Error searching applications: $_" -Level ERROR
+        return @()
+    }
+}
+
+function Search-CMCollectionByName {
+    param([Parameter(Mandatory)][string]$SearchText)
+
+    try {
+        $cols = Get-CMCollection -Name "*$SearchText*" -CollectionType Device -ErrorAction Stop |
+            Select-Object Name, CollectionID, MemberCount, LastRefreshTime |
+            Sort-Object Name
+        Write-Log "Collection search '$SearchText': $($cols.Count) result(s)"
+        return $cols
+    }
+    catch {
+        Write-Log "Error searching collections: $_" -Level ERROR
+        return @()
+    }
+}
+
 function Test-ContentDistributed {
     param([Parameter(Mandatory)]$Application)
 
@@ -235,6 +268,44 @@ function Test-ContentDistributed {
         Write-Log "Error checking distribution status: $_" -Level ERROR
         return @{ Targeted = 0; NumberSuccess = 0; NumberInProgress = 0; NumberErrors = 0; IsFullyDistributed = $false; Error = $_.ToString() }
     }
+}
+
+function Get-DPGroupList {
+    try {
+        $groups = Get-CMDistributionPointGroup -ErrorAction Stop | Sort-Object Name
+        Write-Log "Retrieved $($groups.Count) DP group(s)"
+        return $groups
+    }
+    catch {
+        Write-Log "Error retrieving DP groups: $_" -Level ERROR
+        return @()
+    }
+}
+
+function Start-ContentDistributionToGroups {
+    param(
+        [Parameter(Mandatory)]$Application,
+        [Parameter(Mandatory)][string[]]$DPGroupNames
+    )
+
+    $results = @()
+    foreach ($groupName in $DPGroupNames) {
+        try {
+            Start-CMContentDistribution -ApplicationName $Application.LocalizedDisplayName -DistributionPointGroupName $groupName -ErrorAction Stop
+            Write-Log "Content distribution started to DP group '$groupName'"
+            $results += @{ Group = $groupName; Success = $true }
+        }
+        catch {
+            if ($_.Exception.Message -match 'already been targeted') {
+                Write-Log "Content already distributed to DP group '$groupName'" -Level INFO
+                $results += @{ Group = $groupName; Success = $true; AlreadyTargeted = $true }
+            } else {
+                Write-Log "Error distributing to DP group '$groupName': $_" -Level ERROR
+                $results += @{ Group = $groupName; Success = $false; Error = $_.ToString() }
+            }
+        }
+    }
+    return $results
 }
 
 function Test-CollectionValid {
