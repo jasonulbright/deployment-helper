@@ -2,4 +2,4 @@ Logs/
 Reports/
 DeploymentHelper.windowstate.json
 DeploymentHelper.prefs.json
-project-manifest.json
+*.log
