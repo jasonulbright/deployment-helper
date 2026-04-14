@@ -1,8 +1,8 @@
-{
-  "ProjectType": "mecm-tool",
-  "Description": "Safe MECM application and SUG deployment with audit logging",
-  "Status": "active",
-  "Category": "MECM",
-  "ValidationSchedule": "monthly",
-  "Notes": "TASK: C# + Fluent UI conversion\nINFO: Application and SUG deployment tool\nINFO: Stable"
+﻿{
+    "ProjectType":  "mecm-tool",
+    "Description":  "Safe MECM application and SUG deployment with audit logging",
+    "Status":  "active",
+    "Category":  "MECM",
+    "ValidationSchedule":  "monthly",
+    "Notes":  "PLAN: C# Fluent UI conversion as private repo fork\nINFO: Application and SUG deployment tool\nINFO: Stable"
 }
