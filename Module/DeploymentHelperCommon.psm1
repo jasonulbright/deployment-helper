@@ -427,12 +427,12 @@ function Invoke-ApplicationDeployment {
         [Parameter(Mandatory)][ValidateSet('Required','Available')][string]$DeployPurpose,
         [Parameter(Mandatory)][datetime]$AvailableDateTime,
         [datetime]$DeadlineDateTime,
-        [ValidateSet('LocalTime','UTC')][string]$TimeBasedOn = 'LocalTime',
+        [ValidateSet('LocalTime','Utc')][string]$TimeBasedOn = 'LocalTime',
         [ValidateSet('DisplayAll','DisplaySoftwareCenterOnly','HideAll')]
         [string]$UserNotification = 'DisplayAll',
         [bool]$OverrideServiceWindow = $false,
         [bool]$RebootOutsideServiceWindow = $false,
-        [bool]$AllowMeteredConnection = $false
+        [bool]$UseMeteredNetwork = $false
     )
 
     $params = @{
@@ -451,8 +451,8 @@ function Invoke-ApplicationDeployment {
     if ($DeployPurpose -eq 'Required' -and $DeadlineDateTime) {
         $params['DeadlineDateTime'] = $DeadlineDateTime
     }
-    if ($AllowMeteredConnection) {
-        $params['AllowMeteredConnection'] = $true
+    if ($UseMeteredNetwork) {
+        $params['UseMeteredNetwork'] = $true
     }
 
     try {
@@ -486,14 +486,14 @@ function Invoke-SUGDeployment {
         [Parameter(Mandatory)][ValidateSet('Required','Available')][string]$DeployPurpose,
         [Parameter(Mandatory)][datetime]$AvailableDateTime,
         [datetime]$DeadlineDateTime,
-        [ValidateSet('LocalTime','UTC')][string]$TimeBasedOn = 'LocalTime',
+        [ValidateSet('LocalTime','Utc')][string]$TimeBasedOn = 'LocalTime',
         [ValidateSet('DisplayAll','DisplaySoftwareCenterOnly','HideAll')]
         [string]$UserNotification = 'DisplayAll',
         [bool]$SoftwareInstallation = $false,
         [bool]$AllowRestart = $false,
-        [bool]$AllowUseMeteredNetwork = $false,
+        [bool]$UseMeteredNetwork = $false,
         [bool]$AllowBoundaryFallback = $true,
-        [bool]$AllowWUMU = $false,
+        [bool]$DownloadFromMicrosoftUpdate = $false,
         [bool]$RequirePostRebootFullScan = $true
     )
 
@@ -520,12 +520,11 @@ function Invoke-SUGDeployment {
         $params['UnprotectedType'] = if ($AllowBoundaryFallback) { 'UnprotectedDistributionPoint' } else { 'NoInstall' }
     }
 
-    if ($AllowUseMeteredNetwork) {
-        $params['UseBranchCache'] = $true
-        $params['AllowUseMeteredNetwork'] = $true
+    if ($UseMeteredNetwork) {
+        $params['UseMeteredNetwork'] = $true
     }
-    if ($AllowWUMU) {
-        $params['AllowWUMU'] = $true
+    if ($DownloadFromMicrosoftUpdate) {
+        $params['DownloadFromMicrosoftUpdate'] = $true
     }
 
     try {
@@ -600,6 +599,7 @@ function Write-DeploymentLog {
     $entry = [ordered]@{
         Timestamp          = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
         User               = "$env:USERDOMAIN\$env:USERNAME"
+        DeploymentType     = $Record.DeploymentType
         ApplicationName    = $Record.ApplicationName
         ApplicationVersion = $Record.ApplicationVersion
         CollectionName     = $Record.CollectionName
@@ -715,7 +715,7 @@ function Export-DeploymentHistoryHtml {
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     $headerHtml = "<h1>Deployment History Report</h1><div class='subtitle'>Generated: $timestamp</div>"
 
-    $columns = @('Timestamp','User','ApplicationName','ApplicationVersion','CollectionName','MemberCount','DeployPurpose','DeadlineDateTime','DeploymentID','Result')
+    $columns = @('Timestamp','User','DeploymentType','ApplicationName','ApplicationVersion','CollectionName','MemberCount','DeployPurpose','DeadlineDateTime','DeploymentID','Result')
     $thRow = ($columns | ForEach-Object { "<th>$_</th>" }) -join ""
 
     $bodyRows = foreach ($rec in $Records) {

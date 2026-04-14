@@ -2,7 +2,12 @@
     "Name": "Server Production",
     "DeployPurpose": "Required",
     "UserNotification": "HideAll",
+    "TimeBasedOn": "LocalTime",
     "OverrideServiceWindow": false,
     "RebootOutsideServiceWindow": false,
+    "AllowMeteredConnection": true,
+    "AllowBoundaryFallback": true,
+    "AllowMicrosoftUpdate": false,
+    "RequirePostRebootFullScan": true,
     "DefaultDeadlineOffsetHours": 168
 }

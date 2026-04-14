@@ -2,7 +2,12 @@
     "Name": "Workstation Production",
     "DeployPurpose": "Required",
     "UserNotification": "DisplayAll",
+    "TimeBasedOn": "LocalTime",
     "OverrideServiceWindow": false,
     "RebootOutsideServiceWindow": false,
+    "AllowMeteredConnection": true,
+    "AllowBoundaryFallback": true,
+    "AllowMicrosoftUpdate": false,
+    "RequirePostRebootFullScan": true,
     "DefaultDeadlineOffsetHours": 168
 }

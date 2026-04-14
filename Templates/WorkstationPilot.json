@@ -2,7 +2,12 @@
     "Name": "Workstation Pilot",
     "DeployPurpose": "Available",
     "UserNotification": "DisplayAll",
+    "TimeBasedOn": "LocalTime",
     "OverrideServiceWindow": false,
     "RebootOutsideServiceWindow": false,
+    "AllowMeteredConnection": false,
+    "AllowBoundaryFallback": true,
+    "AllowMicrosoftUpdate": false,
+    "RequirePostRebootFullScan": true,
     "DefaultDeadlineOffsetHours": 0
 }

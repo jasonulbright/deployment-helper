@@ -2,7 +2,12 @@
     "Name": "Server Pilot",
     "DeployPurpose": "Available",
     "UserNotification": "HideAll",
+    "TimeBasedOn": "LocalTime",
     "OverrideServiceWindow": false,
     "RebootOutsideServiceWindow": false,
+    "AllowMeteredConnection": false,
+    "AllowBoundaryFallback": true,
+    "AllowMicrosoftUpdate": false,
+    "RequirePostRebootFullScan": true,
     "DefaultDeadlineOffsetHours": 0
 }

@@ -2,6 +2,23 @@
 
 All notable changes to the Deployment Helper are documented in this file.
 
+## [1.3.1] - 2026-04-14
+
+### Fixed
+- **Layout Z-order** -- Header, connection bar, and form panel were rendering in reverse order (form at top, header at bottom). Fixed `BringToFront()` call sequence to correct visual order: Header -> Connection Bar -> Form -> Validation.
+- **MECM cmdlet parameter names** -- `AllowMeteredConnection` corrected to `UseMeteredNetwork` (app deployments), `AllowUseMeteredNetwork` corrected to `UseMeteredNetwork` (SUG deployments), `AllowWUMU` corrected to `DownloadFromMicrosoftUpdate`, `UseBranchCache` coupling removed. Validated against official learn.microsoft.com docs.
+- **Time basis enum value** -- `UTC` corrected to `Utc` to match MECM cmdlet enum values (`TimeBaseOn`/`TimeBasedOn`).
+- **DeploymentType missing from JSONL log** -- Field was passed by caller but never mapped into `Write-DeploymentLog` output. Now included in JSONL records and HTML export.
+- **About dialog version** -- Showed v1.0.0 instead of v1.3.0.
+- **Module manifest version** -- Was 1.0.0, now 1.3.0.
+
+### Changed
+- **SUG-specific checkboxes** -- Boundary fallback, Microsoft Update, and post-reboot scan checkboxes are now hidden (not just disabled) when deployment type is Application. They appear only when SUG is selected, and the form panel resizes dynamically.
+- **Built-in templates** -- All 4 templates (Workstation/Server x Pilot/Production) updated with v1.2.0 fields: `TimeBasedOn`, `AllowMeteredConnection`, `AllowBoundaryFallback`, `AllowMicrosoftUpdate`, `RequirePostRebootFullScan`. Production templates default metered connection to true.
+- **Form panel height** -- Reduced from 550px to 480px for Application mode (expands to 550px for SUG mode) to eliminate dead space from hidden checkboxes.
+
+---
+
 ## [1.3.0] - 2026-03-29
 
 ### Added

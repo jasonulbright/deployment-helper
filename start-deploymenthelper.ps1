@@ -602,7 +602,7 @@ function Show-AboutDialog {
     $dlg.Controls.Add($lblAboutTitle)
 
     $lblVersion = New-Object System.Windows.Forms.Label
-    $lblVersion.Text = "Deployment Helper v1.0.0"
+    $lblVersion.Text = "Deployment Helper v1.3.0"
     $lblVersion.Font = New-Object System.Drawing.Font("Segoe UI", 10)
     $lblVersion.ForeColor = $clrText
     $lblVersion.AutoSize = $true
@@ -889,7 +889,7 @@ $form.Controls.Add($pnlSep1)
 
 $pnlForm = New-Object System.Windows.Forms.Panel
 $pnlForm.Dock = [System.Windows.Forms.DockStyle]::Top
-$pnlForm.Height = 550
+$pnlForm.Height = 480
 $pnlForm.BackColor = $clrPanelBg
 $form.Controls.Add($pnlForm)
 
@@ -1160,7 +1160,7 @@ $chkBoundaryFallback.BackColor = $clrPanelBg
 $chkBoundaryFallback.Location = New-Object System.Drawing.Point(160, 428)
 $chkBoundaryFallback.AutoSize = $true
 $chkBoundaryFallback.Checked = $true
-$chkBoundaryFallback.Enabled = $false
+$chkBoundaryFallback.Visible = $false
 if ($script:Prefs.DarkMode) { $chkBoundaryFallback.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkBoundaryFallback.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkBoundaryFallback)
 
@@ -1171,7 +1171,7 @@ $chkMicrosoftUpdate.ForeColor = $clrText
 $chkMicrosoftUpdate.BackColor = $clrPanelBg
 $chkMicrosoftUpdate.Location = New-Object System.Drawing.Point(160, 450)
 $chkMicrosoftUpdate.AutoSize = $true
-$chkMicrosoftUpdate.Enabled = $false
+$chkMicrosoftUpdate.Visible = $false
 if ($script:Prefs.DarkMode) { $chkMicrosoftUpdate.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkMicrosoftUpdate.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkMicrosoftUpdate)
 
@@ -1183,7 +1183,7 @@ $chkPostRebootScan.BackColor = $clrPanelBg
 $chkPostRebootScan.Location = New-Object System.Drawing.Point(160, 472)
 $chkPostRebootScan.AutoSize = $true
 $chkPostRebootScan.Checked = $true
-$chkPostRebootScan.Enabled = $false
+$chkPostRebootScan.Visible = $false
 if ($script:Prefs.DarkMode) { $chkPostRebootScan.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat; $chkPostRebootScan.ForeColor = [System.Drawing.Color]::FromArgb(170, 170, 170) }
 $pnlForm.Controls.Add($chkPostRebootScan)
 
@@ -1192,7 +1192,7 @@ $btnValidate = New-Object System.Windows.Forms.Button
 $btnValidate.Text = "Validate"
 $btnValidate.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnValidate.Size = New-Object System.Drawing.Size(120, 32)
-$btnValidate.Location = New-Object System.Drawing.Point(160, 508)
+$btnValidate.Location = New-Object System.Drawing.Point(160, 440)
 Set-ModernButtonStyle -Button $btnValidate -BackColor $clrAccent
 $pnlForm.Controls.Add($btnValidate)
 
@@ -1200,7 +1200,7 @@ $btnDeploy = New-Object System.Windows.Forms.Button
 $btnDeploy.Text = "Deploy"
 $btnDeploy.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $btnDeploy.Size = New-Object System.Drawing.Size(120, 32)
-$btnDeploy.Location = New-Object System.Drawing.Point(290, 508)
+$btnDeploy.Location = New-Object System.Drawing.Point(290, 440)
 $btnDeploy.Enabled = $false
 Set-ModernButtonStyle -Button $btnDeploy -BackColor ([System.Drawing.Color]::FromArgb(34, 139, 34))
 $pnlForm.Controls.Add($btnDeploy)
@@ -1209,7 +1209,7 @@ $btnSaveTemplate = New-Object System.Windows.Forms.Button
 $btnSaveTemplate.Text = "Save Template"
 $btnSaveTemplate.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $btnSaveTemplate.Size = New-Object System.Drawing.Size(130, 32)
-$btnSaveTemplate.Location = New-Object System.Drawing.Point(420, 508)
+$btnSaveTemplate.Location = New-Object System.Drawing.Point(420, 440)
 $btnSaveTemplate.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnSaveTemplate.FlatAppearance.BorderColor = $clrSepLine
 $btnSaveTemplate.ForeColor = $clrText
@@ -1251,12 +1251,13 @@ $pnlValidation.Controls.Add($rtbValidation)
 $form.Controls.Add($menuStrip)
 $menuStrip.SendToBack()
 
-# BringToFront processes innermost-last. Top-docked in reverse visual order:
-$pnlSep2.BringToFront()
-$pnlForm.BringToFront()
-$pnlSep1.BringToFront()
-$pnlConnBar.BringToFront()
+# BringToFront processes innermost-last. First call = outermost (top edge).
+# Visual order top-to-bottom: Header -> ConnBar -> Sep1 -> Form -> Sep2
 $pnlHeader.BringToFront()
+$pnlConnBar.BringToFront()
+$pnlSep1.BringToFront()
+$pnlForm.BringToFront()
+$pnlSep2.BringToFront()
 
 # Fill panel must BringToFront last
 $pnlValidation.BringToFront()
@@ -1298,12 +1299,20 @@ $cboDeployType.Add_SelectedIndexChanged({
     $isSUG = ($cboDeployType.SelectedIndex -eq 1)
     if ($isSUG) {
         $lblAppName.Text = "SUG Name:"
+        $pnlForm.Height = 550
+        $btnValidate.Location = New-Object System.Drawing.Point(160, 508)
+        $btnDeploy.Location = New-Object System.Drawing.Point(290, 508)
+        $btnSaveTemplate.Location = New-Object System.Drawing.Point(420, 508)
     } else {
         $lblAppName.Text = "Application:"
+        $pnlForm.Height = 480
+        $btnValidate.Location = New-Object System.Drawing.Point(160, 440)
+        $btnDeploy.Location = New-Object System.Drawing.Point(290, 440)
+        $btnSaveTemplate.Location = New-Object System.Drawing.Point(420, 440)
     }
-    $chkBoundaryFallback.Enabled = $isSUG
-    $chkMicrosoftUpdate.Enabled  = $isSUG
-    $chkPostRebootScan.Enabled   = $isSUG
+    $chkBoundaryFallback.Visible = $isSUG
+    $chkMicrosoftUpdate.Visible  = $isSUG
+    $chkPostRebootScan.Visible   = $isSUG
 })
 
 # ---------------------------------------------------------------------------
@@ -1322,7 +1331,7 @@ $cboTemplate.Add_SelectedIndexChanged({
     $chkOverrideMW.Checked = [bool]$tmpl.OverrideServiceWindow
     $chkRebootOutside.Checked = [bool]$tmpl.RebootOutsideServiceWindow
     if ($null -ne $tmpl.AllowMeteredConnection) { $chkMetered.Checked = [bool]$tmpl.AllowMeteredConnection }
-    if ($tmpl.TimeBasedOn -eq 'UTC') { $cboTimeBasis.SelectedIndex = 1 } else { $cboTimeBasis.SelectedIndex = 0 }
+    if ($tmpl.TimeBasedOn -eq 'Utc' -or $tmpl.TimeBasedOn -eq 'UTC') { $cboTimeBasis.SelectedIndex = 1 } else { $cboTimeBasis.SelectedIndex = 0 }
     if ($null -ne $tmpl.AllowBoundaryFallback) { $chkBoundaryFallback.Checked = [bool]$tmpl.AllowBoundaryFallback }
     if ($null -ne $tmpl.AllowMicrosoftUpdate) { $chkMicrosoftUpdate.Checked = [bool]$tmpl.AllowMicrosoftUpdate }
     if ($null -ne $tmpl.RequirePostRebootFullScan) { $chkPostRebootScan.Checked = [bool]$tmpl.RequirePostRebootFullScan }
@@ -1404,7 +1413,7 @@ $btnSaveTemplate.Add_Click({
 
         $tmplPath = Join-Path (Join-Path $PSScriptRoot "Templates") "$($tmplName -replace '[^\w\s-]','').json"
 
-        $timeBasisMap = @('LocalTime', 'UTC')
+        $timeBasisMap = @('LocalTime', 'Utc')
         Save-DeploymentTemplate -TemplatePath $tmplPath -TemplateName $tmplName -Config @{
             DeployPurpose               = $purpose
             UserNotification            = $notifMap[$cboNotification.SelectedIndex]
@@ -1660,7 +1669,7 @@ $btnDeploy.Add_Click({
     # Map notification and time basis comboboxes to parameter values
     $notifMap = @('DisplayAll', 'DisplaySoftwareCenterOnly', 'HideAll')
     $notifValue = $notifMap[$cboNotification.SelectedIndex]
-    $timeBasisMap = @('LocalTime', 'UTC')
+    $timeBasisMap = @('LocalTime', 'Utc')
     $timeBasisValue = $timeBasisMap[$cboTimeBasis.SelectedIndex]
 
     # Confirmation dialog
@@ -1706,18 +1715,18 @@ $btnDeploy.Add_Click({
 
     if ($isSUG) {
         $deployParams = @{
-            SUG                       = $script:ValidatedApp
-            Collection                = $script:ValidatedCol
-            DeployPurpose             = $purpose
-            AvailableDateTime         = $dtpAvailable.Value
-            TimeBasedOn               = $timeBasisValue
-            UserNotification          = $notifValue
-            SoftwareInstallation      = $chkOverrideMW.Checked
-            AllowRestart              = $chkRebootOutside.Checked
-            AllowUseMeteredNetwork    = $chkMetered.Checked
-            AllowBoundaryFallback     = $chkBoundaryFallback.Checked
-            AllowWUMU                 = $chkMicrosoftUpdate.Checked
-            RequirePostRebootFullScan = $chkPostRebootScan.Checked
+            SUG                        = $script:ValidatedApp
+            Collection                 = $script:ValidatedCol
+            DeployPurpose              = $purpose
+            AvailableDateTime          = $dtpAvailable.Value
+            TimeBasedOn                = $timeBasisValue
+            UserNotification           = $notifValue
+            SoftwareInstallation       = $chkOverrideMW.Checked
+            AllowRestart               = $chkRebootOutside.Checked
+            UseMeteredNetwork          = $chkMetered.Checked
+            AllowBoundaryFallback      = $chkBoundaryFallback.Checked
+            DownloadFromMicrosoftUpdate = $chkMicrosoftUpdate.Checked
+            RequirePostRebootFullScan  = $chkPostRebootScan.Checked
         }
         if ($radRequired.Checked) {
             $deployParams['DeadlineDateTime'] = $dtpDeadline.Value
@@ -1733,7 +1742,7 @@ $btnDeploy.Add_Click({
             UserNotification            = $notifValue
             OverrideServiceWindow       = $chkOverrideMW.Checked
             RebootOutsideServiceWindow  = $chkRebootOutside.Checked
-            AllowMeteredConnection      = $chkMetered.Checked
+            UseMeteredNetwork           = $chkMetered.Checked
         }
         if ($radRequired.Checked) {
             $deployParams['DeadlineDateTime'] = $dtpDeadline.Value
