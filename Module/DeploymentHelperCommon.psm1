@@ -436,20 +436,20 @@ function Invoke-ApplicationDeployment {
     )
 
     $params = @{
-        Name                        = $Application.LocalizedDisplayName
-        CollectionName              = $Collection.Name
-        DeployPurpose               = $DeployPurpose
-        DeployAction                = 'Install'
-        AvailableDateTime           = $AvailableDateTime
-        TimeBaseOn                  = $TimeBasedOn
-        UserNotification            = $UserNotification
-        OverrideServiceWindow       = $OverrideServiceWindow
-        RebootOutsideServiceWindow  = $RebootOutsideServiceWindow
-        ErrorAction                 = 'Stop'
+        Name              = $Application.LocalizedDisplayName
+        CollectionName    = $Collection.Name
+        DeployPurpose     = $DeployPurpose
+        DeployAction      = 'Install'
+        AvailableDateTime = $AvailableDateTime
+        TimeBaseOn        = $TimeBasedOn
+        UserNotification  = $UserNotification
+        ErrorAction       = 'Stop'
     }
 
-    if ($DeployPurpose -eq 'Required' -and $DeadlineDateTime) {
-        $params['DeadlineDateTime'] = $DeadlineDateTime
+    if ($DeployPurpose -eq 'Required') {
+        if ($DeadlineDateTime) { $params['DeadlineDateTime'] = $DeadlineDateTime }
+        $params['OverrideServiceWindow']      = $OverrideServiceWindow
+        $params['RebootOutsideServiceWindow'] = $RebootOutsideServiceWindow
     }
     if ($UseMeteredNetwork) {
         $params['UseMeteredNetwork'] = $true
