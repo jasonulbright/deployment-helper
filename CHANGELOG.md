@@ -2,6 +2,13 @@
 
 All notable changes to the Deployment Helper are documented in this file.
 
+## [1.4.0-alpha1] - 2026-04-14
+
+### Added
+- **Pester 5 test suite** -- 51 unit tests covering all 22 exported module functions. CM cmdlets mocked via stub functions with `-ModuleName` scoping. Tests run locally without the CM console installed. Covers: connection management, validation engine (5 checks), safety guardrails (SMS000* blocking), deployment execution (app + SUG), JSONL audit log, templates, CSV/HTML export.
+
+---
+
 ## [1.3.2] - 2026-04-14
 
 ### Fixed
