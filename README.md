@@ -10,15 +10,16 @@ Safe, fast MECM application and software update group deployment with pre-execut
 - **Application + SUG support** - Deploy applications or software update groups from the same interface
 - **Search dialogs** - Browse buttons for Application and Collection fields open search dialogs with filtered DataGridView results
 - **DP group distribution** - CheckedListBox of all DP groups, distribute content to selected groups before deployment
-- **5-check validation engine** - Application/SUG exists, content distributed, collection valid, collection safe (blocks built-in system collections), no duplicate deployment
+- **5-check validation engine** - Application/SUG exists, content distributed, collection valid, collection safe (blocks all `SMS000*` system collections), no duplicate deployment
 - **Safety guardrails** - All `SMS000*` built-in collections blocked, deploy button disabled until validation passes, confirmation dialog before execution
 - **Time basis** - Choose UTC or Client Local Time for Available/Deadline scheduling (both App and SUG)
 - **SUG download settings** - Allow download from default site boundary group, Microsoft Update, and post-reboot full scan (enabled by default)
 - **Metered connection handling** - Auto-checked for Required deployments (app and SUG)
 - **Deployment templates** - Predefined and user-saved configs, Save Template button in GUI
-- **Immutable audit log** - JSONL format (one JSON object per line), append-only, records every deployment attempt (success and failure)
-- **Export** - CSV and HTML history reports
-- **Dark mode** - Full theme support with 16 color variables
+- **Immutable audit log** - JSONL format (one JSON object per line), append-only, records every deployment attempt with deployment type (Application/SUG), success, and failure
+- **Form reset after deploy** - All fields reset to defaults after successful deployment to prevent accidental redeploy
+- **Export** - CSV and HTML history reports with deployment type column
+- **Dark mode** - Full theme support
 
 ## Requirements
 
@@ -51,8 +52,10 @@ Safe, fast MECM application and software update group deployment with pre-execut
 deploymenthelper/
     start-deploymenthelper.ps1          Main GUI application
     Module/
-        DeploymentHelperCommon.psd1     Module manifest (20 functions)
+        DeploymentHelperCommon.psd1     Module manifest (22 functions)
         DeploymentHelperCommon.psm1     Core module
+    Tests/
+        DeploymentHelperCommon.Tests.ps1  Pester 5 test suite (51 tests)
     Templates/
         WorkstationPilot.json           Deployment template
         WorkstationProduction.json
@@ -83,6 +86,16 @@ Templates are JSON files in the `Templates\` folder:
 ```
 
 New fields (`TimeBasedOn`, `AllowBoundaryFallback`, `AllowMicrosoftUpdate`, `RequirePostRebootFullScan`) are optional for backwards compatibility with older templates.
+
+## Testing
+
+Run unit tests locally (no CM console required):
+
+```powershell
+Invoke-Pester -Path .\Tests\DeploymentHelperCommon.Tests.ps1 -Output Detailed
+```
+
+51 tests cover all 22 exported module functions with mocked CM cmdlets. E2E validated against CM 2509.
 
 ## License
 
