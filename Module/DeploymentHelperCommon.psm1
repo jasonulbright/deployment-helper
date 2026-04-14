@@ -351,7 +351,7 @@ function Test-DuplicateDeployment {
     )
 
     try {
-        $existing = Get-CMDeployment -SoftwareName $ApplicationName -CollectionName $CollectionName -ErrorAction Stop
+        $existing = Get-CMApplicationDeployment -Name $ApplicationName -CollectionName $CollectionName -ErrorAction Stop
         if ($null -ne $existing -and @($existing).Count -gt 0) {
             Write-Log "Duplicate deployment found: '$ApplicationName' already deployed to '$CollectionName'" -Level WARN
             return $existing

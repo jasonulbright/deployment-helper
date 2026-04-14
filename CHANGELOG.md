@@ -2,6 +2,23 @@
 
 All notable changes to the Deployment Helper are documented in this file.
 
+## [1.3.2] - 2026-04-14
+
+### Fixed
+- **Form reset after deployment** -- Application name, collection, template, purpose, dates, checkboxes, and DP group selections all reset to defaults after a successful deployment. Prevents accidental redeploy.
+- **Duplicate deployment check** -- Switched from `Get-CMDeployment` (summary cmdlet) to `Get-CMApplicationDeployment` which natively supports `-Name` + `-CollectionName` filtering for accurate duplicate detection.
+- **Dark mode log scrollbar** -- Vertical scrollbar was disabled (`ScrollBars = None`) in dark mode. Now always enabled.
+- **Duplicate startup message** -- Status bar and log console both showed the same "Configure site..." text. Status bar now shows "Disconnected" instead.
+
+### Added
+- **Validation Results label** -- Added a "Validation Results" header above the validation output panel so users know its purpose before clicking Validate.
+- **Connection bar visual distinction** -- Connection bar now uses a subtly different background color from the form panel to visually separate the connection status from the deployment form.
+
+### Removed
+- Dead color variables (`$clrGridAlt`, `$clrGridLine`, `$clrInputBdr`, `$clrGridText`) that were defined but never referenced.
+
+---
+
 ## [1.3.1] - 2026-04-14
 
 ### Fixed

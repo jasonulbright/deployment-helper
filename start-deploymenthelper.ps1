@@ -333,15 +333,11 @@ if ($script:Prefs.DarkMode) {
     $clrPanelBg    = [System.Drawing.Color]::FromArgb(40, 40, 40)
     $clrHint       = [System.Drawing.Color]::FromArgb(140, 140, 140)
     $clrSubtitle   = [System.Drawing.Color]::FromArgb(180, 200, 220)
-    $clrGridAlt    = [System.Drawing.Color]::FromArgb(48, 48, 48)
-    $clrGridLine   = [System.Drawing.Color]::FromArgb(60, 60, 60)
     $clrDetailBg   = [System.Drawing.Color]::FromArgb(45, 45, 45)
     $clrSepLine    = [System.Drawing.Color]::FromArgb(55, 55, 55)
-    $clrInputBdr   = [System.Drawing.Color]::FromArgb(70, 70, 70)
     $clrLogBg      = [System.Drawing.Color]::FromArgb(35, 35, 35)
     $clrLogFg      = [System.Drawing.Color]::FromArgb(200, 200, 200)
     $clrText       = [System.Drawing.Color]::FromArgb(220, 220, 220)
-    $clrGridText   = [System.Drawing.Color]::FromArgb(220, 220, 220)
     $clrErrText    = [System.Drawing.Color]::FromArgb(255, 100, 100)
     $clrWarnText   = [System.Drawing.Color]::FromArgb(255, 200, 80)
     $clrOkText     = [System.Drawing.Color]::FromArgb(80, 200, 80)
@@ -350,15 +346,11 @@ if ($script:Prefs.DarkMode) {
     $clrPanelBg    = [System.Drawing.Color]::White
     $clrHint       = [System.Drawing.Color]::FromArgb(140, 140, 140)
     $clrSubtitle   = [System.Drawing.Color]::FromArgb(220, 230, 245)
-    $clrGridAlt    = [System.Drawing.Color]::FromArgb(248, 250, 252)
-    $clrGridLine   = [System.Drawing.Color]::FromArgb(230, 230, 230)
     $clrDetailBg   = [System.Drawing.Color]::FromArgb(250, 250, 250)
     $clrSepLine    = [System.Drawing.Color]::FromArgb(218, 220, 224)
-    $clrInputBdr   = [System.Drawing.Color]::FromArgb(200, 200, 200)
     $clrLogBg      = [System.Drawing.Color]::White
     $clrLogFg      = [System.Drawing.Color]::Black
     $clrText       = [System.Drawing.Color]::Black
-    $clrGridText   = [System.Drawing.Color]::Black
     $clrErrText    = [System.Drawing.Color]::FromArgb(180, 0, 0)
     $clrWarnText   = [System.Drawing.Color]::FromArgb(180, 120, 0)
     $clrOkText     = [System.Drawing.Color]::FromArgb(34, 139, 34)
@@ -708,7 +700,7 @@ if ($script:DarkRenderer) {
 }
 $status.SizingGrip = $false
 $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
-$statusLabel.Text = "Configure site in File > Preferences, then click Connect."
+$statusLabel.Text = "Disconnected"
 $statusLabel.ForeColor = $clrText
 $status.Items.Add($statusLabel) | Out-Null
 $form.Controls.Add($status)
@@ -727,7 +719,7 @@ $form.Controls.Add($pnlLog)
 $txtLog = New-Object System.Windows.Forms.TextBox
 $txtLog.Multiline = $true
 $txtLog.ReadOnly = $true
-$txtLog.ScrollBars = if ($script:Prefs.DarkMode) { [System.Windows.Forms.ScrollBars]::None } else { [System.Windows.Forms.ScrollBars]::Vertical }
+$txtLog.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
 $txtLog.Font = New-Object System.Drawing.Font("Consolas", 9)
 $txtLog.BackColor = $clrLogBg
 $txtLog.ForeColor = $clrLogFg
@@ -809,10 +801,12 @@ $pnlHeader.Controls.Add($lblSubtitle)
 # Connection bar (Dock:Top)
 # ---------------------------------------------------------------------------
 
+$clrConnBarBg = if ($script:Prefs.DarkMode) { [System.Drawing.Color]::FromArgb(35, 35, 35) } else { [System.Drawing.Color]::FromArgb(237, 239, 243) }
+
 $pnlConnBar = New-Object System.Windows.Forms.Panel
 $pnlConnBar.Dock = [System.Windows.Forms.DockStyle]::Top
 $pnlConnBar.Height = 36
-$pnlConnBar.BackColor = $clrPanelBg
+$pnlConnBar.BackColor = $clrConnBarBg
 $pnlConnBar.Padding = New-Object System.Windows.Forms.Padding(12, 6, 12, 6)
 $form.Controls.Add($pnlConnBar)
 
@@ -820,7 +814,7 @@ $flowConn = New-Object System.Windows.Forms.FlowLayoutPanel
 $flowConn.Dock = [System.Windows.Forms.DockStyle]::Fill
 $flowConn.FlowDirection = [System.Windows.Forms.FlowDirection]::LeftToRight
 $flowConn.WrapContents = $false
-$flowConn.BackColor = $clrPanelBg
+$flowConn.BackColor = $clrConnBarBg
 $pnlConnBar.Controls.Add($flowConn)
 
 $lblSiteLabel = New-Object System.Windows.Forms.Label
@@ -829,7 +823,7 @@ $lblSiteLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawi
 $lblSiteLabel.AutoSize = $true
 $lblSiteLabel.Margin = New-Object System.Windows.Forms.Padding(0, 3, 2, 0)
 $lblSiteLabel.ForeColor = $clrText
-$lblSiteLabel.BackColor = $clrPanelBg
+$lblSiteLabel.BackColor = $clrConnBarBg
 $flowConn.Controls.Add($lblSiteLabel)
 
 $lblSiteVal = New-Object System.Windows.Forms.Label
@@ -838,7 +832,7 @@ $lblSiteVal.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblSiteVal.AutoSize = $true
 $lblSiteVal.Margin = New-Object System.Windows.Forms.Padding(0, 3, 16, 0)
 $lblSiteVal.ForeColor = if ($script:Prefs.SiteCode) { $clrAccent } else { $clrHint }
-$lblSiteVal.BackColor = $clrPanelBg
+$lblSiteVal.BackColor = $clrConnBarBg
 $flowConn.Controls.Add($lblSiteVal)
 
 $lblServerLabel = New-Object System.Windows.Forms.Label
@@ -847,7 +841,7 @@ $lblServerLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Dra
 $lblServerLabel.AutoSize = $true
 $lblServerLabel.Margin = New-Object System.Windows.Forms.Padding(0, 3, 2, 0)
 $lblServerLabel.ForeColor = $clrText
-$lblServerLabel.BackColor = $clrPanelBg
+$lblServerLabel.BackColor = $clrConnBarBg
 $flowConn.Controls.Add($lblServerLabel)
 
 $lblServerVal = New-Object System.Windows.Forms.Label
@@ -856,7 +850,7 @@ $lblServerVal.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblServerVal.AutoSize = $true
 $lblServerVal.Margin = New-Object System.Windows.Forms.Padding(0, 3, 16, 0)
 $lblServerVal.ForeColor = if ($script:Prefs.SMSProvider) { $clrAccent } else { $clrHint }
-$lblServerVal.BackColor = $clrPanelBg
+$lblServerVal.BackColor = $clrConnBarBg
 $flowConn.Controls.Add($lblServerVal)
 
 $lblConnStatus = New-Object System.Windows.Forms.Label
@@ -865,7 +859,7 @@ $lblConnStatus.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Draw
 $lblConnStatus.AutoSize = $true
 $lblConnStatus.Margin = New-Object System.Windows.Forms.Padding(0, 3, 20, 0)
 $lblConnStatus.ForeColor = $clrHint
-$lblConnStatus.BackColor = $clrPanelBg
+$lblConnStatus.BackColor = $clrConnBarBg
 $flowConn.Controls.Add($lblConnStatus)
 
 $btnConnect = New-Object System.Windows.Forms.Button
@@ -1231,8 +1225,17 @@ $form.Controls.Add($pnlSep2)
 $pnlValidation = New-Object System.Windows.Forms.Panel
 $pnlValidation.Dock = [System.Windows.Forms.DockStyle]::Fill
 $pnlValidation.BackColor = $clrPanelBg
-$pnlValidation.Padding = New-Object System.Windows.Forms.Padding(16, 8, 16, 8)
+$pnlValidation.Padding = New-Object System.Windows.Forms.Padding(16, 4, 16, 8)
 $form.Controls.Add($pnlValidation)
+
+$lblValidation = New-Object System.Windows.Forms.Label
+$lblValidation.Text = "Validation Results"
+$lblValidation.Dock = [System.Windows.Forms.DockStyle]::Top
+$lblValidation.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$lblValidation.ForeColor = $clrHint
+$lblValidation.BackColor = $clrPanelBg
+$lblValidation.Height = 20
+$pnlValidation.Controls.Add($lblValidation)
 
 $rtbValidation = New-Object System.Windows.Forms.RichTextBox
 $rtbValidation.Dock = [System.Windows.Forms.DockStyle]::Fill
@@ -1243,6 +1246,7 @@ $rtbValidation.ForeColor = $clrText
 $rtbValidation.BorderStyle = [System.Windows.Forms.BorderStyle]::None
 $rtbValidation.ScrollBars = [System.Windows.Forms.RichTextBoxScrollBars]::Vertical
 $pnlValidation.Controls.Add($rtbValidation)
+$rtbValidation.BringToFront()
 
 # ---------------------------------------------------------------------------
 # Dock Z-order finalization
@@ -1797,6 +1801,23 @@ $btnDeploy.Add_Click({
     $btnDeploy.Enabled = $false
     $script:ValidatedApp = $null
     $script:ValidatedCol = $null
+
+    # Reset form after deployment to prevent accidental redeploy
+    if ($result.Success) {
+        $txtAppName.Text = ''
+        $txtCollName.Text = ''
+        $cboTemplate.SelectedIndex = 0
+        $radAvailable.Checked = $true
+        $dtpAvailable.Value = Get-Date
+        $dtpDeadline.Value = (Get-Date).AddHours(24)
+        $chkOverrideMW.Checked = $false
+        $chkRebootOutside.Checked = $false
+        $chkMetered.Checked = $false
+        for ($i = 0; $i -lt $clbDPGroups.Items.Count; $i++) {
+            $clbDPGroups.SetItemChecked($i, $false)
+        }
+    }
+
     $form.Cursor = [System.Windows.Forms.Cursors]::Default
 })
 
