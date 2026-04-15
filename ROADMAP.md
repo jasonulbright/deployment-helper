@@ -18,23 +18,13 @@
 
 ---
 
-## v1.4.0 — Functionality Fixes (NEXT)
+## v1.4.0 — Functionality Fixes (COMPLETE)
 
-### Problem
-Deployment Helper has UX issues that make it not fully functional for real-world use. These must be fixed before the C# fork (Dployr) begins, so the proven workflow is correct.
-
-### Scope
-- Audit the full GUI workflow end-to-end against a live MECM environment
-- Identify and fix all UX gaps, broken flows, and unusable features
-- Deep research into MECM deployment cmdlets (`New-CMApplicationDeployment`, `New-CMSoftwareUpdateDeployment`, etc.) — parameter validation, verb specificity, edge cases
-- Verify every module function works against CM 2509
-- Fix deployment creation to match MECM best practices
-
-### Deliverables
-- Working deployment workflow: search app → select collection → validate → deploy
-- All 20 module functions verified functional
-- Updated test coverage
-- This version becomes the baseline for Dployr's logic port
+- E2E workflow validated against live MECM environment
+- 51 Pester 5 tests (all passing)
+- MW parameter fix, form reset, duplicate check
+- All 20 module functions verified functional against CM 2509
+- This version is the baseline for Dployr's logic port
 
 ---
 
