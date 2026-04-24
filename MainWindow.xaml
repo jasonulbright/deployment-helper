@@ -184,7 +184,7 @@
                         <Button x:Name="btnSUG"             Content="Software Update Groups" Style="{StaticResource WorkflowButtonStyle}"
                                 ToolTip="Deploy a software update group to a device collection"/>
 
-                        <Button x:Name="btnOptions"         Content="OPTIONS"                Style="{StaticResource OptionsButtonStyle}"
+                        <Button x:Name="btnOptions"         Content="Options"                Style="{StaticResource OptionsButtonStyle}"
                                 Margin="8,16,8,3"
                                 ToolTip="Connection, Logging, History, Templates, Appearance, About"/>
 
