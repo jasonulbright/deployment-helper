@@ -167,7 +167,8 @@
                                                IsOn="True"
                                                OnContent="" OffContent=""
                                                Margin="0,0,0,0"
-                                               MinWidth="0"/>
+                                               MinWidth="0"
+                                               ToolTip="Toggle dark / light theme"/>
                     </DockPanel>
                 </StackPanel>
 
@@ -256,7 +257,8 @@
                         <TextBlock x:Name="lblTargetName" Grid.Row="0" Grid.Column="0" Text="Application:" Style="{StaticResource FormLabelStyle}" Margin="0,8,12,8"/>
                         <TextBox x:Name="txtTargetName" Grid.Row="0" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,8,0,8"
                                  Controls:TextBoxHelper.Watermark="e.g. 7-Zip 26.00"/>
-                        <Button x:Name="btnBrowseTarget" Grid.Row="0" Grid.Column="2" Content="Browse..." Style="{StaticResource BrowseButtonStyle}" Margin="8,8,0,8"/>
+                        <Button x:Name="btnBrowseTarget" Grid.Row="0" Grid.Column="2" Content="Browse..." Style="{StaticResource BrowseButtonStyle}" Margin="8,8,0,8"
+                                ToolTip="Pick an application, package, task sequence, or SUG from MECM"/>
 
                         <!-- Program (Packages type only) -->
                         <TextBlock x:Name="lblProgram" Grid.Row="1" Grid.Column="0" Text="Program:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
@@ -268,7 +270,8 @@
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Collection:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <TextBox x:Name="txtCollection" Grid.Row="2" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"
                                  Controls:TextBoxHelper.Watermark="Device collection name (e.g. Workstations - Pilot)"/>
-                        <Button x:Name="btnBrowseCollection" Grid.Row="2" Grid.Column="2" Content="Browse..." Style="{StaticResource BrowseButtonStyle}" Margin="8,0,0,8"/>
+                        <Button x:Name="btnBrowseCollection" Grid.Row="2" Grid.Column="2" Content="Browse..." Style="{StaticResource BrowseButtonStyle}" Margin="8,0,0,8"
+                                ToolTip="Pick a device collection from MECM"/>
 
                         <!-- Purpose -->
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Purpose:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
@@ -308,10 +311,12 @@
                         <StackPanel x:Name="pnlDistribute" Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed">
                             <Button x:Name="btnDPPicker" Content="Select DP groups..." MinWidth="220" Height="28" HorizontalContentAlignment="Left" Padding="10,0,10,0"
                                     Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                    ToolTip="Pick distribution point groups for content distribution"/>
                             <Button x:Name="btnDistributeContent" Content="Distribute content" MinWidth="140" Height="28" Margin="8,0,0,0"
                                     Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                    ToolTip="Send content to the selected DP groups now"/>
                         </StackPanel>
 
                         <!-- Required-only: override service window + reboot outside -->
@@ -419,10 +424,12 @@
                 <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,4">
                     <Button x:Name="btnValidate" Content="Validate" MinWidth="110" Height="32" Margin="0,0,8,0"
                             Style="{DynamicResource MahApps.Styles.Button.Square}"
-                            Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+                            Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                            ToolTip="Check all fields against MECM and confirm the deployment is ready"/>
                     <Button x:Name="btnDeploy"   Content="Deploy"   MinWidth="110" Height="32" Visibility="Collapsed"
                             Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
-                            Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+                            Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                            ToolTip="Create the deployment in MECM"/>
                 </StackPanel>
             </Grid>
 
