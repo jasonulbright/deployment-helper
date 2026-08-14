@@ -4,8 +4,8 @@
 
 .DESCRIPTION
     Import this module to get:
-      - Structured logging (Initialize-Logging, Write-Log)
-      - CM site connection management (Connect-CMSite, Disconnect-CMSite, Test-CMConnection)
+      - Structured logging and CM site connection management via the
+        vendored SuiteCommon module (Lib\SuiteCommon)
       - Pre-execution validation (Test-ApplicationExists, Test-ContentDistributed, Test-CollectionValid, Test-CollectionSafe, Test-DuplicateDeployment)
       - DP group management (Get-DPGroupList, Start-ContentDistributionToGroups)
       - Deployment preview and execution (Get-DeploymentPreview, Invoke-ApplicationDeployment)
@@ -20,168 +20,16 @@
 #>
 
 # ---------------------------------------------------------------------------
-# Module-scoped state
+# Shared core (vendored SuiteCommon)
 # ---------------------------------------------------------------------------
-
-$script:__DHLogPath             = $null
-$script:OriginalLocation        = $null
-$script:ConnectedSiteCode       = $null
-$script:ConnectedSMSProvider    = $null
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
-
-function Initialize-Logging {
-    param([string]$LogPath)
-
-    $script:__DHLogPath = $LogPath
-
-    if ($LogPath) {
-        $parentDir = Split-Path -Path $LogPath -Parent
-        if ($parentDir -and -not (Test-Path -LiteralPath $parentDir)) {
-            New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
-        }
-
-        $header = "[{0}] [INFO ] === Log initialized ===" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-        Set-Content -LiteralPath $LogPath -Value $header -Encoding UTF8
-    }
-}
-
-function Write-Log {
-    <#
-    .SYNOPSIS
-        Writes a timestamped, severity-tagged log message.
-
-    .DESCRIPTION
-        INFO  -> Write-Host (stdout)
-        WARN  -> Write-Host (stdout)
-        ERROR -> Write-Host (stdout) + $host.UI.WriteErrorLine (stderr)
-
-        -Quiet suppresses all console output but still writes to the log file.
-    #>
-    param(
-        [AllowEmptyString()]
-        [Parameter(Mandatory, Position = 0)]
-        [string]$Message,
-
-        [ValidateSet('INFO', 'WARN', 'ERROR')]
-        [string]$Level = 'INFO',
-
-        [switch]$Quiet
-    )
-
-    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    $formatted = "[{0}] [{1,-5}] {2}" -f $timestamp, $Level, $Message
-
-    if (-not $Quiet) {
-        Write-Host $formatted
-
-        if ($Level -eq 'ERROR') {
-            $host.UI.WriteErrorLine($formatted)
-        }
-    }
-
-    if ($script:__DHLogPath) {
-        Add-Content -LiteralPath $script:__DHLogPath -Value $formatted -Encoding UTF8 -ErrorAction SilentlyContinue
-    }
-}
-
-# ---------------------------------------------------------------------------
-# CM Connection
-# ---------------------------------------------------------------------------
-
-function Connect-CMSite {
-    <#
-    .SYNOPSIS
-        Imports the ConfigurationManager module, creates a PSDrive, and sets location.
-
-    .DESCRIPTION
-        Saves original location for restoration via Disconnect-CMSite.
-        Returns $true on success, $false on failure.
-    #>
-    param(
-        [Parameter(Mandatory)][string]$SiteCode,
-        [Parameter(Mandatory)][string]$SMSProvider
-    )
-
-    $script:OriginalLocation = Get-Location
-
-    # Import CM module if not already loaded
-    if (-not (Get-Module ConfigurationManager -ErrorAction SilentlyContinue)) {
-        $cmModulePath = $null
-        if ($env:SMS_ADMIN_UI_PATH) {
-            $cmModulePath = Join-Path $env:SMS_ADMIN_UI_PATH '..\ConfigurationManager.psd1'
-        }
-
-        if (-not $cmModulePath -or -not (Test-Path -LiteralPath $cmModulePath)) {
-            Write-Log "ConfigurationManager module not found. Ensure the CM console is installed." -Level ERROR
-            return $false
-        }
-
-        try {
-            Import-Module $cmModulePath -ErrorAction Stop
-            Write-Log "Imported ConfigurationManager module"
-        }
-        catch {
-            Write-Log "Failed to import ConfigurationManager module: $_" -Level ERROR
-            return $false
-        }
-    }
-
-    # Create PSDrive if needed
-    if (-not (Get-PSDrive -Name $SiteCode -PSProvider CMSite -ErrorAction SilentlyContinue)) {
-        try {
-            New-PSDrive -Name $SiteCode -PSProvider CMSite -Root $SMSProvider -ErrorAction Stop | Out-Null
-            Write-Log "Created PSDrive for site $SiteCode"
-        }
-        catch {
-            Write-Log "Failed to create PSDrive for site $SiteCode : $_" -Level ERROR
-            return $false
-        }
-    }
-
-    try {
-        Set-Location "${SiteCode}:" -ErrorAction Stop
-        $site = Get-CMSite -SiteCode $SiteCode -ErrorAction Stop
-        Write-Log "Connected to site $SiteCode ($($site.SiteName))"
-        $script:ConnectedSiteCode    = $SiteCode
-        $script:ConnectedSMSProvider = $SMSProvider
-        return $true
-    }
-    catch {
-        Write-Log "Failed to connect to site $SiteCode : $_" -Level ERROR
-        return $false
-    }
-}
-
-function Disconnect-CMSite {
-    <#
-    .SYNOPSIS
-        Restores the original location before CM connection.
-    #>
-    if ($script:OriginalLocation) {
-        try { Set-Location $script:OriginalLocation -ErrorAction SilentlyContinue } catch { }
-    }
-    $script:ConnectedSiteCode    = $null
-    $script:ConnectedSMSProvider = $null
-    Write-Log "Disconnected from CM site"
-}
-
-function Test-CMConnection {
-    <#
-    .SYNOPSIS
-        Returns $true if currently connected to a CM site.
-    #>
-    if (-not $script:ConnectedSiteCode) { return $false }
-
-    try {
-        $drive = Get-PSDrive -Name $script:ConnectedSiteCode -PSProvider CMSite -ErrorAction Stop
-        return ($null -ne $drive)
-    }
-    catch {
-        return $false
-    }
+# Logging (Initialize-Logging, Write-Log), CM connection (Connect-CMSite,
+# Disconnect-CMSite, Test-CMConnection, Get-CMConnectionInfo), and settings
+# persistence come from the vendored copy at Lib\SuiteCommon\. -Global makes
+# the functions resolvable from the shell script and from this module alike;
+# the guard keeps a -Force reimport of this module from resetting SuiteCommon
+# state mid-session.
+if (-not (Get-Module SuiteCommon)) {
+    Import-Module (Join-Path $PSScriptRoot '..\Lib\SuiteCommon\SuiteCommon.psd1') -Global -DisableNameChecking
 }
 
 # ---------------------------------------------------------------------------

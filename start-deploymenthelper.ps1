@@ -33,7 +33,7 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 1.0.0
+    Version    : 1.1.0
     Updated    : 2026-05-02
 #>
 
@@ -143,9 +143,7 @@ function Get-DhPreferences {
 
 function Save-DhPreferences {
     param([hashtable]$Prefs)
-    try {
-        $Prefs | ConvertTo-Json | Set-Content -LiteralPath $global:PrefsPath -Encoding UTF8
-    } catch { }
+    $null = Save-SuiteSettings -Path $global:PrefsPath -Settings $Prefs
 }
 
 $global:Prefs = Get-DhPreferences

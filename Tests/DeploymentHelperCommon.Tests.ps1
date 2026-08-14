@@ -79,14 +79,16 @@ Describe 'Write-Log' {
     }
 }
 
+# Connect-CMSite lives in the vendored SuiteCommon module now, so the mocks
+# target that module's scope.
 Describe 'Connect-CMSite' {
     BeforeAll {
-        Mock Import-Module { } -ModuleName DeploymentHelperCommon -ParameterFilter { $Name -like '*ConfigurationManager*' }
-        Mock Get-Module { $null } -ModuleName DeploymentHelperCommon -ParameterFilter { $Name -eq 'ConfigurationManager' }
-        Mock Get-PSDrive { $null } -ModuleName DeploymentHelperCommon -ParameterFilter { $PSProvider -eq 'CMSite' }
-        Mock New-PSDrive { [PSCustomObject]@{ Name = 'MCM' } } -ModuleName DeploymentHelperCommon
-        Mock Set-Location { } -ModuleName DeploymentHelperCommon
-        Mock Get-CMSite { [PSCustomObject]@{ SiteCode = 'MCM'; SiteName = 'Test Site' } } -ModuleName DeploymentHelperCommon
+        Mock Import-Module { } -ModuleName SuiteCommon -ParameterFilter { $Name -like '*ConfigurationManager*' }
+        Mock Get-Module { $null } -ModuleName SuiteCommon -ParameterFilter { $Name -eq 'ConfigurationManager' }
+        Mock Get-PSDrive { $null } -ModuleName SuiteCommon -ParameterFilter { $PSProvider -eq 'CMSite' }
+        Mock New-PSDrive { [PSCustomObject]@{ Name = 'MCM' } } -ModuleName SuiteCommon
+        Mock Set-Location { } -ModuleName SuiteCommon
+        Mock Get-CMSite { [PSCustomObject]@{ SiteCode = 'MCM'; SiteName = 'Test Site' } } -ModuleName SuiteCommon
     }
 
     It 'Returns true on successful connection' {
@@ -100,6 +102,10 @@ Describe 'Connect-CMSite' {
     }
 
     It 'Returns false when CM module not found' {
+        # Clearing SMS_ADMIN_UI_PATH is not enough on a workstation with a
+        # real console install: SuiteCommon's resolver falls through to the
+        # known install paths. Mock the resolver to simulate no console.
+        Mock Resolve-ConfigurationManagerModulePath { $null } -ModuleName SuiteCommon
         $savedPath = $env:SMS_ADMIN_UI_PATH
         $env:SMS_ADMIN_UI_PATH = $null
         $result = Connect-CMSite -SiteCode 'MCM' -SMSProvider 'sms.example.com'

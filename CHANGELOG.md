@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0] - 2026-08-14
+
+### Changed
+
+- **Shared plumbing moved to the vendored `SuiteCommon` module.** Logging
+  (`Initialize-Logging`, `Write-Log`) and CM site connection
+  (`Connect-CMSite`, `Disconnect-CMSite`, `Test-CMConnection`) now load
+  from `Lib\SuiteCommon\`, shared across the tool suite and synced from
+  the suite-core repository instead of hand-edited per repo. The
+  connection additionally gains behavior this tool's own copy lacked: a
+  globally scoped CMSite PSDrive, normalized ConfigurationManager module
+  path resolution with known-install-path fallback, provider rebind when
+  the configured SMS Provider changes, and rebuild of a stale drive whose
+  provider connection died. `Initialize-Logging` gains `-Attach`.
+
 ## [1.0.0] - 2026-05-02
 
 Deployment Helper is a single-pane MECM deployment tool for
