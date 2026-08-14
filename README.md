@@ -1,5 +1,10 @@
 # Deployment Helper
 
+[![Latest release](https://img.shields.io/github/v/release/jasonulbright/deployment-helper?label=release)](https://github.com/jasonulbright/deployment-helper/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/jasonulbright/deployment-helper/total?label=downloads)](https://github.com/jasonulbright/deployment-helper/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
+[![License](https://img.shields.io/github/license/jasonulbright/deployment-helper)](LICENSE)
+
 Safe MECM deployment for Applications, Packages, Task Sequences, and Software Update Groups with pre-execution validation, safety guardrails, and immutable audit logging.
 
 ![Deployment Helper](screenshots/main-dark.png)
