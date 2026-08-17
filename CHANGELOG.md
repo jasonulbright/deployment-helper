@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0] - 2026-08-16
+
+### Changed
+
+- **Window chrome, theming, and the message dialog now come from the
+  vendored `SuiteCommon` module** (0.3.0): the title-bar drag block,
+  action-button theming, window-state persistence, and
+  `Show-ThemedMessage` load from `Lib\SuiteCommon\`. Dialog buttons
+  standardize at the suite's 32px height (previously 30px here).
+  Behavior gains: hook state no longer leaks on window close, a
+  maximized close persists the pre-maximize geometry, an off-screen
+  saved position clamps into the nearest monitor, the dialog's inactive
+  title-bar brushes now copy from the owner's inactive properties, and
+  Escape closes OK-only dialogs.
+
 ## [1.1.0] - 2026-08-14
 
 ### Changed
