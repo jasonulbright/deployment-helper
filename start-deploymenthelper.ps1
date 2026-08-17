@@ -318,79 +318,10 @@ function Set-StatusText {
 }
 
 # =============================================================================
-# Window state persistence
+# Window state persistence (geometry logic: SuiteCommon)
 # =============================================================================
 function Get-WindowStatePath {
     Join-Path $PSScriptRoot 'DeploymentHelper.windowstate.json'
-}
-
-function Save-WindowState {
-    param([Parameter(Mandatory)]$Window)
-
-    $state = @{}
-    if ($Window.WindowState -eq [System.Windows.WindowState]::Normal) {
-        $state.Left   = [int]$Window.Left
-        $state.Top    = [int]$Window.Top
-        $state.Width  = [int]$Window.Width
-        $state.Height = [int]$Window.Height
-    }
-    else {
-        $state.Left   = [int]$Window.RestoreBounds.Left
-        $state.Top    = [int]$Window.RestoreBounds.Top
-        $state.Width  = [int]$Window.RestoreBounds.Width
-        $state.Height = [int]$Window.RestoreBounds.Height
-    }
-    $state.Maximized = ($Window.WindowState -eq [System.Windows.WindowState]::Maximized)
-    $state.DarkTheme = ($toggleTheme.IsOn -eq $true)
-    $state.CurrentType = $script:CurrentType
-
-    try {
-        $json = $state | ConvertTo-Json
-        Set-Content -LiteralPath (Get-WindowStatePath) -Value $json -Encoding UTF8
-    }
-    catch { }
-}
-
-function Restore-WindowState {
-    param([Parameter(Mandatory)]$Window)
-
-    $path = Get-WindowStatePath
-    if (-not (Test-Path -LiteralPath $path)) { return }
-
-    try {
-        $state = Get-Content -LiteralPath $path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-
-        $w = [int]$state.Width
-        $h = [int]$state.Height
-        if ($w -lt $Window.MinWidth)  { $w = [int]$Window.MinWidth }
-        if ($h -lt $Window.MinHeight) { $h = [int]$Window.MinHeight }
-
-        $screens = [System.Windows.Forms.Screen]::AllScreens
-        $visible = $false
-        foreach ($screen in $screens) {
-            $titleBarRect = New-Object System.Drawing.Rectangle ([int]$state.Left), ([int]$state.Top), $w, 40
-            if ($screen.WorkingArea.IntersectsWith($titleBarRect)) {
-                $visible = $true
-                break
-            }
-        }
-
-        if ($visible) {
-            $Window.WindowStartupLocation = [System.Windows.WindowStartupLocation]::Manual
-            $Window.Left   = [double]$state.Left
-            $Window.Top    = [double]$state.Top
-            $Window.Width  = [double]$w
-            $Window.Height = [double]$h
-        }
-
-        if ($state.Maximized -eq $true) {
-            $Window.WindowState = [System.Windows.WindowState]::Maximized
-        }
-
-        $script:SavedDarkTheme = if ($null -ne $state.DarkTheme) { [bool]$state.DarkTheme } else { $true }
-        $script:SavedType      = if ($state.CurrentType)         { [string]$state.CurrentType } else { 'Apps' }
-    }
-    catch { }
 }
 
 # =============================================================================
@@ -403,129 +334,8 @@ $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [System.Windows.Markup.XamlReader]::Load($reader)
 
 # =============================================================================
-# Title-bar drag fallback. PS51-WPF-033.
-# Some VS Code PowerShell launch contexts can leave MahApps' custom title
-# thumb unable to initiate native window move. Install a WM_NCHITTEST hook
-# returning HTCAPTION for the title band, plus a managed DragMove fallback
-# for hosts where HwndSource cannot be hooked. Wire on every MetroWindow
-# (main window and every modal popup).
+# Title-bar drag fallback. PS51-WPF-033. SuiteCommon owns the hook.
 # =============================================================================
-$script:TitleBarHitTestWindows = @{}
-$script:TitleBarHitTestHooks   = @{}
-
-function Get-TitleBarDragHeight {
-    param([MahApps.Metro.Controls.MetroWindow]$Window)
-    try {
-        $h = [double]$Window.TitleBarHeight
-        if ($h -gt 0 -and -not [double]::IsNaN($h)) { return $h }
-    } catch { $null = $_ }
-    return 30.0
-}
-
-function Get-InputAncestors {
-    param([System.Windows.DependencyObject]$Start)
-    $cur = $Start
-    while ($cur) {
-        $cur
-        $parent = $null
-        if ($cur -is [System.Windows.Media.Visual] -or $cur -is [System.Windows.Media.Media3D.Visual3D]) {
-            try { $parent = [System.Windows.Media.VisualTreeHelper]::GetParent($cur) } catch { $parent = $null }
-        }
-        if (-not $parent -and $cur -is [System.Windows.FrameworkElement]) { $parent = $cur.Parent }
-        if (-not $parent -and $cur -is [System.Windows.FrameworkContentElement]) { $parent = $cur.Parent }
-        if (-not $parent -and $cur -is [System.Windows.ContentElement]) {
-            try { $parent = [System.Windows.ContentOperations]::GetParent($cur) } catch { $parent = $null }
-        }
-        $cur = $parent
-    }
-}
-
-function Test-IsWindowCommandPoint {
-    param([MahApps.Metro.Controls.MetroWindow]$Window, [System.Windows.Point]$Point)
-    try {
-        [void]$Window.ApplyTemplate()
-        $commands = $Window.Template.FindName('PART_WindowButtonCommands', $Window)
-        if ($commands -and $commands.IsVisible -and $commands.ActualWidth -gt 0 -and $commands.ActualHeight -gt 0) {
-            $origin = $commands.TransformToAncestor($Window).Transform([System.Windows.Point]::new(0, 0))
-            if ($Point.X -ge $origin.X -and $Point.X -le ($origin.X + $commands.ActualWidth) -and
-                $Point.Y -ge $origin.Y -and $Point.Y -le ($origin.Y + $commands.ActualHeight)) {
-                return $true
-            }
-        }
-    } catch { $null = $_ }
-    return ($Window.ActualWidth -gt 150 -and $Point.X -ge ($Window.ActualWidth - 150))
-}
-
-function Add-NativeTitleBarHitTestHook {
-    param([MahApps.Metro.Controls.MetroWindow]$Window)
-    try {
-        $helper = [System.Windows.Interop.WindowInteropHelper]::new($Window)
-        $source = [System.Windows.Interop.HwndSource]::FromHwnd($helper.Handle)
-        if (-not $source) { return }
-        $key = $helper.Handle.ToInt64().ToString()
-        if ($script:TitleBarHitTestHooks.ContainsKey($key)) { return }
-        $script:TitleBarHitTestWindows[$key] = $Window
-        $hook = [System.Windows.Interop.HwndSourceHook]{
-            param([IntPtr]$hwnd, [int]$msg, [IntPtr]$wParam, [IntPtr]$lParam, [ref]$handled)
-            $WM_NCHITTEST = 0x0084; $HTCAPTION = 2
-            if ($msg -ne $WM_NCHITTEST) { return [IntPtr]::Zero }
-            try {
-                $target = $script:TitleBarHitTestWindows[$hwnd.ToInt64().ToString()]
-                if (-not $target) { return [IntPtr]::Zero }
-                $raw = $lParam.ToInt64()
-                $screenX = [int]($raw -band 0xffff); if ($screenX -ge 0x8000) { $screenX -= 0x10000 }
-                $screenY = [int](($raw -shr 16) -band 0xffff); if ($screenY -ge 0x8000) { $screenY -= 0x10000 }
-                $pt = $target.PointFromScreen([System.Windows.Point]::new($screenX, $screenY))
-                $titleBarH = Get-TitleBarDragHeight -Window $target
-                if ($pt.X -lt 0 -or $pt.X -gt $target.ActualWidth) { return [IntPtr]::Zero }
-                if ($pt.Y -lt 4 -or $pt.Y -gt $titleBarH) { return [IntPtr]::Zero }
-                if (Test-IsWindowCommandPoint -Window $target -Point $pt) { return [IntPtr]::Zero }
-                $handled.Value = $true
-                return [IntPtr]$HTCAPTION
-            } catch { return [IntPtr]::Zero }
-        }
-        $script:TitleBarHitTestHooks[$key] = $hook
-        $source.AddHook($hook)
-    } catch { $null = $_ }
-}
-
-function Remove-NativeTitleBarHitTestHook {
-    param([MahApps.Metro.Controls.MetroWindow]$Window)
-    try {
-        $helper = [System.Windows.Interop.WindowInteropHelper]::new($Window)
-        $key = $helper.Handle.ToInt64().ToString()
-        if ($script:TitleBarHitTestHooks.ContainsKey($key)) {
-            $source = [System.Windows.Interop.HwndSource]::FromHwnd($helper.Handle)
-            if ($source) { $source.RemoveHook($script:TitleBarHitTestHooks[$key]) }
-            $script:TitleBarHitTestHooks.Remove($key)
-        }
-        if ($script:TitleBarHitTestWindows.ContainsKey($key)) {
-            $script:TitleBarHitTestWindows.Remove($key)
-        }
-    } catch { $null = $_ }
-}
-
-function Install-TitleBarDragFallback {
-    param([MahApps.Metro.Controls.MetroWindow]$Window)
-    $Window.Add_SourceInitialized({ param($s, $e) Add-NativeTitleBarHitTestHook -Window $s })
-    $Window.Add_Closed({ param($s, $e) Remove-NativeTitleBarHitTestHook -Window $s })
-    $Window.Add_PreviewMouseLeftButtonDown({
-        param($s, $e)
-        try {
-            if ($s.WindowState -eq [System.Windows.WindowState]::Maximized) { return }
-            $titleBarH = Get-TitleBarDragHeight -Window $s
-            $pos = $e.GetPosition($s)
-            if ($pos.Y -lt 4 -or $pos.Y -gt $titleBarH) { return }
-            if (Test-IsWindowCommandPoint -Window $s -Point $pos) { return }
-            foreach ($ancestor in Get-InputAncestors -Start ($e.OriginalSource -as [System.Windows.DependencyObject])) {
-                if ($ancestor -is [System.Windows.Controls.Primitives.ButtonBase]) { return }
-            }
-            $s.DragMove()
-            $e.Handled = $true
-        } catch { $null = $_ }
-    })
-}
-
 Install-TitleBarDragFallback -Window $window
 
 # =============================================================================
@@ -605,27 +415,17 @@ $dtpDeadline.SelectedDateTime  = (Get-Date).AddHours(24)
 # =============================================================================
 [void][ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($window, 'Dark.Steel')
 
-$script:DarkButtonBg      = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#1E1E1E')
-$script:DarkButtonBorder  = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#555555')
-$script:LightWfBg         = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#0078D4')
-$script:LightWfBorder     = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#006CBE')
-
 $script:WorkflowButtons = @($btnApps, $btnPackages, $btnTaskSequences, $btnSUG)
 $script:OptionsButtons  = @($btnOptions)
 
-function Set-ButtonTheme {
-    param([bool]$IsDark)
-    if ($IsDark) {
-        foreach ($b in $script:WorkflowButtons) { $b.Background = $script:DarkButtonBg; $b.BorderBrush = $script:DarkButtonBorder }
-        foreach ($b in $script:OptionsButtons)  { $b.Background = $script:DarkButtonBg; $b.BorderBrush = $script:DarkButtonBorder }
-        if ($lblLogOutput) { $lblLogOutput.Foreground = $script:LogLabelDark }
-    }
-    else {
-        foreach ($b in $script:WorkflowButtons) { $b.Background = $script:LightWfBg; $b.BorderBrush = $script:LightWfBorder }
-        foreach ($b in $script:OptionsButtons)  { $b.Background = $script:LightWfBg; $b.BorderBrush = $script:LightWfBorder }
-        if ($lblLogOutput) { $lblLogOutput.Foreground = $script:LogLabelLight }
-    }
-}
+# Initialize-SuiteTheme must run before the first Set-ButtonTheme call
+# (SourceInitialized handler below, and the toggle's Add_Toggled) --
+# Set-ButtonTheme throws if the module's theme context is still empty.
+Initialize-SuiteTheme -Window $window `
+    -IsDarkGetter { $toggleTheme.IsOn -eq $true } `
+    -WorkflowButtons $script:WorkflowButtons `
+    -OptionsButtons $script:OptionsButtons `
+    -LogLabel $lblLogOutput
 
 $script:TitleBarBlue         = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#0078D4')
 $script:TitleBarBlueInactive = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#4BA3E0')
@@ -762,138 +562,8 @@ function Connect-IfNeeded {
 
 # =============================================================================
 # Themed message dialog (replaces System.Windows.MessageBox::Show calls so
-# every confirmation/error stays within the MahApps theme)
+# every confirmation/error stays within the MahApps theme): SuiteCommon
 # =============================================================================
-function Show-ThemedMessage {
-    param(
-        [Parameter(Mandatory)]$Owner,
-        [Parameter(Mandatory)][string]$Title,
-        [Parameter(Mandatory)][string]$Message,
-        [ValidateSet('OK','OKCancel','YesNo')][string]$Buttons = 'OK',
-        [ValidateSet('None','Info','Warn','Error','Question')][string]$Icon = 'None'
-    )
-
-    $dlgXaml = @'
-<Controls:MetroWindow
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
-    Title="Message"
-    SizeToContent="Height"
-    Width="460" MinHeight="160"
-    WindowStartupLocation="CenterOwner"
-    TitleCharacterCasing="Normal"
-    ShowIconOnTitleBar="False"
-    ResizeMode="NoResize"
-    GlowBrush="{DynamicResource MahApps.Brushes.Accent}"
-    BorderThickness="1">
-    <Window.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
-                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
-                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Window.Resources>
-    <Grid Margin="20,18,20,14">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-
-        <TextBlock x:Name="txtIcon" Grid.Row="0" Grid.Column="0" FontSize="20" VerticalAlignment="Top" Margin="0,0,14,0"/>
-        <TextBlock x:Name="txtMsg"  Grid.Row="0" Grid.Column="1" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center"/>
-
-        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
-            <Button x:Name="btnPrimary"   MinWidth="90" Height="30" Margin="0,0,8,0" IsDefault="True"
-                    Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
-                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
-            <Button x:Name="btnSecondary" MinWidth="90" Height="30" IsCancel="True" Visibility="Collapsed"
-                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
-        </StackPanel>
-    </Grid>
-</Controls:MetroWindow>
-'@
-
-    [xml]$xml = $dlgXaml
-    $reader = New-Object System.Xml.XmlNodeReader $xml
-    $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
-    Install-TitleBarDragFallback -Window $dlg
-
-    $theme = [ControlzEx.Theming.ThemeManager]::Current.DetectTheme($Owner)
-    if ($theme) { [void][ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($dlg, $theme) }
-    $dlg.Owner = $Owner
-    try {
-        $dlg.WindowTitleBrush          = $Owner.WindowTitleBrush
-        $dlg.NonActiveWindowTitleBrush = $Owner.WindowTitleBrush
-        $dlg.GlowBrush                 = $Owner.GlowBrush
-        $dlg.NonActiveGlowBrush        = $Owner.GlowBrush
-    } catch { }
-
-    $dlg.Title = $Title
-    $txtIcon   = $dlg.FindName('txtIcon')
-    $txtMsg    = $dlg.FindName('txtMsg')
-    $btn1      = $dlg.FindName('btnPrimary')
-    $btn2      = $dlg.FindName('btnSecondary')
-    $txtMsg.Text = $Message
-
-    # Icon glyph. No color override -- per feedback_no_red_green_in_brand.md,
-    # state is carried by the glyph shape, not color. Info/Warn/Error/Question
-    # are visually distinct as ℹ / ⚠ / ✖ / ? regardless of hue; they inherit
-    # ThemeForeground for AAA contrast on both themes.
-    $glyph = switch ($Icon) {
-        'Info'     { [char]0x2139 }
-        'Warn'     { [char]0x26A0 }
-        'Error'    { [char]0x2716 }
-        'Question' { [char]0x003F }
-        default    { '' }
-    }
-    $txtIcon.Text = [string]$glyph
-
-    # Button layout
-    switch ($Buttons) {
-        'OK' {
-            $btn1.Content = 'OK'
-            $btn2.Visibility = [System.Windows.Visibility]::Collapsed
-        }
-        'OKCancel' {
-            $btn1.Content = 'OK'
-            $btn2.Content = 'Cancel'
-            $btn2.Visibility = [System.Windows.Visibility]::Visible
-        }
-        'YesNo' {
-            $btn1.Content = 'Yes'
-            $btn2.Content = 'No'
-            $btn2.Visibility = [System.Windows.Visibility]::Visible
-        }
-    }
-
-    $script:ThemedMessageResult = switch ($Buttons) { 'YesNo' { 'No' } default { 'Cancel' } }
-
-    # No .GetNewClosure() -- Show-ThemedMessage is still blocked on
-    # $dlg.ShowDialog() when these handlers fire, so lexical parent scope
-    # reaches $dlg and $Buttons naturally. GetNewClosure would strip
-    # $script: WRITES (silently dropped, not errored) AND script-function
-    # lookup, so $script:ThemedMessageResult would never actually update
-    # and the return value would always be the initial 'No'/'Cancel'.
-    $btn1.Add_Click({
-        $script:ThemedMessageResult = switch ($Buttons) { 'YesNo' { 'Yes' } default { 'OK' } }
-        $dlg.Close()
-    })
-    $btn2.Add_Click({
-        $script:ThemedMessageResult = switch ($Buttons) { 'YesNo' { 'No' } default { 'Cancel' } }
-        $dlg.Close()
-    })
-
-    [void]$dlg.ShowDialog()
-    return $script:ThemedMessageResult
-}
 
 # =============================================================================
 # Deployment schedule sanity checks
@@ -3561,7 +3231,11 @@ $cboApplyTemplate.Add_SelectionChanged({
 # =============================================================================
 $script:SavedDarkTheme = $true
 $script:SavedType      = 'Apps'
-Restore-WindowState -Window $window
+Restore-WindowState -Window $window -Path (Get-WindowStatePath) -OnStateLoaded {
+    param($s)
+    $script:SavedDarkTheme = if ($null -ne $s.DarkTheme) { [bool]$s.DarkTheme } else { $true }
+    $script:SavedType      = if ($s.CurrentType)         { [string]$s.CurrentType } else { 'Apps' }
+}
 
 $window.Add_SourceInitialized({
     if (-not $script:SavedDarkTheme) {
@@ -3581,7 +3255,10 @@ $window.Add_Loaded({
 })
 
 $window.Add_Closing({
-    Save-WindowState -Window $window
+    Save-WindowState -Window $window -Path (Get-WindowStatePath) -ExtraState @{
+        DarkTheme   = ($toggleTheme.IsOn -eq $true)
+        CurrentType = $script:CurrentType
+    }
     try { Disconnect-CMSite } catch { }
 })
 
