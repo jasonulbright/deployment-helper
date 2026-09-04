@@ -33,7 +33,7 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 1.2.2
+    Version    : 1.2.3
     Updated    : 2026-05-02
 #>
 
@@ -332,6 +332,13 @@ $xamlPath = Join-Path $PSScriptRoot 'MainWindow.xaml'
 
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [System.Windows.Markup.XamlReader]::Load($reader)
+
+# Installed version: the script header is the single source of truth for the
+# About panel.
+$script:AppVersion = '0.0.0'
+foreach ($headerLine in (Get-Content -LiteralPath $PSCommandPath -TotalCount 80)) {
+    if ($headerLine -match '^\s*Version\s*:\s*([0-9][0-9\.]*[0-9])\s*$') { $script:AppVersion = $Matches[1]; break }
+}
 
 # =============================================================================
 # Title-bar drag fallback. PS51-WPF-033. SuiteCommon owns the hook.
@@ -2651,7 +2658,7 @@ function New-AboutPanel {
     [void]$grid.Children.Add($title)
 
     $ver = New-Object System.Windows.Controls.TextBlock
-    $ver.Text = 'Version 1.0.0'
+    $ver.Text = 'Version ' + $script:AppVersion
     $ver.FontSize = 12
     $ver.Margin = '0,0,0,12'
     [void]$grid.Children.Add($ver)
