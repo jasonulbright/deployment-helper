@@ -33,7 +33,7 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 1.2.1
+    Version    : 1.2.2
     Updated    : 2026-05-02
 #>
 
