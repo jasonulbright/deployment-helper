@@ -1,6 +1,6 @@
 @{
     RootModule        = 'DeploymentHelperCommon.psm1'
-    ModuleVersion     = '1.2.1'
+    ModuleVersion     = '1.2.2'
     GUID              = 'c3d4e5f6-a7b8-9012-cdef-345678901234'
     Author            = 'Jason Ulbright'
     Description       = 'MECM application deployment with pre-execution validation, safety guardrails, and immutable audit logging.'
