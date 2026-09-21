@@ -33,7 +33,7 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 2026.09.21.0007
+    Version    : 2026.09.21.0008
     Updated    : 2026-09-21
 #>
 
@@ -147,6 +147,11 @@ function Save-DhPreferences {
 }
 
 $global:Prefs = Get-DhPreferences
+
+# The suite launcher hands its site code and provider to each tool it starts.
+# A value saved in this tool wins; the launcher value fills an empty one.
+if (-not $global:Prefs.SiteCode    -and $env:SUITE_CM_SITECODE) { $global:Prefs.SiteCode    = [string]$env:SUITE_CM_SITECODE }
+if (-not $global:Prefs.SMSProvider -and $env:SUITE_CM_PROVIDER) { $global:Prefs.SMSProvider = [string]$env:SUITE_CM_PROVIDER }
 
 # Script params override prefs only when non-empty. Empty-by-default
 # means the shipped app reads from DeploymentHelper.prefs.json (user-
@@ -3256,7 +3261,7 @@ $window.Add_SourceInitialized({
 $window.Add_Loaded({
     & $script:SetCurrentType $script:SavedType
     & $script:RefreshApplyTemplateCombo
-    Add-LogLine -Message ('Deployment Helper loaded. Site={0} Provider={1}' -f $SiteCode, $SMSProvider)
+    Add-LogLine -Message ('Deployment Helper loaded. Site={0} Provider={1}' -f $global:Prefs['SiteCode'], $global:Prefs['SMSProvider'])
     Add-LogLine -Message ('Tool log: {0}' -f $toolLogPath)
     Set-StatusText -Text 'Ready.'
 })
