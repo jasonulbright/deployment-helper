@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026.09.21.0008] - 2026-09-21
+
+### Fixed
+
+- Use the site code and provider from the suite launcher when the tool has none saved.
+- Show the site code and provider in use in the startup log line.
+
+### Changed
+
+- Update the README screenshot.
+
 ## [2026.09.21.0007] - 2026-09-21
 
 ### Changed
