@@ -5,7 +5,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4)](#requirements)
 [![License](https://img.shields.io/github/license/jasonulbright/deployment-helper)](LICENSE)
 
-Safe MECM deployment for Applications, Packages, Task Sequences, and Software Update Groups with pre-execution validation, safety guardrails, and immutable audit logging.
+Safe Configuration Manager deployment for Applications, Packages, Task Sequences, and Software Update Groups with pre-execution validation, safety guardrails, and immutable audit logging.
 
 ![Deployment Helper](screenshots/main-dark.png)
 
@@ -29,7 +29,7 @@ Safe MECM deployment for Applications, Packages, Task Sequences, and Software Up
 - PowerShell 5.1
 - .NET Framework 4.8 or later
 - Configuration Manager admin console installed locally
-- MECM role permissions sufficient for application, package, task sequence, and software update deployment
+- Configuration Manager role permissions sufficient for application, package, task sequence, and software update deployment
 
 ## Install
 

@@ -1,9 +1,9 @@
 @{
     RootModule        = 'DeploymentHelperCommon.psm1'
-    ModuleVersion     = '1.2.3'
+    ModuleVersion     = '2026.09.21.0007'
     GUID              = 'c3d4e5f6-a7b8-9012-cdef-345678901234'
     Author            = 'Jason Ulbright'
-    Description       = 'MECM application deployment with pre-execution validation, safety guardrails, and immutable audit logging.'
+    Description       = 'Configuration Manager application deployment with pre-execution validation, safety guardrails, and immutable audit logging.'
     PowerShellVersion = '5.1'
 
     FunctionsToExport = @(

@@ -965,7 +965,7 @@ function Invoke-TaskSequenceDeployment {
     if ($RebootOutsideServiceWindow) { $params['SystemRestart']        = $true }
     # UseMeteredNetwork is a Required-only param. Passing it on Available
     # TS deploys triggers a cmdlet WARN that leaks into the audit log
-    # (MECM surfaces "Parameter X does not apply to deployments with Purpose
+    # (ConfigMgr surfaces "Parameter X does not apply to deployments with Purpose
     # Available"). Apps + Packages already model this gating via their
     # $params hashtable conditions; mirror it here.
     if ($DeployPurpose -eq 'Required' -and $UseMeteredNetwork) {
@@ -1007,7 +1007,7 @@ function Invoke-PackageDeployment {
         Success/failure is returned as a hashtable with DeploymentID.
 
         UTC semantics: TimeBasedOn='Utc' sets both -UseUtcForAvailableSchedule and
-        -UseUtcForExpireSchedule. The package cmdlet treats these independently in MECM;
+        -UseUtcForExpireSchedule. The package cmdlet treats these independently in ConfigMgr;
         for safety-critical tool usage we keep them in lockstep.
 
         Maintenance-window semantics:
