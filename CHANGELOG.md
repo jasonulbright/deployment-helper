@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026.09.21.0007] - 2026-09-21
+
+### Changed
+
+- Use the product name Configuration Manager in the application and the documentation.
+- Use date versions.
+- Update the shared SuiteCommon module to 2026.09.21.0031.
+
 ## [1.2.3] - 2026-09-04
 
 ### Fixed

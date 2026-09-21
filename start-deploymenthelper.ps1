@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    MahApps.Metro WPF front-end for MECM deployment workflows.
+    Main window of Deployment Helper, a tool that creates Configuration Manager deployments with validation and an audit log.
 
 .DESCRIPTION
     MahApps.Metro 2.4.10 WPF shell for deploying Apps, Packages, Task Sequences,
-    and Software Update Groups to MECM device collections.
+    and Software Update Groups to ConfigMgr device collections.
 
     Four deployment types surface via sidebar buttons. All types share a unified
     form pane in the right column. Session 2 fully wires the Apps type
@@ -33,8 +33,8 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 1.2.3
-    Updated    : 2026-05-02
+    Version    : 2026.09.21.0007
+    Updated    : 2026-09-21
 #>
 
 param(
@@ -269,28 +269,28 @@ $script:TypeMeta = @{
         Subheader   = 'Select an application and a device collection, then configure the deployment.'
         TargetLabel = 'Application:'
         Watermark   = 'e.g. 7-Zip 26.00'
-        Check1Text  = 'Application exists in MECM'
+        Check1Text  = 'Application exists in ConfigMgr'
     }
     'Packages' = @{
         Header      = 'Packages Deployment'
         Subheader   = 'Select a classic package, program, and device collection.'
         TargetLabel = 'Package:'
         Watermark   = 'Classic package name'
-        Check1Text  = 'Package and program exist in MECM'
+        Check1Text  = 'Package and program exist in ConfigMgr'
     }
     'TaskSequences' = @{
         Header      = 'Task Sequences Deployment'
         Subheader   = 'Select a task sequence and a device collection.'
         TargetLabel = 'Task Sequence:'
         Watermark   = 'Task sequence name'
-        Check1Text  = 'Task sequence exists in MECM'
+        Check1Text  = 'Task sequence exists in ConfigMgr'
     }
     'SUG' = @{
         Header      = 'Software Update Groups Deployment'
         Subheader   = 'Select a software update group and a device collection.'
         TargetLabel = 'Update Group:'
         Watermark   = 'Software update group name'
-        Check1Text  = 'Software update group exists in MECM'
+        Check1Text  = 'Software update group exists in ConfigMgr'
     }
 }
 
@@ -585,7 +585,7 @@ function Test-DeploymentNotification {
     # Guards the "Available + HideAll" combo. Both halves are individually
     # valid, together they produce a deployment that neither surfaces to
     # the user in Software Center NOR auto-installs -- a silent no-op.
-    # MECM accepts it; we don't.
+    # ConfigMgr accepts it; we don't.
     param(
         [Parameter(Mandatory)][ValidateSet('Available','Required')][string]$Purpose,
         [Parameter(Mandatory)][ValidateSet('DisplayAll','DisplaySoftwareCenterOnly','HideAll')][string]$Notification
@@ -1369,11 +1369,11 @@ $script:InvokeTaskSequencesValidate = {
         # tracked independently. Walking that reference tree is a v1.1
         # candidate (Get-CMTaskSequenceDeployment's -InputObject
         # Reference collection). For v1.0, mark PASS with an info log;
-        # MECM's deploy cmdlet will still error if a referenced item's
+        # ConfigMgr's deploy cmdlet will still error if a referenced item's
         # content isn't on a reachable DP. User confirmed "content is
         # fully distributed" surface via the console for this case.
         Set-CheckGlyph -Index 2 -State 'Pass'
-        Add-LogLine -Message 'Check 2 (content) skipped for TS: referenced-content distribution enforced by MECM at deploy time. Verify in console if unsure.'
+        Add-LogLine -Message 'Check 2 (content) skipped for TS: referenced-content distribution enforced by ConfigMgr at deploy time. Verify in console if unsure.'
 
         # Check 3: collection valid
         $col = Test-CollectionValid -CollectionName $collName
@@ -1544,7 +1544,7 @@ $script:InvokeAppsDeploy = {
 
     # Schedule sanity. Block inverted Required deadlines; warn-and-confirm
     # on backdated Available. Stops accidental "fires immediately on every
-    # client" moments before the MECM cmdlet accepts them.
+    # client" moments before the ConfigMgr cmdlet accepts them.
     $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose
     if (-not $schedule.Ok) {
         [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
@@ -1829,7 +1829,7 @@ function Show-DPGroupPickerDialog {
 function New-ConnectionPanel {
     $grid = New-Object System.Windows.Controls.StackPanel
     $hdr = New-Object System.Windows.Controls.TextBlock
-    $hdr.Text = 'MECM Connection'
+    $hdr.Text = 'Configuration Manager Connection'
     $hdr.FontSize = 18
     $hdr.FontWeight = 'SemiBold'
     $hdr.Margin = '0,0,0,12'
@@ -2664,7 +2664,7 @@ function New-AboutPanel {
     [void]$grid.Children.Add($ver)
 
     $desc = New-Object System.Windows.Controls.TextBlock
-    $desc.Text = 'Safe MECM deployment for Apps, Packages, Task Sequences, and Software Update Groups with 5-check validation and audit logging.'
+    $desc.Text = 'Safe Configuration Manager deployment for Apps, Packages, Task Sequences, and Software Update Groups with 5-check validation and audit logging.'
     $desc.FontSize = 12
     $desc.TextWrapping = 'Wrap'
     $desc.Margin = '0,0,0,12'
