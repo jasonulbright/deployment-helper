@@ -12,7 +12,7 @@ Safe Configuration Manager deployment for Applications, Packages, Task Sequences
 ## Features
 
 - Unified deployment workflow for Apps, Packages, Task Sequences, and Software Update Groups
-- Search dialogs for target object and target collection (filtered DataGrid results)
+- Browse dialogs for the target object and the target collection: the full list loads in the background, a filter box narrows it as you type, and collections show in their console folder tree (lists are kept for the session; Refresh, or Shift+Browse for collections, reloads)
 - Distribution point group picker with per-group status
 - Five-check pre-execution validation (target exists, content distributed, collection valid, collection safe, no duplicate deployment)
 - SMS-built-in collection guardrail: every `SMS000*` collection is blocked

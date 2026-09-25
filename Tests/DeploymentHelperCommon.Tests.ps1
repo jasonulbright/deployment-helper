@@ -14,6 +14,7 @@ BeforeAll {
     # These do nothing by default -- each test overrides them via Mock.
     $cmStubs = @(
         'Get-CMSite', 'Get-CMApplication', 'Get-CMCollection',
+        'Get-CMPackage', 'Get-CMTaskSequence',
         'Get-CMSoftwareUpdateGroup', 'Get-CMDistributionStatus',
         'Get-CMDistributionPointGroup', 'Get-CMDeployment',
         'Get-CMApplicationDeployment',
@@ -209,6 +210,180 @@ Describe 'Search-CMCollectionByName' {
             $results = Search-CMCollectionByName -SearchText 'Pilot'
             @($results).Count | Should -Be 2
         }
+    }
+}
+
+Describe 'Get-CMBrowseList' {
+    Context 'Applications' {
+        BeforeAll {
+            Mock Get-CMApplication -ModuleName DeploymentHelperCommon {
+                @(
+                    [PSCustomObject]@{ LocalizedDisplayName = 'Zulu'; SoftwareVersion = '1'; PackageID = 'MCM00002'; DateLastModified = (Get-Date); CI_ID = 9 },
+                    [PSCustomObject]@{ LocalizedDisplayName = 'Alpha'; SoftwareVersion = '2'; PackageID = 'MCM00001'; DateLastModified = (Get-Date); CI_ID = 8 }
+                )
+            }
+        }
+
+        It 'Loads every application in one read, sorted by name, with only the browse columns' {
+            $rows = Get-CMBrowseList -Type Apps
+            Should -Invoke Get-CMApplication -ModuleName DeploymentHelperCommon -Times 1 -Exactly
+            @($rows).Count | Should -Be 2
+            $rows[0].LocalizedDisplayName | Should -Be 'Alpha'
+            @($rows[0].PSObject.Properties.Name) | Should -Be @('LocalizedDisplayName', 'SoftwareVersion', 'PackageID', 'DateLastModified')
+        }
+    }
+
+    Context 'Packages, task sequences, update groups' {
+        BeforeAll {
+            Mock Get-CMPackage -ModuleName DeploymentHelperCommon {
+                @([PSCustomObject]@{ Name = 'Pkg'; PackageID = 'MCM00010'; Manufacturer = 'M'; Version = '1' })
+            }
+            Mock Get-CMTaskSequence -ModuleName DeploymentHelperCommon {
+                @([PSCustomObject]@{ Name = 'TS'; PackageID = 'MCM00020'; BootImageID = 'MCM00021'; Description = 'd' })
+            }
+            Mock Get-CMSoftwareUpdateGroup -ModuleName DeploymentHelperCommon {
+                @([PSCustomObject]@{ LocalizedDisplayName = 'SUG'; NumberOfUpdates = 3; NumberOfExpiredUpdates = 0; DateCreated = (Get-Date) })
+            }
+        }
+
+        It 'Returns package rows' {
+            $rows = Get-CMBrowseList -Type Packages
+            @($rows).Count | Should -Be 1
+            $rows[0].PackageID | Should -Be 'MCM00010'
+        }
+
+        It 'Returns task sequence rows' {
+            $rows = Get-CMBrowseList -Type TaskSequences
+            $rows[0].Name | Should -Be 'TS'
+        }
+
+        It 'Returns software update group rows' {
+            $rows = Get-CMBrowseList -Type SUG
+            $rows[0].LocalizedDisplayName | Should -Be 'SUG'
+        }
+    }
+
+    Context 'Collections' {
+        BeforeAll {
+            Mock Get-CMCollection -ModuleName DeploymentHelperCommon {
+                @(
+                    [PSCustomObject]@{ Name = 'All Systems'; CollectionID = 'SMS00001'; MemberCount = 100; LastRefreshTime = (Get-Date); IsBuiltIn = $true },
+                    [PSCustomObject]@{ Name = 'Pilot'; CollectionID = 'MCM00010'; MemberCount = 5; LastRefreshTime = (Get-Date) }
+                )
+            }
+        }
+
+        It 'Requests device collections only and marks built-in rows' {
+            $rows = Get-CMBrowseList -Type Collections
+            Should -Invoke Get-CMCollection -ModuleName DeploymentHelperCommon -Times 1 -Exactly -ParameterFilter { $CollectionType -eq 'Device' }
+            @($rows).Count | Should -Be 2
+            ($rows | Where-Object CollectionID -eq 'SMS00001').IsBuiltIn | Should -BeTrue
+            ($rows | Where-Object CollectionID -eq 'MCM00010').IsBuiltIn | Should -BeFalse
+        }
+    }
+
+    Context 'Empty site' {
+        BeforeAll {
+            Mock Get-CMPackage -ModuleName DeploymentHelperCommon { @() }
+        }
+
+        It 'Returns an empty array' {
+            $rows = Get-CMBrowseList -Type Packages
+            @($rows).Count | Should -Be 0
+        }
+    }
+}
+
+Describe 'Get-CMCollectionFolderInfo' {
+    BeforeAll {
+        Mock Get-CimInstance -ModuleName DeploymentHelperCommon -ParameterFilter { $ClassName -eq 'SMS_ObjectContainerNode' } {
+            @(
+                [PSCustomObject]@{ ContainerNodeID = 16777217; Name = 'Servers'; ParentContainerNodeID = 0 },
+                [PSCustomObject]@{ ContainerNodeID = 16777218; Name = 'SQL'; ParentContainerNodeID = 16777217 }
+            )
+        }
+        Mock Get-CimInstance -ModuleName DeploymentHelperCommon -ParameterFilter { $ClassName -eq 'SMS_ObjectContainerItem' } {
+            @([PSCustomObject]@{ InstanceKey = 'MCM00010'; ContainerNodeID = 16777218 })
+        }
+    }
+
+    It 'Reads folders and placements from the site namespace with two CIM reads' {
+        $info = Get-CMCollectionFolderInfo -SMSProvider 'sccm.contoso.com' -SiteCode 'MCM'
+        Should -Invoke Get-CimInstance -ModuleName DeploymentHelperCommon -Times 2 -Exactly -ParameterFilter {
+            $ComputerName -eq 'sccm.contoso.com' -and $Namespace -eq 'root\sms\site_MCM' -and $Filter -eq 'ObjectType = 5000'
+        }
+        @($info.Folders).Count | Should -Be 2
+        ($info.Folders | Where-Object Name -eq 'SQL').ParentID | Should -Be 16777217
+        $info.FolderMap['MCM00010'] | Should -Be 16777218
+    }
+}
+
+Describe 'Add-CollectionFolderId' {
+    It 'Maps placed collections to their folder and the rest to the root' {
+        $rows = @(
+            [PSCustomObject]@{ Name = 'A'; CollectionID = 'MCM00010' },
+            [PSCustomObject]@{ Name = 'B'; CollectionID = 'MCM00011' }
+        )
+        $out = Add-CollectionFolderId -Collections $rows -FolderMap @{ 'MCM00010' = 42 }
+        ($out | Where-Object CollectionID -eq 'MCM00010').FolderID | Should -Be 42
+        ($out | Where-Object CollectionID -eq 'MCM00011').FolderID | Should -Be 0
+    }
+
+    It 'Returns an empty array for no collections' {
+        $out = Add-CollectionFolderId -Collections @() -FolderMap @{}
+        @($out).Count | Should -Be 0
+    }
+}
+
+Describe 'Select-BrowseMatch' {
+    BeforeAll {
+        $script:BrowseRows = @(
+            [PSCustomObject]@{ LocalizedDisplayName = '7-Zip'; SoftwareVersion = '24.09'; PackageID = 'MCM00001' },
+            [PSCustomObject]@{ LocalizedDisplayName = 'Notepad++'; SoftwareVersion = '8.6'; PackageID = 'MCM00002' },
+            [PSCustomObject]@{ LocalizedDisplayName = 'Zip Utility'; SoftwareVersion = $null; PackageID = 'MCM00003' }
+        )
+    }
+
+    It 'Returns every row in order for an empty needle' {
+        $out = Select-BrowseMatch -Items $script:BrowseRows -Needle ''
+        @($out).Count | Should -Be 3
+        $out[0].PackageID | Should -Be 'MCM00001'
+    }
+
+    It 'Returns every row for a null needle' {
+        $out = Select-BrowseMatch -Items $script:BrowseRows -Needle $null
+        @($out).Count | Should -Be 3
+    }
+
+    It 'Matches a case-insensitive substring on any column' {
+        $out = Select-BrowseMatch -Items $script:BrowseRows -Needle 'ZIP'
+        @($out.LocalizedDisplayName) | Should -Be @('7-Zip', 'Zip Utility')
+    }
+
+    It 'Matches on the ID column' {
+        $out = Select-BrowseMatch -Items $script:BrowseRows -Needle 'mcm00002'
+        @($out).Count | Should -Be 1
+        $out[0].LocalizedDisplayName | Should -Be 'Notepad++'
+    }
+
+    It 'Restricts the match to the given properties' {
+        $out = Select-BrowseMatch -Items $script:BrowseRows -Needle 'MCM' -Property LocalizedDisplayName
+        @($out).Count | Should -Be 0
+    }
+
+    It 'Trims the needle and skips null values' {
+        $out = Select-BrowseMatch -Items $script:BrowseRows -Needle '  8.6  '
+        @($out).Count | Should -Be 1
+    }
+
+    It 'Returns an empty array when nothing matches' {
+        $out = Select-BrowseMatch -Items $script:BrowseRows -Needle 'xyzzy'
+        @($out).Count | Should -Be 0
+    }
+
+    It 'Returns an empty array for no items' {
+        $out = Select-BrowseMatch -Items @() -Needle 'a'
+        @($out).Count | Should -Be 0
     }
 }
 

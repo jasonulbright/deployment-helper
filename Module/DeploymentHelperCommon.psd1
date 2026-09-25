@@ -1,6 +1,6 @@
 @{
     RootModule        = 'DeploymentHelperCommon.psm1'
-    ModuleVersion     = '2026.09.21.0008'
+    ModuleVersion     = '2026.09.25.0009'
     GUID              = 'c3d4e5f6-a7b8-9012-cdef-345678901234'
     Author            = 'Jason Ulbright'
     Description       = 'Configuration Manager application deployment with pre-execution validation, safety guardrails, and immutable audit logging.'
@@ -13,6 +13,12 @@
         # Search
         'Search-CMApplicationByName'
         'Search-CMCollectionByName'
+
+        # Browse
+        'Get-CMBrowseList'
+        'Get-CMCollectionFolderInfo'
+        'Add-CollectionFolderId'
+        'Select-BrowseMatch'
 
         # DP Groups
         'Get-DPGroupList'
