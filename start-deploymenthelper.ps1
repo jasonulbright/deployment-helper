@@ -33,7 +33,7 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 2026.09.21.0008
+    Version    : 2026.09.25.0009
     Updated    : 2026-09-21
 #>
 
@@ -653,15 +653,43 @@ function Test-DeploymentSchedule {
 }
 
 # =============================================================================
-# Themed search dialog (Application + Collection lookup)
+# Background runspace for browse loads
 # =============================================================================
-function Show-SearchDialog {
+$script:BgRunspace       = $null
+$script:BgPowerShell     = $null
+$script:BgInvokeHandle   = $null
+$script:BgTimer          = $null
+$script:BgGraveyard      = @()
+$script:BrowseLoadState  = $null
+$script:BrowseLoadDialog = $null
+$script:BrowseLoadResult = $null
+$script:BrowseCache      = @{}
+
+function Initialize-BgRunspace {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Lazy-init of the background runspace; idempotent.')]
+    param()
+    if ($script:BgRunspace -and $script:BgRunspace.RunspaceStateInfo.State -eq 'Opened') { return }
+    $script:BgRunspace = New-SuiteBgRunspace -ModulePath $__modulePath -LogPath $toolLogPath
+}
+
+function Stop-BgWork {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Tears down ephemeral runspace plumbing only.')]
+    param()
+    $script:BgGraveyard = @(Stop-SuiteBgWork -PowerShell $script:BgPowerShell -Timer $script:BgTimer -Graveyard $script:BgGraveyard)
+    $script:BgTimer        = $null
+    $script:BgPowerShell   = $null
+    $script:BgInvokeHandle = $null
+}
+
+# =============================================================================
+# Browse loading dialog: runs one bulk read off the dispatcher and returns
+# @{ Items; Folders } or $null (cancel / error).
+# =============================================================================
+function Show-BrowseLoadingDialog {
     param(
         [Parameter(Mandatory)]$Owner,
         [Parameter(Mandatory)][string]$Title,
-        [Parameter(Mandatory)][string]$Watermark,
-        [Parameter(Mandatory)][scriptblock]$SearchAction,
-        [Parameter(Mandatory)][string]$NameProperty
+        [Parameter(Mandatory)][ValidateSet('Apps', 'Packages', 'TaskSequences', 'SUG', 'Collections')][string]$Type
     )
 
     $dlgXaml = @'
@@ -669,8 +697,218 @@ function Show-SearchDialog {
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
-    Title="Search"
-    Width="720" Height="480"
+    Title="Loading"
+    Width="420" Height="170"
+    ResizeMode="NoResize"
+    WindowStartupLocation="CenterOwner"
+    TitleCharacterCasing="Normal"
+    ShowIconOnTitleBar="False"
+    ShowCloseButton="False"
+    GlowBrush="{DynamicResource MahApps.Brushes.Accent}"
+    BorderThickness="1">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+            <Controls:ProgressRing IsActive="True" Width="36" Height="36" Margin="0,0,16,0"
+                                   Foreground="{DynamicResource MahApps.Brushes.Accent}"/>
+            <TextBlock x:Name="txtStep" VerticalAlignment="Center" FontSize="13" Text="Connecting..."/>
+        </StackPanel>
+        <Button x:Name="btnCancel" Grid.Row="1" Content="Cancel" MinWidth="90" Height="32" HorizontalAlignment="Right" IsCancel="True"
+                Style="{DynamicResource MahApps.Styles.Button.Square}"
+                Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+    </Grid>
+</Controls:MetroWindow>
+'@
+
+    [xml]$xml = $dlgXaml
+    $reader = New-Object System.Xml.XmlNodeReader $xml
+    $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
+    Install-TitleBarDragFallback -Window $dlg
+    $dlg.Owner = $Owner
+    $dlg.Title = $Title
+    Set-DialogTheme -Dialog $dlg
+
+    $btnCancel = $dlg.FindName('btnCancel')
+
+    # New-SuiteBgRunspace throws when the module bootstrap fails; an
+    # uncaught throw here takes down the dispatcher.
+    try {
+        Initialize-BgRunspace
+    }
+    catch {
+        Add-LogLine -Message ('Browse load failed: {0}' -f $_.Exception.Message)
+        [void](Show-ThemedMessage -Owner $Owner -Title 'Browse' -Message ('Background load could not start: {0}' -f $_.Exception.Message) -Buttons OK -Icon Error)
+        return $null
+    }
+    Stop-BgWork
+
+    $script:BrowseLoadDialog = $dlg
+    $script:BrowseLoadResult = $null
+    $script:BrowseLoadState  = [hashtable]::Synchronized(@{
+        Step     = 'Connecting...'
+        Done     = $false
+        Result   = $null
+        ErrorMsg = $null
+    })
+
+    $siteCode    = [string]$global:Prefs['SiteCode']
+    $smsProvider = [string]$global:Prefs['SMSProvider']
+
+    $script:BgPowerShell = [powershell]::Create()
+    $script:BgPowerShell.Runspace = $script:BgRunspace
+    [void]$script:BgPowerShell.AddScript({
+        param($SiteCode, $SMSProvider, $Type, $State)
+        try {
+            # The CM site drive and current location are per runspace; the
+            # UI-thread connection does not reach this runspace.
+            if (-not (Test-CMConnection)) {
+                $State.Step = "Connecting to $SiteCode..."
+                if (-not (Connect-CMSite -SiteCode $SiteCode -SMSProvider $SMSProvider)) {
+                    $State.ErrorMsg = "Failed to connect to site $SiteCode (provider $SMSProvider)."
+                    return
+                }
+            }
+
+            $label = switch ($Type) {
+                'Apps'          { 'applications' }
+                'Packages'      { 'packages' }
+                'TaskSequences' { 'task sequences' }
+                'SUG'           { 'software update groups' }
+                'Collections'   { 'device collections' }
+            }
+            $State.Step = "Loading $label..."
+            $items   = @(Get-CMBrowseList -Type $Type)
+            $folders = @()
+
+            if ($Type -eq 'Collections') {
+                $State.Step = 'Loading collection folders...'
+                $folderMap = @{}
+                try {
+                    $info      = Get-CMCollectionFolderInfo -SMSProvider $SMSProvider -SiteCode $SiteCode
+                    $folders   = @($info.Folders)
+                    $folderMap = $info.FolderMap
+                } catch {
+                    # A blocked CIM read degrades the picker to a flat root list.
+                    Write-Log ("Collection folder read failed; showing a flat list: {0}" -f $_.Exception.Message) -Level WARN
+                    $folders   = @()
+                    $folderMap = @{}
+                }
+                $items = @(Add-CollectionFolderId -Collections $items -FolderMap $folderMap)
+            }
+
+            $State.Result = [PSCustomObject]@{ Items = $items; Folders = $folders }
+        }
+        catch {
+            $State.ErrorMsg = $_.Exception.Message
+        }
+        finally {
+            $State.Done = $true
+        }
+    }).AddArgument($siteCode).AddArgument($smsProvider).AddArgument($Type).AddArgument($script:BrowseLoadState)
+
+    $script:BgInvokeHandle = $script:BgPowerShell.BeginInvoke()
+
+    # $script: state only in the tick handler: the timer outlives the
+    # dialog's Loaded scope and the handler must not depend on lexical refs.
+    $script:BgTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:BgTimer.Interval = [TimeSpan]::FromMilliseconds(150)
+    $script:BgTimer.Add_Tick({
+        $state = $script:BrowseLoadState
+        if (-not $state) { return }
+        $step = [string]$state.Step
+        $lbl  = $script:BrowseLoadDialog.FindName('txtStep')
+        if ($lbl -and $lbl.Text -ne $step) { $lbl.Text = $step }
+        if (-not $state.Done) { return }
+
+        $script:BgTimer.Stop()
+        try { [void]$script:BgPowerShell.EndInvoke($script:BgInvokeHandle) } catch { $null = $_ }
+        try { $script:BgPowerShell.Dispose() } catch { $null = $_ }
+        $script:BgPowerShell   = $null
+        $script:BgInvokeHandle = $null
+
+        if ($state.ErrorMsg) {
+            $script:BrowseLoadResult = $null
+            Add-LogLine -Message ('Browse load failed: {0}' -f $state.ErrorMsg)
+            [void](Show-ThemedMessage -Owner $script:BrowseLoadDialog -Title 'Browse' -Message ('Load error: {0}' -f $state.ErrorMsg) -Buttons OK -Icon Error)
+        }
+        else {
+            $script:BrowseLoadResult = $state.Result
+        }
+        $script:BrowseLoadDialog.Close()
+    })
+
+    $btnCancel.Add_Click({
+        $script:BrowseLoadResult = $null
+        Stop-BgWork
+        $dlg.Close()
+    })
+
+    # Alt+F4 bypasses the Cancel button; the pipeline must not outlive the dialog.
+    $dlg.Add_Closing({ Stop-BgWork })
+
+    $dlg.Add_Loaded({ $script:BgTimer.Start() })
+    [void]$dlg.ShowDialog()
+
+    $script:BrowseLoadDialog = $null
+    $result = $script:BrowseLoadResult
+    $script:BrowseLoadResult = $null
+    return $result
+}
+
+function Get-BrowseList {
+    <#
+    .SYNOPSIS
+        Returns the cached rows for one object type, loading them once per
+        session. -Force reloads. $null when the load was cancelled or failed.
+    #>
+    param(
+        [Parameter(Mandatory)]$Owner,
+        [Parameter(Mandatory)][string]$Title,
+        [Parameter(Mandatory)][string]$Type,
+        [switch]$Force
+    )
+    if (-not $Force -and $script:BrowseCache.ContainsKey($Type)) { return $script:BrowseCache[$Type] }
+    $loaded = Show-BrowseLoadingDialog -Owner $Owner -Title $Title -Type $Type
+    if ($null -eq $loaded) { return $null }
+    $script:BrowseCache[$Type] = $loaded
+    return $loaded
+}
+
+# =============================================================================
+# Themed browse dialog (Application / Package / Task Sequence / SUG)
+# =============================================================================
+function Show-BrowseDialog {
+    param(
+        [Parameter(Mandatory)]$Owner,
+        [Parameter(Mandatory)][string]$Title,
+        [Parameter(Mandatory)][string]$Watermark,
+        [Parameter(Mandatory)][ValidateSet('Apps', 'Packages', 'TaskSequences', 'SUG')][string]$Type,
+        [Parameter(Mandatory)][string]$NameProperty
+    )
+
+    $loaded = Get-BrowseList -Owner $Owner -Title $Title -Type $Type
+    if ($null -eq $loaded) { return $null }
+
+    $dlgXaml = @'
+<Controls:MetroWindow
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+    Title="Browse"
+    Width="760" Height="520"
+    MinWidth="540" MinHeight="360"
     WindowStartupLocation="CenterOwner"
     TitleCharacterCasing="Normal"
     ShowIconOnTitleBar="False"
@@ -690,14 +928,15 @@ function Show-SearchDialog {
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
 
-        <TextBox x:Name="txtSearch" Grid.Row="0" Grid.Column="0" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,8,8"/>
-        <Button  x:Name="btnSearch" Grid.Row="0" Grid.Column="1" Content="Search" Width="90" Height="28" Margin="0,0,0,8"
+        <TextBox x:Name="txtFilter" Grid.Row="0" Grid.Column="0" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,8,8"/>
+        <Button  x:Name="btnRefresh" Grid.Row="0" Grid.Column="1" Content="Refresh" Width="90" Height="28" Margin="0,0,0,8"
                  Style="{DynamicResource MahApps.Styles.Button.Square}"
                  Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
 
@@ -712,9 +951,14 @@ function Show-SearchDialog {
                   HeadersVisibility="Column"
                   RowHeaderWidth="0"
                   BorderThickness="0"
-                  ColumnHeaderHeight="30"/>
+                  ColumnHeaderHeight="30"
+                  EnableRowVirtualization="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling"/>
 
-        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+        <TextBlock x:Name="txtStatus" Grid.Row="2" Grid.ColumnSpan="2" FontSize="11" Margin="0,8,0,0"
+                   Foreground="{DynamicResource MahApps.Brushes.Gray1}" Text=""/>
+
+        <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
             <Button x:Name="btnOK"     Content="OK"     MinWidth="90" Height="32" Margin="0,0,8,0" IsDefault="True"
                     Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
                     Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
@@ -741,74 +985,59 @@ function Show-SearchDialog {
         $dlg.NonActiveGlowBrush        = $Owner.GlowBrush
     } catch { }
 
-    $dlg.Title     = $Title
-    $txtSearch     = $dlg.FindName('txtSearch')
-    $btnSearch     = $dlg.FindName('btnSearch')
-    $dgResults     = $dlg.FindName('dgResults')
-    $btnOK         = $dlg.FindName('btnOK')
-    $btnCancel     = $dlg.FindName('btnCancel')
-    [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtSearch, $Watermark)
+    $dlg.Title  = $Title
+    $txtFilter  = $dlg.FindName('txtFilter')
+    $btnRefresh = $dlg.FindName('btnRefresh')
+    $dgResults  = $dlg.FindName('dgResults')
+    $txtStatus  = $dlg.FindName('txtStatus')
+    $btnOK      = $dlg.FindName('btnOK')
+    $btnCancel  = $dlg.FindName('btnCancel')
+    [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtFilter, $Watermark)
 
-    # No .GetNewClosure() on any handler registered in this modal dialog
-    # -- same rule as Show-ThemedMessage. $doSearch calls Show-ThemedMessage
-    # (a script-level function) on the <2-char guard and on search error;
-    # GetNewClosure strips script-function lookup so that call fails with
-    # "not recognized". Lexical parent scope reaches $dlg / $dgResults /
-    # $SearchAction / $txtSearch / $btnOK naturally because ShowDialog()
-    # is still blocking this function while the handlers fire.
-    $doSearch = {
-        $term = $txtSearch.Text
-        if ($null -eq $term) { return }
-        $term = $term.Trim()
-        if ($term.Length -lt 2) {
-            [void](Show-ThemedMessage -Owner $dlg -Title 'Search' -Message 'Enter at least 2 characters to search.' -Buttons OK -Icon Info)
-            return
-        }
+    # Shared mutable rows live in a hashtable so the handlers below can
+    # replace the list after a Refresh without a $script: variable.
+    $state = @{ All = @($loaded.Items) }
 
-        $dlg.Cursor = [System.Windows.Input.Cursors]::Wait
-        try {
-            $results = & $SearchAction $term
-        } catch {
-            $results = @()
-            [void](Show-ThemedMessage -Owner $dlg -Title 'Search' -Message ('Search error: {0}' -f $_.Exception.Message) -Buttons OK -Icon Error)
-        } finally {
-            $dlg.Cursor = $null
-        }
+    # No .GetNewClosure() on any handler in this modal dialog: ShowDialog()
+    # blocks this function while the handlers fire, so lexical parent scope
+    # reaches $dlg / $dgResults / $state / $NameProperty. GetNewClosure would
+    # strip script-function lookup (Show-ThemedMessage, Select-BrowseMatch)
+    # and $script: writes.
+    $applyFilter = {
+        $rows = Select-BrowseMatch -Items $state.All -Needle ([string]$txtFilter.Text)
+        $dgResults.ItemsSource = $rows
+        $total = @($state.All).Count
+        if (@($rows).Count -eq $total) { $txtStatus.Text = ('{0} item(s). Type to filter, or pick a row.' -f $total) }
+        else                            { $txtStatus.Text = ('{0} of {1} item(s) match.' -f @($rows).Count, $total) }
+    }
 
+    $buildColumns = {
         $dgResults.Columns.Clear()
-        $dgResults.ItemsSource = $null
-        if ($null -eq $results -or @($results).Count -eq 0) {
-            return
-        }
-
-        $first = @($results)[0]
-        $props = $first.PSObject.Properties.Name
+        if (@($state.All).Count -eq 0) { return }
+        $props = @($state.All)[0].PSObject.Properties.Name
         foreach ($p in $props) {
             $col = New-Object System.Windows.Controls.DataGridTextColumn
-            $col.Header = $p
+            $col.Header  = $p
             $col.Binding = New-Object System.Windows.Data.Binding($p)
             if ($p -eq $props[0]) { $col.Width = [System.Windows.Controls.DataGridLength]::new(1, [System.Windows.Controls.DataGridLengthUnitType]::Star) }
             else                  { $col.Width = [System.Windows.Controls.DataGridLength]::SizeToCells }
             $dgResults.Columns.Add($col) | Out-Null
         }
-        $dgResults.ItemsSource = @($results)
     }
 
-    $btnSearch.Add_Click($doSearch)
-    $txtSearch.Add_KeyDown({
-        param($s, $e)
-        if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
-            $e.Handled = $true
-            & $doSearch
-        }
+    & $buildColumns
+    & $applyFilter
+
+    $txtFilter.Add_TextChanged({ & $applyFilter })
+
+    $btnRefresh.Add_Click({
+        $fresh = Get-BrowseList -Owner $dlg -Title $Title -Type $Type -Force
+        if ($null -eq $fresh) { return }
+        $state.All = @($fresh.Items)
+        & $buildColumns
+        & $applyFilter
     })
 
-    # No .GetNewClosure() on the three handlers below -- same rule as
-    # Show-ThemedMessage: ShowDialog() is still blocking this function
-    # when the handlers fire, so lexical parent scope reaches $dlg /
-    # $dgResults / $NameProperty naturally. GetNewClosure would strip
-    # $script: writes (silently) so $script:DialogResult would never
-    # update and the function would return $null on every OK-click.
     $dgResults.Add_MouseDoubleClick({
         if ($dgResults.SelectedItem) { $btnOK.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)) }
     })
@@ -821,15 +1050,38 @@ function Show-SearchDialog {
             $dlg.Close()
         }
         else {
-            [void](Show-ThemedMessage -Owner $dlg -Title 'Search' -Message 'Select a row, then click OK.' -Buttons OK -Icon Info)
+            [void](Show-ThemedMessage -Owner $dlg -Title 'Browse' -Message 'Select a row, then click OK.' -Buttons OK -Icon Info)
         }
     })
 
     $btnCancel.Add_Click({ $script:DialogResult = $null; $dlg.Close() })
 
-    $dlg.Add_Loaded({ $txtSearch.Focus() })
+    $dlg.Add_Loaded({ $txtFilter.Focus() })
     [void]$dlg.ShowDialog()
     return $script:DialogResult
+}
+
+# =============================================================================
+# Device collection browse: cached bulk load, then the shared folder-tree
+# picker. The shared picker has no Refresh button, so -Force (Shift held on
+# the Browse button) reloads. Returns the picked collection name or $null.
+# =============================================================================
+function Show-CollectionBrowse {
+    param(
+        [Parameter(Mandatory)]$Owner,
+        [switch]$Force
+    )
+
+    $loaded = Get-BrowseList -Owner $Owner -Title 'Browse device collections' -Type 'Collections' -Force:$Force
+    if ($null -eq $loaded) { return $null }
+    if (@($loaded.Items).Count -eq 0) {
+        [void](Show-ThemedMessage -Owner $Owner -Title 'Browse' -Message 'No device collections were returned by the site.' -Buttons OK -Icon Info)
+        return $null
+    }
+
+    $picked = Show-CollectionPickerDialog -Owner $Owner -Collections @($loaded.Items) -Folders @($loaded.Folders) -Title 'Pick device collection'
+    if ($picked) { return [string]$picked.Name }
+    return $null
 }
 
 # =============================================================================
@@ -1793,7 +2045,7 @@ function Show-DPGroupPickerDialog {
     $lstGroups.ItemsSource = $rows
 
     # No .GetNewClosure() on any handler in this modal dialog -- same
-    # rule as Show-ThemedMessage / Show-SearchDialog: ShowDialog() is
+    # rule as Show-ThemedMessage / Show-BrowseDialog: ShowDialog() is
     # still blocking this function when the handlers fire, so lexical
     # parent scope reaches $rows / $lstGroups / $dlg naturally, AND
     # $script:DPPickerResult writes land on the real factory-scope var
@@ -2428,7 +2680,7 @@ function New-TemplatesPanel {
     # The helpers below (sanitize/refreshList/loadEditor/harvestConfig) use
     # .GetNewClosure() because they reference the local control refs
     # ($txtName, $list, etc.) created in this factory. The "call out to
-    # script scope" helpers (showThemed, showSearch, connectIfNeeded,
+    # script scope" helpers (showThemed, showCollectionBrowse, connectIfNeeded,
     # refreshMainCombo) are PLAIN (no GetNewClosure) so they keep their
     # factory SessionState and can resolve script-scope callees.
     # -----------------------------------------------------------------------
@@ -2443,15 +2695,9 @@ function New-TemplatesPanel {
         Show-ThemedMessage -Owner $Owner -Title $Title -Message $Message -Buttons $Buttons -Icon $Icon
     }
 
-    $showSearch = {
-        param(
-            [Parameter(Mandatory)]$Owner,
-            [Parameter(Mandatory)][string]$Title,
-            [Parameter(Mandatory)][string]$Watermark,
-            [Parameter(Mandatory)][scriptblock]$SearchAction,
-            [Parameter(Mandatory)][string]$NameProperty
-        )
-        Show-SearchDialog -Owner $Owner -Title $Title -Watermark $Watermark -SearchAction $SearchAction -NameProperty $NameProperty
+    $showCollectionBrowse = {
+        param([Parameter(Mandatory)]$Owner, [switch]$Force)
+        Show-CollectionBrowse -Owner $Owner -Force:$Force
     }
 
     $connectIfNeeded  = { Connect-IfNeeded }
@@ -2540,10 +2786,8 @@ function New-TemplatesPanel {
 
     $btnBrowseColl.Add_Click({
         if (-not (& $connectIfNeeded)) { return }
-        $picked = & $showSearch -Owner $ownerWindow -Title 'Find device collection' `
-            -Watermark 'Search collections by name (min 2 chars)' `
-            -SearchAction { param($q) Search-CMCollectionByName -SearchText $q } `
-            -NameProperty 'Name'
+        $reload = ([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Shift) -ne 0
+        $picked = & $showCollectionBrowse -Owner $ownerWindow -Force:$reload
         if ($picked) { $txtColl.Text = $picked }
     }.GetNewClosure())
 
@@ -2945,20 +3189,18 @@ $btnBrowseTarget.Add_Click({
     if (-not (Connect-IfNeeded)) { return }
     switch ($script:CurrentType) {
         'Apps' {
-            $picked = Show-SearchDialog -Owner $window -Title 'Find application' `
-                -Watermark 'Search applications by name (min 2 chars)' `
-                -SearchAction { param($q) Search-CMApplicationByName -SearchText $q } `
-                -NameProperty 'LocalizedDisplayName'
+            $picked = Show-BrowseDialog -Owner $window -Title 'Browse applications' `
+                -Watermark 'Filter by name, version, or package ID' `
+                -Type 'Apps' -NameProperty 'LocalizedDisplayName'
             if ($picked) {
                 $txtTargetName.Text = $picked
                 Add-LogLine -Message ('Selected application: {0}' -f $picked)
             }
         }
         'Packages' {
-            $picked = Show-SearchDialog -Owner $window -Title 'Find package' `
-                -Watermark 'Search packages by name (min 2 chars)' `
-                -SearchAction { param($q) Search-CMPackageByName -SearchText $q } `
-                -NameProperty 'Name'
+            $picked = Show-BrowseDialog -Owner $window -Title 'Browse packages' `
+                -Watermark 'Filter by name, package ID, manufacturer, or version' `
+                -Type 'Packages' -NameProperty 'Name'
             if ($picked) {
                 $txtTargetName.Text = $picked
                 Add-LogLine -Message ('Selected package: {0}' -f $picked)
@@ -2967,20 +3209,18 @@ $btnBrowseTarget.Add_Click({
             }
         }
         'TaskSequences' {
-            $picked = Show-SearchDialog -Owner $window -Title 'Find task sequence' `
-                -Watermark 'Search task sequences by name (min 2 chars)' `
-                -SearchAction { param($q) Search-CMTaskSequenceByName -SearchText $q } `
-                -NameProperty 'Name'
+            $picked = Show-BrowseDialog -Owner $window -Title 'Browse task sequences' `
+                -Watermark 'Filter by name, package ID, or description' `
+                -Type 'TaskSequences' -NameProperty 'Name'
             if ($picked) {
                 $txtTargetName.Text = $picked
                 Add-LogLine -Message ('Selected task sequence: {0}' -f $picked)
             }
         }
         'SUG' {
-            $picked = Show-SearchDialog -Owner $window -Title 'Find software update group' `
-                -Watermark 'Search SUGs by name (min 2 chars)' `
-                -SearchAction { param($q) Search-CMSoftwareUpdateGroupByName -SearchText $q } `
-                -NameProperty 'LocalizedDisplayName'
+            $picked = Show-BrowseDialog -Owner $window -Title 'Browse software update groups' `
+                -Watermark 'Filter by name' `
+                -Type 'SUG' -NameProperty 'LocalizedDisplayName'
             if ($picked) {
                 $txtTargetName.Text = $picked
                 Add-LogLine -Message ('Selected SUG: {0}' -f $picked)
@@ -2994,10 +3234,8 @@ $btnBrowseTarget.Add_Click({
 
 $btnBrowseCollection.Add_Click({
     if (-not (Connect-IfNeeded)) { return }
-    $picked = Show-SearchDialog -Owner $window -Title 'Find device collection' `
-        -Watermark 'Search collections by name (min 2 chars)' `
-        -SearchAction { param($q) Search-CMCollectionByName -SearchText $q } `
-        -NameProperty 'Name'
+    $reload = ([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Shift) -ne 0
+    $picked = Show-CollectionBrowse -Owner $window -Force:$reload
     if ($picked) {
         $txtCollection.Text = $picked
         Add-LogLine -Message ('Selected collection: {0}' -f $picked)
@@ -3271,6 +3509,9 @@ $window.Add_Closing({
         DarkTheme   = ($toggleTheme.IsOn -eq $true)
         CurrentType = $script:CurrentType
     }
+    Stop-BgWork
+    Close-SuiteBgRunspace -Runspace $script:BgRunspace
+    $script:BgRunspace = $null
     try { Disconnect-CMSite } catch { }
 })
 

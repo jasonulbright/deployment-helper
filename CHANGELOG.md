@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026.09.25.0009] - 2026-09-25
+
+## Browse opens 5 object types with no search term
+
+### Changed
+
+- Update the shared SuiteCommon module to 2026.09.25.0033.
+- List every application, package, task sequence, or update group when Browse opens.
+- Filter the browse list as you type; no search term is required.
+- Load browse lists in the background with a progress dialog and Cancel.
+- Keep browse lists for the session; Refresh, or Shift+Browse for collections, reloads.
+- Browse device collections in their console folder tree.
+
 ## [2026.09.21.0008] - 2026-09-21
 
 ### Fixed

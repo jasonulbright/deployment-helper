@@ -89,6 +89,146 @@ function Search-CMCollectionByName {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Browse (bulk load + client-side filter)
+# ---------------------------------------------------------------------------
+
+function Get-CMBrowseList {
+    <#
+    .SYNOPSIS
+        Returns every object of one type as flat rows for the browse dialogs.
+        One provider read per call; the dialogs filter the rows locally.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('Apps', 'Packages', 'TaskSequences', 'SUG', 'Collections')]
+        [string]$Type
+    )
+
+    $rows = switch ($Type) {
+        'Apps' {
+            @(Get-CMApplication -Fast -ErrorAction Stop |
+                Select-Object LocalizedDisplayName, SoftwareVersion, PackageID, DateLastModified |
+                Sort-Object LocalizedDisplayName)
+        }
+        'Packages' {
+            @(Get-CMPackage -Fast -ErrorAction Stop |
+                Select-Object Name, PackageID, Manufacturer, Version |
+                Sort-Object Name)
+        }
+        'TaskSequences' {
+            @(Get-CMTaskSequence -Fast -ErrorAction Stop |
+                Select-Object Name, PackageID, BootImageID, Description |
+                Sort-Object Name)
+        }
+        'SUG' {
+            @(Get-CMSoftwareUpdateGroup -ErrorAction Stop |
+                Select-Object LocalizedDisplayName, NumberOfUpdates, NumberOfExpiredUpdates, DateCreated |
+                Sort-Object LocalizedDisplayName)
+        }
+        'Collections' {
+            @(Get-CMCollection -CollectionType Device -ErrorAction Stop | ForEach-Object {
+                $builtIn = if ($null -ne $_.IsBuiltIn) { [bool]$_.IsBuiltIn } else { ([string]$_.CollectionID) -like 'SMS*' }
+                [PSCustomObject]@{
+                    Name            = [string]$_.Name
+                    CollectionID    = [string]$_.CollectionID
+                    MemberCount     = [int]$_.MemberCount
+                    LastRefreshTime = $_.LastRefreshTime
+                    IsBuiltIn       = $builtIn
+                }
+            } | Sort-Object Name)
+        }
+    }
+
+    $rows = @($rows)
+    Write-Log "Browse load '$Type': $($rows.Count) object(s)"
+    return ,$rows
+}
+
+function Get-CMCollectionFolderInfo {
+    <#
+    .SYNOPSIS
+        Returns the device-collection console folders and the
+        CollectionID -> folder map. Two CIM reads, independent of row count.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$SMSProvider,
+        [Parameter(Mandatory)][string]$SiteCode
+    )
+
+    $namespace = "root\sms\site_$SiteCode"
+
+    $folders = @(
+        Get-CimInstance -ComputerName $SMSProvider -Namespace $namespace `
+            -ClassName SMS_ObjectContainerNode -Filter 'ObjectType = 5000' -ErrorAction Stop |
+        ForEach-Object {
+            [PSCustomObject]@{
+                FolderID = [int]$_.ContainerNodeID
+                Name     = [string]$_.Name
+                ParentID = [int]$_.ParentContainerNodeID
+            }
+        }
+    )
+
+    $items = @(
+        Get-CimInstance -ComputerName $SMSProvider -Namespace $namespace `
+            -ClassName SMS_ObjectContainerItem -Filter 'ObjectType = 5000' -ErrorAction Stop
+    )
+    $map = @{}
+    foreach ($i in $items) { $map[[string]$i.InstanceKey] = [int]$i.ContainerNodeID }
+
+    Write-Log "Collection folders: $($folders.Count) folder(s), $($map.Count) placed collection(s)"
+    return @{ Folders = $folders; FolderMap = $map }
+}
+
+function Add-CollectionFolderId {
+    <#
+    .SYNOPSIS
+        Adds a FolderID property to each collection row. A collection absent
+        from the map lives at the tree root (FolderID 0).
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][array]$Collections,
+        [hashtable]$FolderMap = @{}
+    )
+
+    $out = @(foreach ($c in $Collections) {
+        $key = [string]$c.CollectionID
+        $fid = if ($FolderMap.ContainsKey($key)) { [int]$FolderMap[$key] } else { 0 }
+        $c | Add-Member -MemberType NoteProperty -Name FolderID -Value $fid -Force -PassThru
+    })
+    return ,$out
+}
+
+function Select-BrowseMatch {
+    <#
+    .SYNOPSIS
+        Filters browse rows by a case-insensitive substring over the given
+        properties (default: every property). An empty needle returns all
+        rows in their original order.
+    #>
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][array]$Items,
+        [AllowEmptyString()][AllowNull()][string]$Needle,
+        [string[]]$Property
+    )
+
+    $needle = ([string]$Needle).Trim()
+    if ($needle.Length -eq 0) { return ,@($Items) }
+
+    $out = @(foreach ($item in $Items) {
+        $names = if ($Property -and $Property.Count -gt 0) { $Property } else { @($item.PSObject.Properties.Name) }
+        $hit = $false
+        foreach ($n in $names) {
+            $v = $item.$n
+            if ($null -eq $v) { continue }
+            if (([string]$v).IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { $hit = $true; break }
+        }
+        if ($hit) { $item }
+    })
+    return ,$out
+}
+
 function Test-ContentDistributed {
     param([Parameter(Mandatory)]$Application)
 
