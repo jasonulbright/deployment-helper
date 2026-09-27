@@ -234,7 +234,8 @@ Describe 'Get-CMBrowseList' {
             Should -Invoke Get-CMApplication -ModuleName DeploymentHelperCommon -Times 1 -Exactly
             @($rows).Count | Should -Be 2
             $rows[0].LocalizedDisplayName | Should -Be 'Alpha'
-            @($rows[0].PSObject.Properties.Name) | Should -Be @('LocalizedDisplayName', 'SoftwareVersion', 'PackageID', 'DateLastModified')
+            @($rows[0].PSObject.Properties.Name) | Should -Be @('LocalizedDisplayName', 'SoftwareVersion', 'CI_ID', 'DateLastModified')
+            $rows[0].CI_ID | Should -Be 8
         }
     }
 
@@ -260,6 +261,7 @@ Describe 'Get-CMBrowseList' {
         It 'Returns task sequence rows' {
             $rows = Get-CMBrowseList -Type TaskSequences
             $rows[0].Name | Should -Be 'TS'
+            @($rows[0].PSObject.Properties.Name) | Should -Be @('Name', 'PackageID', 'Description')
         }
 
         It 'Returns software update group rows' {

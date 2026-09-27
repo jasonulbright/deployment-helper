@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026.09.27.0011] - 2026-09-27
+
+## The ring view shows the preview and open runs together at 1320 x 820
+
+### Fixed
+
+- Show the CI ID in the application browse list instead of an always-empty package ID.
+- Remove the always-empty boot image column from the task sequence browse list.
+- Widen the ring grid columns so no header is cut off.
+- Show full run labels, notes, and checks as tooltips in the ring grids.
+
+### Changed
+
+- Move the ring preview buttons to the preview header line.
+- Update the README screenshots and add one of the ring view.
+
 ## [2026.09.26.0010] - 2026-09-26
 
 ## One confirmation creates the deployments for all 4 rings of a plan

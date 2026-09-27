@@ -492,42 +492,52 @@
                                       VerticalAlignment="Center" Margin="16,0,0,0"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="txtRingPlanInfo" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextWrapping="Wrap"
+                        <TextBlock x:Name="txtRingPlanInfo" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                    Foreground="{DynamicResource MahApps.Brushes.Gray1}" Margin="0,0,0,4"/>
                     </Grid>
 
-                    <TextBlock Text="EXPANSION PREVIEW (EDITS APPLY TO THIS RUN ONLY)" Style="{StaticResource SectionHeaderStyle}" Margin="0,10,0,6"/>
-                    <DataGrid x:Name="dgRingPreview" Height="180"
+                    <DockPanel Margin="0,10,0,6" LastChildFill="False">
+                        <TextBlock DockPanel.Dock="Left" Text="EXPANSION PREVIEW (EDITS APPLY TO THIS RUN ONLY)" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"/>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button x:Name="btnRingPickCollection" Content="Set collection..." MinWidth="120" Height="32" Margin="0,0,8,0"
+                                    Style="{DynamicResource MahApps.Styles.Button.Square}"
+                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                    ToolTip="Pick the device collection for the selected ring (this run only). Shift+click reloads the list."/>
+                            <Button x:Name="btnRingValidate" Content="Validate" MinWidth="110" Height="32" Margin="0,0,8,0"
+                                    Style="{DynamicResource MahApps.Styles.Button.Square}"
+                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                    ToolTip="Run the five checks for every ring and the plan rules"/>
+                            <Button x:Name="btnRingCreate" Content="Create deployments" MinWidth="150" Height="32" Visibility="Collapsed"
+                                    Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
+                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                    ToolTip="Create the ring deployments in Configuration Manager"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <DataGrid x:Name="dgRingPreview" Height="132"
                               AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                               CanUserSortColumns="False" SelectionMode="Single" SelectionUnit="FullRow"
                               GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0"
                               ColumnHeaderHeight="28" FontSize="12">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="#" Binding="{Binding Index}" IsReadOnly="True" Width="32"/>
-                            <DataGridTextColumn Header="Ring" Binding="{Binding Name}" IsReadOnly="True" Width="100"/>
-                            <DataGridTextColumn Header="Collection ID" Binding="{Binding CollectionID, Mode=TwoWay}" Width="100"/>
+                            <DataGridTextColumn Header="Ring" Binding="{Binding Name}" IsReadOnly="True" Width="96"/>
+                            <DataGridTextColumn Header="Collection ID" Binding="{Binding CollectionID, Mode=TwoWay}" Width="118"/>
                             <DataGridTextColumn Header="Collection" Binding="{Binding CollectionName}" IsReadOnly="True" Width="*"/>
-                            <DataGridTextColumn Header="Purpose" Binding="{Binding Purpose}" IsReadOnly="True" Width="70"/>
+                            <DataGridTextColumn Header="Purpose" Binding="{Binding Purpose}" IsReadOnly="True" Width="86"/>
                             <DataGridTextColumn Header="Available" Binding="{Binding AvailableText, Mode=TwoWay}" Width="120"/>
                             <DataGridTextColumn Header="Deadline" Binding="{Binding DeadlineText, Mode=TwoWay}" Width="120"/>
-                            <DataGridTextColumn Header="Threshold" Binding="{Binding ThresholdText}" IsReadOnly="True" Width="70"/>
-                            <DataGridTextColumn Header="Checks" Binding="{Binding Checks}" IsReadOnly="True" Width="2*"/>
+                            <DataGridTextColumn Header="Threshold" Binding="{Binding ThresholdText}" IsReadOnly="True" Width="96"/>
+                            <DataGridTextColumn Header="Checks" Binding="{Binding Checks}" IsReadOnly="True" Width="1.5*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                        <Setter Property="ToolTip" Value="{Binding Checks}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                         </DataGrid.Columns>
                     </DataGrid>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                        <Button x:Name="btnRingPickCollection" Content="Set collection..." MinWidth="120" Height="32" Margin="0,0,8,0"
-                                Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                ToolTip="Pick the device collection for the selected ring (this run only). Shift+click reloads the list."/>
-                        <Button x:Name="btnRingValidate" Content="Validate" MinWidth="110" Height="32" Margin="0,0,8,0"
-                                Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                ToolTip="Run the five checks for every ring and the plan rules"/>
-                        <Button x:Name="btnRingCreate" Content="Create deployments" MinWidth="150" Height="32" Visibility="Collapsed"
-                                Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
-                                Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                ToolTip="Create the ring deployments in Configuration Manager"/>
-                    </StackPanel>
 
                     <DockPanel Margin="0,14,0,6" LastChildFill="False">
                         <TextBlock x:Name="lblRingRuns" DockPanel.Dock="Left" Text="OPEN RUNS" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"/>
@@ -538,23 +548,37 @@
                         <CheckBox x:Name="chkRingShowClosed" DockPanel.Dock="Right" Content="Show closed runs" FontSize="12"
                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
                     </DockPanel>
-                    <DataGrid x:Name="dgRingRuns" Height="190"
+                    <DataGrid x:Name="dgRingRuns" Height="160"
                               AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
                               SelectionMode="Single" SelectionUnit="FullRow"
                               GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0"
                               ColumnHeaderHeight="28" FontSize="12">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Run" Binding="{Binding RunLabel}" Width="2*"/>
+                            <DataGridTextColumn Header="Run" Binding="{Binding RunLabel}" Width="3*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                        <Setter Property="ToolTip" Value="{Binding RunLabel}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                             <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="32"/>
                             <DataGridTextColumn Header="Ring" Binding="{Binding Name}" Width="90"/>
-                            <DataGridTextColumn Header="Collection" Binding="{Binding CollectionID}" Width="90"/>
-                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="70"/>
+                            <DataGridTextColumn Header="Collection" Binding="{Binding CollectionID}" Width="104"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="80"/>
                             <DataGridTextColumn Header="Deadline" Binding="{Binding DeadlineText}" Width="115"/>
-                            <DataGridTextColumn Header="Targeted" Binding="{Binding Targeted}" Width="64"/>
-                            <DataGridTextColumn Header="Success" Binding="{Binding Success}" Width="60"/>
-                            <DataGridTextColumn Header="Error" Binding="{Binding Errors}" Width="50"/>
-                            <DataGridTextColumn Header="In progress" Binding="{Binding InProgress}" Width="76"/>
-                            <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="3*"/>
+                            <DataGridTextColumn Header="Targeted" Binding="{Binding Targeted}" Width="90"/>
+                            <DataGridTextColumn Header="Success" Binding="{Binding Success}" Width="82"/>
+                            <DataGridTextColumn Header="Error" Binding="{Binding Errors}" Width="66"/>
+                            <DataGridTextColumn Header="In progress" Binding="{Binding InProgress}" Width="110"/>
+                            <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="2*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                        <Setter Property="ToolTip" Value="{Binding Note}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                             <DataGridTemplateColumn Header="" Width="90">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
