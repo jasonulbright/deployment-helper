@@ -182,6 +182,8 @@
                                 ToolTip="Deploy a task sequence to a device collection"/>
                         <Button x:Name="btnSUG"             Content="Software Update Groups" Style="{StaticResource WorkflowButtonStyle}"
                                 ToolTip="Deploy a software update group to a device collection"/>
+                        <Button x:Name="btnRings"           Content="Ring deployment"        Style="{StaticResource WorkflowButtonStyle}"
+                                ToolTip="Deploy one object to several collections in rings from a ring plan"/>
 
                         <Button x:Name="btnOptions"         Content="Options"                Style="{StaticResource OptionsButtonStyle}"
                                 Margin="8,16,8,3"
@@ -209,7 +211,7 @@
 
             <!-- Module header + Apply Template -->
             <DockPanel Grid.Row="0" Margin="16,14,16,6" LastChildFill="True">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                <StackPanel x:Name="pnlApplyTemplate" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                     <TextBlock Text="Apply template:" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <ComboBox x:Name="cboApplyTemplate" Width="220" Height="28" FontSize="12" VerticalContentAlignment="Center"/>
                 </StackPanel>
@@ -407,7 +409,7 @@
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                 <TextBlock x:Name="glyphCheck4" Text="&#x22EF;" Style="{StaticResource CheckGlyphStyle}"/>
-                                <TextBlock x:Name="lblCheck4"   Text="Collection safe (not SMS000*)"          Style="{StaticResource CheckLabelStyle}"/>
+                                <TextBlock x:Name="lblCheck4"   Text="Collection safe (not built-in SMS*)"    Style="{StaticResource CheckLabelStyle}"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock x:Name="glyphCheck5" Text="&#x22EF;" Style="{StaticResource CheckGlyphStyle}"/>
@@ -430,6 +432,154 @@
                             Controls:ControlsHelper.ContentCharacterCasing="Normal"
                             ToolTip="Create the deployment in ConfigMgr"/>
                 </StackPanel>
+            </Grid>
+
+            <!-- Ring deployment pane: shares Grid.Row 1 with formPane; one of the two is visible. -->
+            <Grid Grid.Row="1" x:Name="ringPane" Margin="16,6,16,6" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Object type:" Style="{StaticResource FormLabelStyle}" Margin="0,8,12,8"/>
+                        <ComboBox x:Name="cboRingType" Grid.Row="0" Grid.Column="1" Width="280" HorizontalAlignment="Left"
+                                  FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,8,0,8">
+                            <ComboBoxItem Content="Application" Tag="Application" IsSelected="True"/>
+                            <ComboBoxItem Content="Package" Tag="Package"/>
+                            <ComboBoxItem Content="Task sequence" Tag="TaskSequence"/>
+                            <ComboBoxItem Content="Software update group" Tag="SUG"/>
+                        </ComboBox>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Object:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
+                        <TextBox x:Name="txtRingObject" Grid.Row="1" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"
+                                 Controls:TextBoxHelper.Watermark="Name of the application, package, task sequence, or update group"/>
+                        <Button x:Name="btnRingBrowseObject" Grid.Row="1" Grid.Column="2" Content="Browse..." Style="{StaticResource BrowseButtonStyle}" Margin="8,0,0,8"
+                                ToolTip="Pick the object from Configuration Manager"/>
+
+                        <TextBlock x:Name="lblRingProgram" Grid.Row="2" Grid.Column="0" Text="Program:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
+                        <ComboBox x:Name="cboRingProgram" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="28"
+                                  VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Ring plan:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
+                        <ComboBox x:Name="cboRingPlan" Grid.Row="3" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"/>
+                        <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,8">
+                            <Button x:Name="btnRingReloadPlans" Content="Reload" Style="{StaticResource BrowseButtonStyle}" Margin="0"
+                                    ToolTip="Read the plan files again"/>
+                            <Button x:Name="btnRingOpenFolder" Content="Open folder" Style="{StaticResource BrowseButtonStyle}"
+                                    ToolTip="Open the Rings folder that holds the plan files"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Plan start:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
+                        <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
+                            <Controls:DateTimePicker x:Name="dtpRingStart" Width="240" FontSize="12" Height="28"/>
+                            <Button x:Name="btnRingExpand" Content="Expand" MinWidth="90" Height="28" Margin="8,0,0,0"
+                                    Style="{DynamicResource MahApps.Styles.Button.Square}"
+                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                    ToolTip="Compute every ring's dates from the plan start. Discards edits in the preview."/>
+                            <CheckBox x:Name="chkRingHold" Content="Hold later rings (create ring 1 now, promote the rest)" FontSize="12"
+                                      VerticalAlignment="Center" Margin="16,0,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="txtRingPlanInfo" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource MahApps.Brushes.Gray1}" Margin="0,0,0,4"/>
+                    </Grid>
+
+                    <TextBlock Text="EXPANSION PREVIEW (EDITS APPLY TO THIS RUN ONLY)" Style="{StaticResource SectionHeaderStyle}" Margin="0,10,0,6"/>
+                    <DataGrid x:Name="dgRingPreview" Height="180"
+                              AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                              CanUserSortColumns="False" SelectionMode="Single" SelectionUnit="FullRow"
+                              GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0"
+                              ColumnHeaderHeight="28" FontSize="12">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="#" Binding="{Binding Index}" IsReadOnly="True" Width="32"/>
+                            <DataGridTextColumn Header="Ring" Binding="{Binding Name}" IsReadOnly="True" Width="100"/>
+                            <DataGridTextColumn Header="Collection ID" Binding="{Binding CollectionID, Mode=TwoWay}" Width="100"/>
+                            <DataGridTextColumn Header="Collection" Binding="{Binding CollectionName}" IsReadOnly="True" Width="*"/>
+                            <DataGridTextColumn Header="Purpose" Binding="{Binding Purpose}" IsReadOnly="True" Width="70"/>
+                            <DataGridTextColumn Header="Available" Binding="{Binding AvailableText, Mode=TwoWay}" Width="120"/>
+                            <DataGridTextColumn Header="Deadline" Binding="{Binding DeadlineText, Mode=TwoWay}" Width="120"/>
+                            <DataGridTextColumn Header="Threshold" Binding="{Binding ThresholdText}" IsReadOnly="True" Width="70"/>
+                            <DataGridTextColumn Header="Checks" Binding="{Binding Checks}" IsReadOnly="True" Width="2*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button x:Name="btnRingPickCollection" Content="Set collection..." MinWidth="120" Height="32" Margin="0,0,8,0"
+                                Style="{DynamicResource MahApps.Styles.Button.Square}"
+                                Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                ToolTip="Pick the device collection for the selected ring (this run only). Shift+click reloads the list."/>
+                        <Button x:Name="btnRingValidate" Content="Validate" MinWidth="110" Height="32" Margin="0,0,8,0"
+                                Style="{DynamicResource MahApps.Styles.Button.Square}"
+                                Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                ToolTip="Run the five checks for every ring and the plan rules"/>
+                        <Button x:Name="btnRingCreate" Content="Create deployments" MinWidth="150" Height="32" Visibility="Collapsed"
+                                Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
+                                Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                ToolTip="Create the ring deployments in Configuration Manager"/>
+                    </StackPanel>
+
+                    <DockPanel Margin="0,14,0,6" LastChildFill="False">
+                        <TextBlock x:Name="lblRingRuns" DockPanel.Dock="Left" Text="OPEN RUNS" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"/>
+                        <Button x:Name="btnRingRefreshRuns" DockPanel.Dock="Right" Content="Refresh and reconcile" MinWidth="150" Height="28"
+                                Style="{DynamicResource MahApps.Styles.Button.Square}"
+                                Controls:ControlsHelper.ContentCharacterCasing="Normal"
+                                ToolTip="Read live counts, mark deleted deployments Removed, and close finished runs"/>
+                        <CheckBox x:Name="chkRingShowClosed" DockPanel.Dock="Right" Content="Show closed runs" FontSize="12"
+                                  VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    </DockPanel>
+                    <DataGrid x:Name="dgRingRuns" Height="190"
+                              AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
+                              SelectionMode="Single" SelectionUnit="FullRow"
+                              GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0"
+                              ColumnHeaderHeight="28" FontSize="12">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Run" Binding="{Binding RunLabel}" Width="2*"/>
+                            <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="32"/>
+                            <DataGridTextColumn Header="Ring" Binding="{Binding Name}" Width="90"/>
+                            <DataGridTextColumn Header="Collection" Binding="{Binding CollectionID}" Width="90"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="70"/>
+                            <DataGridTextColumn Header="Deadline" Binding="{Binding DeadlineText}" Width="115"/>
+                            <DataGridTextColumn Header="Targeted" Binding="{Binding Targeted}" Width="64"/>
+                            <DataGridTextColumn Header="Success" Binding="{Binding Success}" Width="60"/>
+                            <DataGridTextColumn Header="Error" Binding="{Binding Errors}" Width="50"/>
+                            <DataGridTextColumn Header="In progress" Binding="{Binding InProgress}" Width="76"/>
+                            <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="3*"/>
+                            <DataGridTemplateColumn Header="" Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="Promote" Height="24" Margin="2" Padding="8,0,8,0"
+                                                IsEnabled="{Binding CanPromote}"
+                                                ToolTip="{Binding PromoteTip}" ToolTipService.ShowOnDisabled="True"
+                                                Controls:ControlsHelper.ContentCharacterCasing="Normal">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button.Square.Accent}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ShowPromote}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+                </ScrollViewer>
             </Grid>
 
             <!-- Resizable splitter -->

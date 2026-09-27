@@ -11,6 +11,9 @@
     (5-check validation plus Invoke-ApplicationDeployment). Packages, Task
     Sequences, and Software Update Groups ship their wiring in later sessions.
 
+    The Ring deployment entry expands one object through a ring plan
+    (Rings\*.json) into one ordinary deployment per ring.
+
     Shared pre-execution validation for Apps: Test-ApplicationExists,
     Test-ContentDistributed, Test-CollectionValid, Test-CollectionSafe,
     Test-DuplicateDeployment. All implemented in
@@ -33,8 +36,8 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 2026.09.25.0009
-    Updated    : 2026-09-21
+    Version    : 2026.09.26.0010
+    Updated    : 2026-09-26
 #>
 
 param(
@@ -126,6 +129,7 @@ function Get-DhPreferences {
         SiteCode                = ''
         SMSProvider             = ''
         DeploymentAuditLogPath  = Join-Path $PSScriptRoot 'Logs\deployment-audit.jsonl'
+        RingRunStatePath        = Join-Path $PSScriptRoot 'Rings\runs'
     }
     if (Test-Path -LiteralPath $global:PrefsPath) {
         try {
@@ -250,6 +254,16 @@ if (-not (Get-ChildItem -LiteralPath $__templatesDir -Filter '*.json' -ErrorActi
 }
 
 # =============================================================================
+# Ring plans: Rings\*.json beside Templates\. First run writes two seed plans
+# that name no collection. Run state for held rings lives in the folder set
+# in Options > Logging (default Rings\runs; a UNC path lets a team share it).
+# =============================================================================
+$script:RingPlanDir = Join-Path $PSScriptRoot 'Rings'
+try { [void](Initialize-RingPlanFolder -Path $script:RingPlanDir) }
+catch { Write-Log ('Ring plan seed failed: {0}' -f $_.Exception.Message) -Level WARN }
+$script:RingRunStatePath = [string]$global:Prefs['RingRunStatePath']
+
+# =============================================================================
 # Deployment type state
 # =============================================================================
 $script:CurrentType = 'Apps'
@@ -320,6 +334,65 @@ function Add-LogLine {
 function Set-StatusText {
     param([Parameter(Mandatory)][string]$Text)
     $txtStatus.Text = $Text
+}
+
+function Show-AuditWriteFailure {
+    param(
+        [Parameter(Mandatory)][hashtable]$AuditResult,
+        [bool]$DeploymentCreated,
+        [string]$DeploymentID
+    )
+
+    $message = if ($DeploymentCreated) {
+        "Configuration Manager created deployment $DeploymentID, but the audit record could not be written to $script:DeploymentAuditLog. Record the deployment ID and restore audit logging before continuing. Error: $($AuditResult.Error)"
+    } else {
+        "The deployment attempt could not be written to the audit log at $script:DeploymentAuditLog. Error: $($AuditResult.Error)"
+    }
+    Add-LogLine -Message $message
+    Set-StatusText -Text $(if ($DeploymentCreated) { 'Deployment created; audit write failed.' } else { 'Audit write failed.' })
+    [void](Show-ThemedMessage -Owner $window -Title 'Audit log write failed' -Message $message -Buttons OK -Icon Warn)
+}
+
+function Test-DeploymentAuditReady {
+    $check = Test-DeploymentLogWritable -LogPath $script:DeploymentAuditLog
+    if ($check.Success) { return $true }
+
+    $message = ("Deployment was blocked because the audit log is not writable at {0}: {1}" -f $script:DeploymentAuditLog, $check.Error)
+    Add-LogLine -Message $message
+    Set-StatusText -Text 'Deployment blocked: audit log unavailable.'
+    [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $message -Buttons OK -Icon Error)
+    return $false
+}
+
+function Test-NoCurrentDuplicateDeployment {
+    param(
+        [Parameter(Mandatory)][ValidateSet('Application', 'Package', 'TaskSequence', 'SUG')][string]$Type,
+        [Parameter(Mandatory)]$TargetObject,
+        [Parameter(Mandatory)]$Collection,
+        [string]$ProgramName
+    )
+
+    $duplicate = switch ($Type) {
+        'Application'  { Test-DuplicateDeployment -ApplicationName $TargetObject.LocalizedDisplayName -CollectionName $Collection.Name }
+        'Package'      { Test-DuplicatePackageDeployment -PackageID $TargetObject.PackageID -ProgramName $ProgramName -CollectionName $Collection.Name }
+        'TaskSequence' { Test-DuplicateTaskSequenceDeployment -TaskSequencePackageId $TargetObject.PackageID -CollectionName $Collection.Name }
+        'SUG'          { Test-DuplicateSUGDeployment -SUGName $TargetObject.LocalizedDisplayName -CollectionName $Collection.Name }
+    }
+    $checkFailure = Get-DuplicateCheckFailure -Result $duplicate
+    if ($checkFailure) {
+        $message = ("Could not recheck for a duplicate deployment: {0}. No deployment was created." -f $checkFailure.Error)
+    }
+    elseif ($null -ne $duplicate) {
+        $message = ("A matching deployment now exists on '{0}'. No duplicate was created." -f $Collection.Name)
+    }
+    else {
+        return $true
+    }
+
+    Add-LogLine -Message $message
+    Set-StatusText -Text 'Deployment blocked by the final duplicate check.'
+    [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $message -Buttons OK -Icon Warn)
+    return $false
 }
 
 # =============================================================================
@@ -417,17 +490,43 @@ $txtLog             = $window.FindName('txtLog')
 $lblLogOutput       = $window.FindName('lblLogOutput')
 $txtStatus          = $window.FindName('txtStatus')
 $cboApplyTemplate   = $window.FindName('cboApplyTemplate')
+$pnlApplyTemplate   = $window.FindName('pnlApplyTemplate')
+$formPane           = $window.FindName('formPane')
+$btnRings           = $window.FindName('btnRings')
+$ringPane           = $window.FindName('ringPane')
+$cboRingType        = $window.FindName('cboRingType')
+$txtRingObject      = $window.FindName('txtRingObject')
+$btnRingBrowseObject = $window.FindName('btnRingBrowseObject')
+$lblRingProgram     = $window.FindName('lblRingProgram')
+$cboRingProgram     = $window.FindName('cboRingProgram')
+$cboRingPlan        = $window.FindName('cboRingPlan')
+$btnRingReloadPlans = $window.FindName('btnRingReloadPlans')
+$btnRingOpenFolder  = $window.FindName('btnRingOpenFolder')
+$dtpRingStart       = $window.FindName('dtpRingStart')
+$btnRingExpand      = $window.FindName('btnRingExpand')
+$chkRingHold        = $window.FindName('chkRingHold')
+$txtRingPlanInfo    = $window.FindName('txtRingPlanInfo')
+$dgRingPreview      = $window.FindName('dgRingPreview')
+$btnRingPickCollection = $window.FindName('btnRingPickCollection')
+$btnRingValidate    = $window.FindName('btnRingValidate')
+$btnRingCreate      = $window.FindName('btnRingCreate')
+$lblRingRuns        = $window.FindName('lblRingRuns')
+$btnRingRefreshRuns = $window.FindName('btnRingRefreshRuns')
+$chkRingShowClosed  = $window.FindName('chkRingShowClosed')
+$dgRingRuns         = $window.FindName('dgRingRuns')
 
 # Seed datetime pickers so SelectedDate is non-null at first render
 $dtpAvailable.SelectedDateTime = Get-Date
 $dtpDeadline.SelectedDateTime  = (Get-Date).AddHours(24)
+$__now = Get-Date
+$dtpRingStart.SelectedDateTime = $__now.Date.AddHours($__now.Hour).AddMinutes(($__now.Minute - ($__now.Minute % 5)) + 5)
 
 # =============================================================================
 # Theme setup and toggle
 # =============================================================================
 [void][ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($window, 'Dark.Steel')
 
-$script:WorkflowButtons = @($btnApps, $btnPackages, $btnTaskSequences, $btnSUG)
+$script:WorkflowButtons = @($btnApps, $btnPackages, $btnTaskSequences, $btnSUG, $btnRings)
 $script:OptionsButtons  = @($btnOptions)
 
 # Initialize-SuiteTheme must run before the first Set-ButtonTheme call
@@ -616,10 +715,13 @@ function Test-DeploymentSchedule {
         # function body runs -- the null-check on the next line never
         # gets a chance to fire.
         [Nullable[datetime]]$Deadline,
-        [Parameter(Mandatory)][ValidateSet('Available','Required')][string]$Purpose
+        [Parameter(Mandatory)][ValidateSet('Available','Required')][string]$Purpose,
+        # With time basis UTC the pickers hold UTC wall-clock values; the
+        # caller passes UtcNow so a passed UTC deadline is still caught.
+        [datetime]$Now = (Get-Date)
     )
 
-    $now = Get-Date
+    $now = $Now
 
     if ($Purpose -eq 'Required') {
         if ($null -eq $Deadline) {
@@ -1064,9 +1166,10 @@ function Show-BrowseDialog {
 # =============================================================================
 # Device collection browse: cached bulk load, then the shared folder-tree
 # picker. The shared picker has no Refresh button, so -Force (Shift held on
-# the Browse button) reloads. Returns the picked collection name or $null.
+# the Browse button) reloads. Show-CollectionBrowseItem returns the picked
+# row (Name, CollectionID, ...); Show-CollectionBrowse returns its name.
 # =============================================================================
-function Show-CollectionBrowse {
+function Show-CollectionBrowseItem {
     param(
         [Parameter(Mandatory)]$Owner,
         [switch]$Force
@@ -1079,7 +1182,16 @@ function Show-CollectionBrowse {
         return $null
     }
 
-    $picked = Show-CollectionPickerDialog -Owner $Owner -Collections @($loaded.Items) -Folders @($loaded.Folders) -Title 'Pick device collection'
+    return Show-CollectionPickerDialog -Owner $Owner -Collections @($loaded.Items) -Folders @($loaded.Folders) -Title 'Pick device collection'
+}
+
+function Show-CollectionBrowse {
+    param(
+        [Parameter(Mandatory)]$Owner,
+        [switch]$Force
+    )
+
+    $picked = Show-CollectionBrowseItem -Owner $Owner -Force:$Force
     if ($picked) { return [string]$picked.Name }
     return $null
 }
@@ -1141,7 +1253,11 @@ $script:InvokeAppsValidate = {
         }
 
         $dup = Test-DuplicateDeployment -ApplicationName $appName -CollectionName $collName
-        if ($null -eq $dup) {
+        $dupFailure = Get-DuplicateCheckFailure -Result $dup
+        if ($dupFailure) {
+            Set-CheckGlyph -Index 5 -State 'Fail'
+            Add-LogLine -Message ('Duplicate check failed; deployment is blocked: {0}' -f $dupFailure.Error)
+        } elseif ($null -eq $dup) {
             Set-CheckGlyph -Index 5 -State 'Pass'
         } else {
             Set-CheckGlyph -Index 5 -State 'Fail'
@@ -1265,7 +1381,11 @@ $script:InvokePackagesValidate = {
 
         # Check 5: duplicate package+program+collection deployment
         $dup = Test-DuplicatePackageDeployment -PackageID $pkg.PackageID -ProgramName $programName -CollectionName $collName
-        if ($null -eq $dup) {
+        $dupFailure = Get-DuplicateCheckFailure -Result $dup
+        if ($dupFailure) {
+            Set-CheckGlyph -Index 5 -State 'Fail'
+            Add-LogLine -Message ('Duplicate check failed; deployment is blocked: {0}' -f $dupFailure.Error)
+        } elseif ($null -eq $dup) {
             Set-CheckGlyph -Index 5 -State 'Pass'
         } else {
             Set-CheckGlyph -Index 5 -State 'Fail'
@@ -1310,7 +1430,7 @@ $script:InvokePackagesDeploy = {
         $deadline = if ($dtpDeadline.SelectedDateTime) { [datetime]$dtpDeadline.SelectedDateTime } else { (Get-Date).AddHours(24) }
     }
 
-    $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose
+    $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose -Now $(if ($timeBasis -eq 'Utc') { [datetime]::UtcNow } else { Get-Date })
     if (-not $schedule.Ok) {
         [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid schedule.'
@@ -1365,6 +1485,9 @@ $script:InvokePackagesDeploy = {
         }
         if ($deadline) { $params['DeadlineDateTime'] = $deadline }
 
+        if (-not (Test-NoCurrentDuplicateDeployment -Type Package -TargetObject $script:ValidatedPackage `
+                -Collection $script:ValidatedCollection -ProgramName $script:ValidatedProgram)) { return }
+        if (-not (Test-DeploymentAuditReady)) { return }
         $result = Invoke-PackageDeployment @params
 
         $record = @{
@@ -1379,7 +1502,7 @@ $script:InvokePackagesDeploy = {
             DeploymentID       = $result.DeploymentID
             Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $result.Error) }
         }
-        Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
+        $auditResult = Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
 
         if ($result.Success) {
             Add-LogLine -Message ('Package deployment succeeded. DeploymentID={0}' -f $result.DeploymentID)
@@ -1390,6 +1513,7 @@ $script:InvokePackagesDeploy = {
             Add-LogLine -Message ('Package deployment failed: {0}' -f $result.Error)
             Set-StatusText -Text 'Deployment failed.'
         }
+        if (-not $auditResult.Success) { Show-AuditWriteFailure -AuditResult $auditResult -DeploymentCreated ([bool]$result.Success) -DeploymentID ([string]$result.DeploymentID) }
     }
     finally {
         $window.Cursor = $null
@@ -1455,7 +1579,11 @@ $script:InvokeSUGValidate = {
 
         # Check 5: duplicate SUG deployment
         $dup = Test-DuplicateSUGDeployment -SUGName $sug.LocalizedDisplayName -CollectionName $collName
-        if ($null -eq $dup) {
+        $dupFailure = Get-DuplicateCheckFailure -Result $dup
+        if ($dupFailure) {
+            Set-CheckGlyph -Index 5 -State 'Fail'
+            Add-LogLine -Message ('Duplicate check failed; deployment is blocked: {0}' -f $dupFailure.Error)
+        } elseif ($null -eq $dup) {
             Set-CheckGlyph -Index 5 -State 'Pass'
         } else {
             Set-CheckGlyph -Index 5 -State 'Fail'
@@ -1500,7 +1628,7 @@ $script:InvokeSUGDeploy = {
         $deadline = if ($dtpDeadline.SelectedDateTime) { [datetime]$dtpDeadline.SelectedDateTime } else { (Get-Date).AddHours(24) }
     }
 
-    $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose
+    $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose -Now $(if ($timeBasis -eq 'Utc') { [datetime]::UtcNow } else { Get-Date })
     if (-not $schedule.Ok) {
         [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid schedule.'
@@ -1557,6 +1685,9 @@ $script:InvokeSUGDeploy = {
         }
         if ($deadline) { $params['DeadlineDateTime'] = $deadline }
 
+        if (-not (Test-NoCurrentDuplicateDeployment -Type SUG -TargetObject $script:ValidatedSUG `
+                -Collection $script:ValidatedCollection)) { return }
+        if (-not (Test-DeploymentAuditReady)) { return }
         $result = Invoke-SUGDeployment @params
 
         $preview = Get-DeploymentPreview -TargetObject $script:ValidatedSUG -Collection $script:ValidatedCollection -DeploymentType 'SUG'
@@ -1572,7 +1703,7 @@ $script:InvokeSUGDeploy = {
             DeploymentID       = $result.DeploymentID
             Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $result.Error) }
         }
-        Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
+        $auditResult = Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
 
         if ($result.Success) {
             Add-LogLine -Message ('SUG deployment succeeded. AssignmentID={0}' -f $result.DeploymentID)
@@ -1583,6 +1714,7 @@ $script:InvokeSUGDeploy = {
             Add-LogLine -Message ('SUG deployment failed: {0}' -f $result.Error)
             Set-StatusText -Text 'Deployment failed.'
         }
+        if (-not $auditResult.Success) { Show-AuditWriteFailure -AuditResult $auditResult -DeploymentCreated ([bool]$result.Success) -DeploymentID ([string]$result.DeploymentID) }
     }
     finally {
         $window.Cursor = $null
@@ -1654,7 +1786,11 @@ $script:InvokeTaskSequencesValidate = {
 
         # Check 5: duplicate TS deployment
         $dup = Test-DuplicateTaskSequenceDeployment -TaskSequencePackageId $ts.PackageID -CollectionName $collName
-        if ($null -eq $dup) {
+        $dupFailure = Get-DuplicateCheckFailure -Result $dup
+        if ($dupFailure) {
+            Set-CheckGlyph -Index 5 -State 'Fail'
+            Add-LogLine -Message ('Duplicate check failed; deployment is blocked: {0}' -f $dupFailure.Error)
+        } elseif ($null -eq $dup) {
             Set-CheckGlyph -Index 5 -State 'Pass'
         } else {
             Set-CheckGlyph -Index 5 -State 'Fail'
@@ -1699,7 +1835,7 @@ $script:InvokeTaskSequencesDeploy = {
         $deadline = if ($dtpDeadline.SelectedDateTime) { [datetime]$dtpDeadline.SelectedDateTime } else { (Get-Date).AddHours(24) }
     }
 
-    $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose
+    $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose -Now $(if ($timeBasis -eq 'Utc') { [datetime]::UtcNow } else { Get-Date })
     if (-not $schedule.Ok) {
         [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid schedule.'
@@ -1747,6 +1883,9 @@ $script:InvokeTaskSequencesDeploy = {
         }
         if ($deadline) { $params['DeadlineDateTime'] = $deadline }
 
+        if (-not (Test-NoCurrentDuplicateDeployment -Type TaskSequence -TargetObject $script:ValidatedTaskSequence `
+                -Collection $script:ValidatedCollection)) { return }
+        if (-not (Test-DeploymentAuditReady)) { return }
         $result = Invoke-TaskSequenceDeployment @params
 
         $record = @{
@@ -1761,7 +1900,7 @@ $script:InvokeTaskSequencesDeploy = {
             DeploymentID       = $result.DeploymentID
             Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $result.Error) }
         }
-        Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
+        $auditResult = Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
 
         if ($result.Success) {
             Add-LogLine -Message ('Task sequence deployment succeeded. DeploymentID={0}' -f $result.DeploymentID)
@@ -1772,6 +1911,7 @@ $script:InvokeTaskSequencesDeploy = {
             Add-LogLine -Message ('Task sequence deployment failed: {0}' -f $result.Error)
             Set-StatusText -Text 'Deployment failed.'
         }
+        if (-not $auditResult.Success) { Show-AuditWriteFailure -AuditResult $auditResult -DeploymentCreated ([bool]$result.Success) -DeploymentID ([string]$result.DeploymentID) }
     }
     finally {
         $window.Cursor = $null
@@ -1802,7 +1942,7 @@ $script:InvokeAppsDeploy = {
     # Schedule sanity. Block inverted Required deadlines; warn-and-confirm
     # on backdated Available. Stops accidental "fires immediately on every
     # client" moments before the ConfigMgr cmdlet accepts them.
-    $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose
+    $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose -Now $(if ($timeBasis -eq 'Utc') { [datetime]::UtcNow } else { Get-Date })
     if (-not $schedule.Ok) {
         [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid schedule.'
@@ -1851,6 +1991,9 @@ $script:InvokeAppsDeploy = {
         }
         if ($deadline) { $params['DeadlineDateTime'] = $deadline }
 
+        if (-not (Test-NoCurrentDuplicateDeployment -Type Application -TargetObject $script:ValidatedApp `
+                -Collection $script:ValidatedCollection)) { return }
+        if (-not (Test-DeploymentAuditReady)) { return }
         $result = Invoke-ApplicationDeployment @params
 
         $preview = Get-DeploymentPreview -TargetObject $script:ValidatedApp -Collection $script:ValidatedCollection -DeploymentType 'Application'
@@ -1866,7 +2009,7 @@ $script:InvokeAppsDeploy = {
             DeploymentID       = $result.DeploymentID
             Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $result.Error) }
         }
-        Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
+        $auditResult = Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
 
         if ($result.Success) {
             Add-LogLine -Message ('Deployment succeeded. AssignmentID={0}' -f $result.DeploymentID)
@@ -1877,6 +2020,7 @@ $script:InvokeAppsDeploy = {
             Add-LogLine -Message ('Deployment failed: {0}' -f $result.Error)
             Set-StatusText -Text 'Deployment failed.'
         }
+        if (-not $auditResult.Success) { Show-AuditWriteFailure -AuditResult $auditResult -DeploymentCreated ([bool]$result.Success) -DeploymentID ([string]$result.DeploymentID) }
     }
     finally {
         $window.Cursor = $null
@@ -2251,6 +2395,8 @@ function New-ConnectionPanel {
 }
 
 function New-LoggingPanel {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Panel Commit runs in a GetNewClosure scope that cannot reach script scope; prefs live in global scope for that reason (see the Preferences section).')]
+    param()
     $grid = New-Object System.Windows.Controls.StackPanel
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'Logging'
@@ -2316,6 +2462,43 @@ function New-LoggingPanel {
         }
     }.GetNewClosure())
 
+    $lblRuns = New-Object System.Windows.Controls.TextBlock
+    $lblRuns.Text = 'Ring run-state folder (local path or UNC share for a team):'
+    $lblRuns.FontSize = 12
+    $lblRuns.Margin = '0,14,0,4'
+    [void]$grid.Children.Add($lblRuns)
+
+    $runsRow = New-Object System.Windows.Controls.DockPanel
+    $runsRow.LastChildFill = $true
+    $runsBtn = New-Object System.Windows.Controls.Button
+    $runsBtn.Name = 'btnBrowseRingRuns'
+    $runsBtn.Content = 'Browse...'
+    $runsBtn.Width = 90
+    $runsBtn.Height = 28
+    $runsBtn.Margin = '8,0,0,0'
+    [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($runsBtn, [System.Windows.Controls.CharacterCasing]::Normal)
+    $runsBtn.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    [System.Windows.Controls.DockPanel]::SetDock($runsBtn, 'Right')
+    [void]$runsRow.Children.Add($runsBtn)
+    $runsTxt = New-Object System.Windows.Controls.TextBox
+    $runsTxt.Name = 'txtRingRuns'
+    $runsTxt.Text = [string]$global:Prefs['RingRunStatePath']
+    $runsTxt.FontSize = 11
+    $runsTxt.FontFamily = 'Cascadia Code, Consolas, Courier New'
+    $runsTxt.Height = 28
+    $runsTxt.VerticalContentAlignment = 'Center'
+    [void]$runsRow.Children.Add($runsTxt)
+    [void]$grid.Children.Add($runsRow)
+
+    $runsBtn.Add_Click({
+        $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dlg.Description = 'Folder for ring run-state files'
+        if (Test-Path -LiteralPath $runsTxt.Text) { $dlg.SelectedPath = $runsTxt.Text }
+        if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $runsTxt.Text = $dlg.SelectedPath
+        }
+    }.GetNewClosure())
+
     # Commit runs after factory returns; GetNewClosure needed for $auditTxt.
     # Script-scope effects ($script:DeploymentAuditLog write, Add-LogLine call)
     # routed through a plain local scriptblock per PS51-WPF-006 so they
@@ -2324,6 +2507,11 @@ function New-LoggingPanel {
         param([string]$NewPath)
         $script:DeploymentAuditLog = $NewPath
         Add-LogLine -Message ('Audit log path updated: {0}' -f $NewPath)
+    }
+    $applyRingRunsPathChange = {
+        param([string]$NewPath)
+        $script:RingRunStatePath = $NewPath
+        Add-LogLine -Message ('Ring run-state folder updated: {0}' -f $NewPath)
     }
 
     return @{
@@ -2334,6 +2522,11 @@ function New-LoggingPanel {
             if ($newPath -and $newPath -ne [string]$global:Prefs['DeploymentAuditLogPath']) {
                 $global:Prefs['DeploymentAuditLogPath'] = $newPath
                 & $applyAuditPathChange -NewPath $newPath
+            }
+            $newRuns = $runsTxt.Text.Trim()
+            if ($newRuns -and $newRuns -ne [string]$global:Prefs['RingRunStatePath']) {
+                $global:Prefs['RingRunStatePath'] = $newRuns
+                & $applyRingRunsPathChange -NewPath $newRuns
             }
         }.GetNewClosure()
     }
@@ -2913,7 +3106,7 @@ function New-AboutPanel {
     [void]$grid.Children.Add($ver)
 
     $desc = New-Object System.Windows.Controls.TextBlock
-    $desc.Text = 'Safe Configuration Manager deployment for Apps, Packages, Task Sequences, and Software Update Groups with 5-check validation and audit logging.'
+    $desc.Text = 'Safe Configuration Manager deployment for Apps, Packages, Task Sequences, and Software Update Groups with 5-check validation, ring deployments, and audit logging.'
     $desc.FontSize = 12
     $desc.TextWrapping = 'Wrap'
     $desc.Margin = '0,0,0,12'
@@ -3081,6 +3274,9 @@ $script:SetCurrentType = {
     param([string]$Type)
 
     $script:CurrentType = $Type
+    $formPane.Visibility         = [System.Windows.Visibility]::Visible
+    $ringPane.Visibility         = [System.Windows.Visibility]::Collapsed
+    $pnlApplyTemplate.Visibility = [System.Windows.Visibility]::Visible
     $meta = $script:TypeMeta[$Type]
     $txtModuleHeader.Text    = $meta.Header
     $txtModuleSubheader.Text = $meta.Subheader
@@ -3156,12 +3352,863 @@ $script:SetCurrentType = {
 }
 
 # =============================================================================
+# Ring deployment view
+#
+# One object, one ring plan, N ordinary deployments. The preview grid holds
+# the expanded rings for this run only; plan files are never written here.
+# Create-all makes every ring now with future dates. Hold later rings writes
+# a run file, creates ring 1, and leaves the rest to Promote in Open runs.
+# =============================================================================
+$script:RingPlans           = @()
+$script:RingPlanErrors      = @()
+$script:RingPreviewRows     = New-Object System.Collections.ObjectModel.ObservableCollection[PSObject]
+$script:RingValidated       = $null
+$script:RingSuppress        = $false
+$script:RingViewInitialized = $false
+$dgRingPreview.ItemsSource  = $script:RingPreviewRows
+
+$script:RingTypeBrowse = @{
+    'Application'  = @{ Browse = 'Apps';          NameProperty = 'LocalizedDisplayName'; Title = 'Browse applications';           Watermark = 'Filter by name, version, or package ID' }
+    'Package'      = @{ Browse = 'Packages';      NameProperty = 'Name';                 Title = 'Browse packages';               Watermark = 'Filter by name, package ID, manufacturer, or version' }
+    'TaskSequence' = @{ Browse = 'TaskSequences'; NameProperty = 'Name';                 Title = 'Browse task sequences';         Watermark = 'Filter by name, package ID, or description' }
+    'SUG'          = @{ Browse = 'SUG';           NameProperty = 'LocalizedDisplayName'; Title = 'Browse software update groups'; Watermark = 'Filter by name' }
+}
+
+function Get-RingSelectedType {
+    if ($cboRingType.SelectedItem) { return [string]$cboRingType.SelectedItem.Tag }
+    return 'Application'
+}
+
+function Get-RingSelectedPlan {
+    $i = $cboRingPlan.SelectedIndex
+    $plans = @($script:RingPlans)
+    if ($i -ge 0 -and $i -lt $plans.Count) { return $plans[$i] }
+    return $null
+}
+
+function Format-RingDate {
+    param($Value)
+    try { $d = ConvertFrom-RingDateText $Value } catch { return [string]$Value }
+    if ($null -eq $d) { return '' }
+    return $d.ToString('yyyy-MM-dd HH:mm')
+}
+
+function Reset-RingValidation {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    $script:RingValidated = $null
+    $btnRingCreate.Visibility = [System.Windows.Visibility]::Collapsed
+}
+
+function Update-RingPreviewGrid {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    # Items.Refresh throws while a cell is still in edit mode.
+    try { [void]$dgRingPreview.CommitEdit([System.Windows.Controls.DataGridEditingUnit]::Row, $true) } catch { $null = $_ }
+    $dgRingPreview.Items.Refresh()
+}
+
+function Update-RingPreview {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    Reset-RingValidation
+    $script:RingPreviewRows.Clear()
+    $plan = Get-RingSelectedPlan
+    if (-not $plan) { return }
+    $start = if ($dtpRingStart.SelectedDateTime) { [datetime]$dtpRingStart.SelectedDateTime } else { Get-Date }
+    foreach ($r in (Expand-RingPlan -Plan $plan -Start $start)) {
+        $r | Add-Member -NotePropertyName AvailableText -NotePropertyValue (Format-RingDate $r.AvailableDateTime)
+        $r | Add-Member -NotePropertyName DeadlineText  -NotePropertyValue (Format-RingDate $r.DeadlineDateTime)
+        $r | Add-Member -NotePropertyName ThresholdText -NotePropertyValue $(if ($null -ne $r.SuccessThresholdPercent) { ('{0}%' -f $r.SuccessThresholdPercent) } else { '' })
+        $r | Add-Member -NotePropertyName Checks        -NotePropertyValue ''
+        $r | Add-Member -NotePropertyName MemberCount   -NotePropertyValue $null
+        $script:RingPreviewRows.Add($r)
+    }
+    Update-RingPreviewGrid
+}
+
+function Update-RingPlanSelection {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    $plan = Get-RingSelectedPlan
+    $refused = @($script:RingPlanErrors).Count
+    if (-not $plan) {
+        $txtRingPlanInfo.Text = if ($refused -gt 0) {
+            ('No plan loaded. {0} plan file(s) in {1} were refused; see the log.' -f $refused, $script:RingPlanDir)
+        } else {
+            ('No plan files in {0}.' -f $script:RingPlanDir)
+        }
+        Reset-RingValidation
+        $script:RingPreviewRows.Clear()
+        return
+    }
+    $info = ('{0} File: {1}. Time basis: {2}.' -f $plan.Description, $plan.FilePath, $plan.TimeBasedOn).Trim()
+    if ($plan.TimeBasedOn -eq 'Utc') { $info += ' Enter the plan start and the preview times in UTC.' }
+    if ($refused -gt 0) { $info += (' {0} other plan file(s) were refused; see the log.' -f $refused) }
+    $txtRingPlanInfo.Text = $info
+    $chkRingHold.IsChecked = [bool]$plan.HoldLaterRings
+    Update-RingPreview
+}
+
+function Update-RingPlanCombo {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    $current = Get-RingSelectedPlan
+    $previous = if ($current) { $current.Name } else { $null }
+    $script:RingSuppress = $true
+    try {
+        $list = Get-RingPlanList -Path $script:RingPlanDir
+        $script:RingPlans      = @($list.Plans)
+        $script:RingPlanErrors = @($list.Errors)
+        $cboRingPlan.Items.Clear()
+        $selected = 0
+        for ($i = 0; $i -lt $script:RingPlans.Count; $i++) {
+            $p = $script:RingPlans[$i]
+            [void]$cboRingPlan.Items.Add(('{0} ({1} rings)' -f $p.Name, @($p.Rings).Count))
+            if ($previous -and $p.Name -eq $previous) { $selected = $i }
+        }
+        if ($script:RingPlans.Count -gt 0) { $cboRingPlan.SelectedIndex = $selected }
+        foreach ($e in $script:RingPlanErrors) { Add-LogLine -Message ('Ring plan refused: ' + ($e -replace "`r?`n", ' ')) }
+    }
+    finally {
+        $script:RingSuppress = $false
+    }
+    Update-RingPlanSelection
+}
+
+function Update-RingProgramCombo {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    $cboRingProgram.Items.Clear()
+    $name = ([string]$txtRingObject.Text).Trim()
+    if ((Get-RingSelectedType) -ne 'Package' -or -not $name) { return }
+    $pkg = Test-PackageExists -PackageName $name
+    if (-not $pkg) { return }
+    foreach ($p in @(Get-CMPackagePrograms -Package $pkg)) { [void]$cboRingProgram.Items.Add([string]$p.ProgramName) }
+    if ($cboRingProgram.Items.Count -eq 1) { $cboRingProgram.SelectedIndex = 0 }
+}
+
+function Get-RingPreviewSubmission {
+    <#
+    .SYNOPSIS
+        Commits pending cell edits and parses the edited text back into the
+        ring rows. Returns @{ Rows; Errors }.
+    #>
+    try { [void]$dgRingPreview.CommitEdit([System.Windows.Controls.DataGridEditingUnit]::Row, $true) } catch { $null = $_ }
+    $errors = New-Object System.Collections.Generic.List[string]
+    foreach ($row in $script:RingPreviewRows) {
+        $label = Get-RingLabel -Ring $row
+        $row.CollectionID = ([string]$row.CollectionID).Trim().ToUpperInvariant()
+        try { $row.AvailableDateTime = ConvertFrom-RingDateText $row.AvailableText }
+        catch { $errors.Add(('{0} available: {1}' -f $label, $_.Exception.Message)) }
+        if ($row.Purpose -eq 'Required') {
+            try { $row.DeadlineDateTime = ConvertFrom-RingDateText $row.DeadlineText }
+            catch { $errors.Add(('{0} deadline: {1}' -f $label, $_.Exception.Message)) }
+        }
+        else {
+            $row.DeadlineDateTime = $null
+        }
+    }
+    return @{ Rows = @($script:RingPreviewRows); Errors = @($errors) }
+}
+
+function Format-RingMessageList {
+    param([string[]]$Lines, [int]$Max = 12)
+    $list = @($Lines)
+    $shown = @($list | Select-Object -First $Max)
+    $text = '- ' + ($shown -join "`n- ")
+    if ($list.Count -gt $Max) { $text += ("`n({0} more in the log)" -f ($list.Count - $Max)) }
+    return $text
+}
+
+function Invoke-RingValidate {
+    Reset-RingValidation
+    $type = Get-RingSelectedType
+    $name = ([string]$txtRingObject.Text).Trim()
+    $plan = Get-RingSelectedPlan
+    $program = if ($cboRingProgram.SelectedItem) { [string]$cboRingProgram.SelectedItem } else { '' }
+
+    if (-not $plan) { Add-LogLine -Message 'Select a ring plan.'; Set-StatusText -Text 'No ring plan selected.'; return }
+    if (-not $name) { Add-LogLine -Message 'Enter or browse the object to deploy.'; Set-StatusText -Text 'Object is required.'; return }
+    if ($type -eq 'Package' -and -not $program) {
+        Update-RingProgramCombo
+        if ($cboRingProgram.Items.Count -eq 1) { $program = [string]$cboRingProgram.SelectedItem }
+        else { Add-LogLine -Message 'Select the package program.'; Set-StatusText -Text 'Program selection required.'; return }
+    }
+
+    $sub = Get-RingPreviewSubmission
+    if (@($sub.Errors).Count -gt 0) {
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring preview' -Message ("Fix the preview dates (yyyy-MM-dd HH:mm):`n" + (Format-RingMessageList $sub.Errors)) -Buttons OK -Icon Error)
+        return
+    }
+    foreach ($row in $sub.Rows) { $row.Checks = '' }
+
+    $exp = Test-RingExpansion -Rings $sub.Rows -Now (Get-RingNow -TimeBasedOn $plan.TimeBasedOn)
+    if (@($exp.Errors).Count -gt 0) {
+        foreach ($e in $exp.Errors) { Add-LogLine -Message ('Ring rule: ' + $e) }
+        Update-RingPreviewGrid
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring run blocked' -Message ("The rings break these rules:`n" + (Format-RingMessageList $exp.Errors)) -Buttons OK -Icon Error)
+        Set-StatusText -Text 'Ring run blocked by plan rules.'
+        return
+    }
+
+    if (-not (Connect-IfNeeded)) { return }
+    Set-StatusText -Text 'Validating rings...'
+    $window.Cursor = [System.Windows.Input.Cursors]::Wait
+    try {
+        $pre = Test-RingPreflight -Type $type -ObjectName $name -ProgramName $program -Rings $sub.Rows
+    }
+    finally {
+        $window.Cursor = $null
+    }
+
+    $collections = @{}
+    foreach ($res in $pre.Rings) {
+        $row = @($sub.Rows | Where-Object { [int]$_.Index -eq $res.Index })[0]
+        if (-not $row) { continue }
+        $row.Checks = $res.Message
+        if ($res.Collection) {
+            $row.CollectionName = [string]$res.Collection.Name
+            $row.MemberCount    = $res.Collection.MemberCount
+            $collections[[int]$res.Index] = $res.Collection
+        }
+    }
+    Update-RingPreviewGrid
+    if ($pre.ObjectMessage) { Add-LogLine -Message $pre.ObjectMessage }
+
+    if ($pre.Ok) {
+        $script:RingValidated = @{
+            Type        = $type
+            Name        = $name
+            ProgramName = $program
+            Object      = $pre.Object
+            Plan        = $plan
+            Hold        = [bool]$chkRingHold.IsChecked
+            Rows        = @($sub.Rows)
+            Collections = $collections
+            Warnings    = @($exp.Warnings)
+        }
+        $btnRingCreate.Visibility = [System.Windows.Visibility]::Visible
+        Set-StatusText -Text ('All {0} ring(s) passed. Ready to create.' -f @($sub.Rows).Count)
+    }
+    else {
+        Set-StatusText -Text 'Validation complete. Fix the failing rings before creating.'
+    }
+}
+
+function Invoke-RingOneDeployment {
+    <#
+    .SYNOPSIS
+        Distributes to the ring's DP group when it has one, creates the ring's
+        deployment, and writes its audit record. Returns the deployment result.
+    #>
+    param(
+        [Parameter(Mandatory)][hashtable]$Validated,
+        [Parameter(Mandatory)]$Ring,
+        [Parameter(Mandatory)]$Collection,
+        [Parameter(Mandatory)][string]$RunId
+    )
+
+    $result = $null
+    $current = @{} + $Validated
+    $identity = Get-RingObjectIdentity -Type $Validated.Type -TargetObject $Validated.Object -ProgramName $Validated.ProgramName
+    $pre = Test-RingPreflight -Type $Validated.Type -ObjectName $Validated.Name -ProgramName $Validated.ProgramName `
+        -Rings @($Ring) -ExpectedObjectId $identity.ID -SkipContentCheck
+    if (-not $pre.Ok) {
+        $why = if ($pre.ObjectMessage) { $pre.ObjectMessage } else { $pre.Rings[0].Message }
+        $result = @{ Success = $false; DeploymentID = $null; DeploymentUniqueID = $null; Error = ("Pre-create validation failed: {0}" -f $why) }
+    }
+    else {
+        $current.Object = $pre.Object
+        $Collection = $pre.Rings[0].Collection
+
+        if ($Ring.DPGroup -and $current.Type -ne 'SUG') {
+            $auditGate = Test-DeploymentLogWritable -LogPath $script:DeploymentAuditLog
+            if (-not $auditGate.Success) {
+                $result = @{ Success = $false; DeploymentID = $null; DeploymentUniqueID = $null; Error = ("Audit log unavailable; content and deployment were not changed: {0}" -f $auditGate.Error) }
+            }
+        }
+
+        if ($Ring.DPGroup -and $current.Type -ne 'SUG' -and $null -eq $result) {
+            $dp = @(Invoke-ContentDistributionToGroups -Type $current.Type -TargetObject $current.Object -DPGroupNames @([string]$Ring.DPGroup))
+            $failed = @($dp | Where-Object { -not $_.Success })
+            if ($failed.Count -gt 0) {
+                $msg = ("Distribution to DP group '{0}' failed: {1}. The deployment was not created." -f $Ring.DPGroup, $failed[0].Error)
+                $result = @{ Success = $false; DeploymentID = $null; DeploymentUniqueID = $null; Error = $msg }
+            }
+            else {
+                Add-LogLine -Message ('{0}: content sent to DP group {1}.' -f (Get-RingLabel -Ring $Ring), $Ring.DPGroup)
+                # A deployment another session creates during the distribution
+                # call would pass the first check; the check runs again here.
+                $pre = Test-RingPreflight -Type $current.Type -ObjectName $current.Name -ProgramName $current.ProgramName `
+                    -Rings @($Ring) -ExpectedObjectId $identity.ID -SkipContentCheck
+                if (-not $pre.Ok) {
+                    $why = if ($pre.ObjectMessage) { $pre.ObjectMessage } else { $pre.Rings[0].Message }
+                    $result = @{ Success = $false; DeploymentID = $null; DeploymentUniqueID = $null; Error = ("Pre-create validation failed after content distribution: {0}" -f $why) }
+                }
+                else {
+                    $current.Object = $pre.Object
+                    $Collection = $pre.Rings[0].Collection
+                }
+            }
+        }
+
+        if ($null -eq $result) {
+            $auditGate = Test-DeploymentLogWritable -LogPath $script:DeploymentAuditLog
+            if (-not $auditGate.Success) {
+                $result = @{ Success = $false; DeploymentID = $null; DeploymentUniqueID = $null; Error = ("Audit log unavailable; deployment was not created: {0}" -f $auditGate.Error) }
+            }
+            else {
+                $result = Invoke-RingDeployment -Type $current.Type -TargetObject $current.Object -Collection $Collection `
+                    -Ring $Ring -ProgramName $current.ProgramName -TimeBasedOn $current.Plan.TimeBasedOn
+            }
+        }
+    }
+    $record = New-RingAuditRecord -Type $current.Type -TargetObject $current.Object -Collection $Collection -Ring $Ring `
+        -Result $result -PlanName $Validated.Plan.Name -RunId $RunId -ProgramName $Validated.ProgramName
+    $audit = Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
+    $result.AuditLogged = [bool]$audit.Success
+    $result.AuditError = [string]$audit.Error
+
+    if ($result.Success) {
+        Add-LogLine -Message ('{0} created: {1} -> {2} (DeploymentID {3}).' -f (Get-RingLabel -Ring $Ring), $Validated.Name, $Collection.Name, $result.DeploymentID)
+        if (-not $audit.Success) {
+            Add-LogLine -Message ('{0}: deployment exists, but the audit record failed: {1}' -f (Get-RingLabel -Ring $Ring), $audit.Error)
+        }
+    }
+    else {
+        if (-not $audit.Success) { $result.Error += (" Audit record also failed: {0}" -f $audit.Error) }
+        Add-LogLine -Message ('{0} failed: {1}' -f (Get-RingLabel -Ring $Ring), $result.Error)
+    }
+    return $result
+}
+
+function Get-RingRecordedId {
+    param([Parameter(Mandatory)][hashtable]$Result)
+    if ($Result.DeploymentUniqueID) { return [string]$Result.DeploymentUniqueID }
+    Write-Log ('No unique deployment ID returned; recording {0}. Reconcile confirms it by collection.' -f $Result.DeploymentID) -Level WARN
+    return [string]$Result.DeploymentID
+}
+
+function Format-RingLine {
+    param($Ring, $Collection, [string]$Type, [switch]$Held)
+    $when = '{0}, available {1}' -f $Ring.Purpose, (Format-RingDate $Ring.AvailableDateTime)
+    if ($Ring.DeadlineDateTime) { $when += ', deadline ' + (Format-RingDate $Ring.DeadlineDateTime) }
+    if ($Ring.DPGroup -and $Type -ne 'SUG') { $when += ('; first distribute to DP group {0}' -f $Ring.DPGroup) }
+    $heldText = if ($Held) { ' (held)' } else { '' }
+    return ("{0}{1} -> {2} ({3}, {4} members)`n    {5}" -f (Get-RingLabel -Ring $Ring), $heldText, $Collection.Name, $Collection.CollectionID, $Collection.MemberCount, $when)
+}
+
+function Invoke-RingCreate {
+    $v = $script:RingValidated
+    if (-not $v) { Add-LogLine -Message 'Run Validate first.'; return }
+    $rows = @($v.Rows)
+
+    $lines = foreach ($r in $rows) {
+        Format-RingLine -Ring $r -Collection $v.Collections[[int]$r.Index] -Type $v.Type -Held:($v.Hold -and [int]$r.Index -gt 1)
+    }
+    $count = if ($v.Hold) { 1 } else { $rows.Count }
+    $msg = ("Create {0} deployment(s) of {1} '{2}' from plan {3}:`n`n{4}" -f $count, $v.Type, $v.Name, $v.Plan.Name, ($lines -join "`n"))
+    if ($v.Plan.TimeBasedOn -eq 'Utc') { $msg += "`n`nAll times are UTC." }
+    if ($v.Hold) {
+        $msg += ("`n`nHeld rings are created later with Promote. A run file is written to {0}." -f $script:RingRunStatePath)
+    }
+    if (@($v.Warnings).Count -gt 0) { $msg += ("`n`nWarnings:`n" + (Format-RingMessageList $v.Warnings)) }
+    $msg += "`n`nContinue?"
+    $icon = if (@($v.Warnings).Count -gt 0) { 'Warn' } else { 'Question' }
+    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm ring deployment' -Message $msg -Buttons OKCancel -Icon $icon
+    if ($confirm -ne 'OK') { Add-LogLine -Message 'Ring deployment cancelled by user.'; return }
+
+    $runId = New-RingRunId
+    Add-LogLine -Message ('Ring run {0}: plan {1}, {2} ring(s), hold later rings: {3}.' -f $runId, $v.Plan.Name, $rows.Count, $v.Hold)
+    Set-StatusText -Text 'Creating ring deployments...'
+    $window.Cursor = [System.Windows.Input.Cursors]::Wait
+    try {
+        if ($v.Hold) { Invoke-RingCreateHeld -Validated $v -RunId $runId }
+        else         { Invoke-RingCreateAll  -Validated $v -RunId $runId }
+    }
+    finally {
+        $window.Cursor = $null
+        Reset-RingValidation
+        Update-RingPreviewGrid
+    }
+    Update-RingRunsGrid -Live:$script:ConnectedToCM
+}
+
+function Invoke-RingCreateAll {
+    param([Parameter(Mandatory)][hashtable]$Validated, [Parameter(Mandatory)][string]$RunId)
+    $rows = @($Validated.Rows)
+    $created = @()
+    $failure = $null
+    foreach ($r in $rows) {
+        $res = Invoke-RingOneDeployment -Validated $Validated -Ring $r -Collection $Validated.Collections[[int]$r.Index] -RunId $RunId
+        if ($res.Success) {
+            $r.Checks = ('Created: {0}' -f $res.DeploymentID)
+            $created += $r
+            if (-not $res.AuditLogged) {
+                $r.Checks += ' (audit write failed)'
+                $failure = @{ Ring = $r; Error = [string]$res.AuditError; Created = $true }
+                break
+            }
+        }
+        else {
+            $r.Checks = ('Failed: {0}' -f $res.Error)
+            $failure = @{ Ring = $r; Error = $res.Error }
+            break
+        }
+    }
+    if (-not $failure) {
+        Set-StatusText -Text ('Created {0} ring deployment(s).' -f $created.Count)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring deployment' -Message ("Created {0} of {0} deployment(s). Run ID {1}. ConfigMgr enforces each ring's dates." -f $created.Count, $RunId) -Buttons OK -Icon Info)
+        return
+    }
+    $notCreated = @($rows | Where-Object { $created -notcontains $_ } | ForEach-Object { Get-RingLabel -Ring $_ })
+    Set-StatusText -Text ('Ring run stopped at {0}.' -f (Get-RingLabel -Ring $failure.Ring))
+    if ($failure.Created) {
+        $text = ("{0} was created, but its audit record could not be written: {1}`n`nLater rings were not created. Created: {2}`nNot created: {3}`n`nThe created deployment stays in Configuration Manager." -f
+            (Get-RingLabel -Ring $failure.Ring), $failure.Error,
+            (($created | ForEach-Object { Get-RingLabel -Ring $_ }) -join ', '),
+            ($notCreated -join ', '))
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring run stopped: audit failure' -Message $text -Buttons OK -Icon Warn)
+    }
+    else {
+        $text = ("{0} failed: {1}`n`nCreated: {2}`nNot created: {3}`n`nThe created deployments stay in Configuration Manager." -f
+            (Get-RingLabel -Ring $failure.Ring), $failure.Error,
+            $(if ($created.Count) { ($created | ForEach-Object { Get-RingLabel -Ring $_ }) -join ', ' } else { 'none' }),
+            ($notCreated -join ', '))
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring run stopped' -Message $text -Buttons OK -Icon Error)
+    }
+}
+
+function Invoke-RingCreateHeld {
+    param([Parameter(Mandatory)][hashtable]$Validated, [Parameter(Mandatory)][string]$RunId)
+    $identity = Get-RingObjectIdentity -Type $Validated.Type -TargetObject $Validated.Object -ProgramName $Validated.ProgramName
+    $run = New-RingRun -PlanName $Validated.Plan.Name -Object $identity -Rings @($Validated.Rows) -RunId $RunId -TimeBasedOn $Validated.Plan.TimeBasedOn
+    $fileName = Get-RingRunFileName -PlanName $Validated.Plan.Name -ObjectKey $identity.ID -Stamp (Get-Date)
+
+    # The file exists before ring 1 is created, so a crash after the create
+    # still leaves a run that Promote can find.
+    try { $path = New-RingRunFile -Run $run -Folder $script:RingRunStatePath -FileName $fileName }
+    catch {
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring run not started' -Message ("The run file could not be written: {0}`n`nNothing was created." -f $_.Exception.Message) -Buttons OK -Icon Error)
+        return
+    }
+    Add-LogLine -Message ('Run file written: {0}' -f $path)
+
+    $lock = $null
+    try {
+        $lock = Enter-RingRunLock -Path $path
+        $ring1 = Get-RingRunRing -Run $run -RingIndex 1
+        $row1  = @($Validated.Rows)[0]
+        [void](Set-RingRunRingStatus -Run $run -RingIndex 1 -Status Creating)
+        try { Save-RingRun -Run $run -Path $path }
+        catch {
+            [void](Show-ThemedMessage -Owner $window -Title 'Ring run not started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f $_.Exception.Message) -Buttons OK -Icon Error)
+            return
+        }
+        $res = Invoke-RingOneDeployment -Validated $Validated -Ring $ring1 -Collection $Validated.Collections[1] -RunId $RunId
+        if (-not $res.Success) {
+            [void](Set-RingRunRingStatus -Run $run -RingIndex 1 -Status Held)
+            try { Save-RingRun -Run $run -Path $path }
+            catch { Add-LogLine -Message ("Ring 1 remains Creating until live reconciliation can confirm no deployment exists: {0}" -f $_.Exception.Message) }
+            $row1.Checks = ('Failed: {0}' -f $res.Error)
+            [void](Show-ThemedMessage -Owner $window -Title 'Ring 1 failed' -Message ("{0}`n`nThe run stays open. If the run file could not be updated, refresh Open runs after the create recovery wait." -f $res.Error) -Buttons OK -Icon Error)
+            return
+        }
+        $row1.Checks = ('Created: {0}' -f $res.DeploymentID)
+        [void](Set-RingRunRingStatus -Run $run -RingIndex 1 -Status Created -DeploymentID (Get-RingRecordedId -Result $res) -AssignmentID $res.DeploymentID)
+        try { Save-RingRun -Run $run -Path $path }
+        catch {
+            [void](Show-ThemedMessage -Owner $window -Title 'Run file not updated' -Message ("Ring 1 was created (DeploymentID {0}), but the run file could not be updated: {1}`n`nThe saved run marks ring 1 Creating. Refresh Open runs to reconcile and adopt the deployment; do not retry it manually." -f $res.DeploymentID, $_.Exception.Message) -Buttons OK -Icon Warn)
+            return
+        }
+        Set-StatusText -Text 'Ring 1 created; later rings held.'
+        $message = ("Ring 1 created (DeploymentID {0}). {1} later ring(s) are held.`n`nUse Promote in Open runs after you check ring 1." -f $res.DeploymentID, (@($Validated.Rows).Count - 1))
+        if (-not $res.AuditLogged) { $message += ("`n`nThe deployment exists, but its audit record failed: {0}" -f $res.AuditError) }
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring deployment' -Message $message -Buttons OK -Icon $(if ($res.AuditLogged) { 'Info' } else { 'Warn' }))
+    }
+    catch {
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring deployment' -Message $_.Exception.Message -Buttons OK -Icon Error)
+    }
+    finally {
+        Exit-RingRunLock -LockPath $lock
+    }
+}
+
+function Update-RingRunsGrid {
+    <#
+    .SYNOPSIS
+        Lists the rings of every open (or closed) run. -Live reads counts from
+        the site, reconciles deleted deployments, and closes finished runs.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Writes only run-state files of this tool; the site is read, not changed.')]
+    param([switch]$Live)
+
+    $showClosed = [bool]$chkRingShowClosed.IsChecked
+    $lblRingRuns.Text = if ($showClosed) { 'CLOSED RUNS' } else { 'OPEN RUNS' }
+    $live = $Live -and -not $showClosed
+    $gridRows = New-Object System.Collections.ObjectModel.ObservableCollection[PSObject]
+
+    foreach ($f in @(Get-RingRunFile -Path $script:RingRunStatePath -Closed:$showClosed)) {
+        $run = $null
+        $runNote = ''
+        $summaries = @{}
+        $recoveryNotes = @{}
+        $rec = $null
+        if ($live) {
+            $lock = $null
+            try {
+                $lock = Enter-RingRunLock -Path $f.FullName
+                $run = Read-RingRun -Path $f.FullName
+                foreach ($r in @($run.Rings | Where-Object { $_.Status -eq 'Created' })) {
+                    $summaries[[int]$r.Index] = Get-RingLiveSummary -Ring $r -ObjectType $run.Object.Type
+                }
+                $creatingCandidates = @{}
+                foreach ($r in @($run.Rings | Where-Object { $_.Status -eq 'Creating' })) {
+                    $pre = Test-RingPreflight -Type $run.Object.Type -ObjectName $run.Object.Name -ProgramName $run.Object.ProgramName `
+                        -Rings @($r) -ExpectedObjectId $run.Object.ID -SkipContentCheck
+                    $ringCheck = $pre.Rings[0]
+                    $checkFailed = -not $ringCheck.Collection -or -not $ringCheck.CollectionSafe -or
+                        -not [string]::IsNullOrWhiteSpace([string]$pre.ObjectMessage) -or
+                        -not [string]::IsNullOrWhiteSpace([string]$ringCheck.DuplicateCheckError)
+                    $creatingCandidates[[int]$r.Index] = @{
+                        CheckFailed = $checkFailed
+                        Error = if ($checkFailed) {
+                            if ($pre.ObjectMessage) { [string]$pre.ObjectMessage }
+                            elseif (-not $ringCheck.Collection) { [string]$ringCheck.Message }
+                            elseif (-not $ringCheck.CollectionSafe) { [string]$ringCheck.Message }
+                            else { [string]$ringCheck.DuplicateCheckError }
+                        } else { '' }
+                        Deployments = @($ringCheck.ExistingDeployments)
+                    }
+                }
+                $rec = Update-RingRunReconcile -Run $run -Summaries $summaries -CreatingCandidates $creatingCandidates
+                $recoveryNotes = $rec.RecoveryNotes
+                foreach ($i in $rec.Recovered) { Add-LogLine -Message ('Reconcile: {0} ring {1} deployment adopted into the run.' -f $f.Name, $i) }
+                foreach ($i in $rec.Reset)     { Add-LogLine -Message ('Reconcile: {0} ring {1} had no matching deployment and returned to Held.' -f $f.Name, $i) }
+                foreach ($i in $rec.Removed)   { Add-LogLine -Message ('Reconcile: {0} ring {1} deployment is gone from the site; marked Removed.' -f $f.Name, $i) }
+                foreach ($i in $rec.Corrected) { Add-LogLine -Message ('Reconcile: {0} ring {1} deployment ID corrected.' -f $f.Name, $i) }
+                foreach ($i in $rec.Recovered) {
+                    $recoveredRing = Get-RingRunRing -Run $run -RingIndex ([int]$i)
+                    $summaries[[int]$i] = Get-RingLiveSummary -Ring $recoveredRing -ObjectType $run.Object.Type
+                }
+                if ($rec.Changed) { Save-RingRun -Run $run -Path $f.FullName }
+                if ($rec.Finished) {
+                    $dest = Close-RingRun -Run $run -Path $f.FullName
+                    Add-LogLine -Message ('Reconcile: run finished and moved to {0}.' -f $dest)
+                    continue
+                }
+            }
+            catch {
+                $runNote = $_.Exception.Message
+                if ($rec) {
+                    foreach ($i in $rec.Recovered) {
+                        $recoveryNotes[[int]$i] = ("A matching deployment was found, but the recovered run state could not be saved: {0}" -f $runNote)
+                    }
+                    foreach ($i in $rec.Reset) {
+                        $recoveryNotes[[int]$i] = ("No matching deployment was found, but the reset to Held could not be saved: {0}" -f $runNote)
+                    }
+                }
+                try { $run = Read-RingRun -Path $f.FullName } catch { $run = $null }
+            }
+            finally {
+                Exit-RingRunLock -LockPath $lock
+            }
+        }
+        else {
+            try { $run = Read-RingRun -Path $f.FullName } catch { $runNote = $_.Exception.Message }
+        }
+
+        if (-not $run) {
+            $gridRows.Add([PSCustomObject]@{
+                RunLabel = $f.Name; RunPath = $f.FullName; Index = ''; Name = ''; CollectionID = ''; Status = ''
+                DeadlineText = ''; Targeted = ''; Success = ''; Errors = ''; InProgress = ''; Note = $runNote
+                ShowPromote = $false; CanPromote = $false; PromoteTip = ''
+            })
+            continue
+        }
+
+        $next = Get-RingRunNextHeld -Run $run
+        $finished = Test-RingRunFinished -Run $run
+        $label = ('{0}: {1} ({2})' -f $run.PlanName, $run.Object.Name, (Format-RingDate $run.CreatedAt))
+        foreach ($r in @($run.Rings | Sort-Object { [int]$_.Index })) {
+            $idx = [int]$r.Index
+            $s = $summaries[$idx]
+            $note = $runNote
+            $counted = ($s -and $s.Found -eq $true -and $s.Summarized -eq $true)
+            if ($s -and $s.Error) { $note = $s.Error }
+            elseif ($s -and $s.Found -eq $true -and -not $counted) { $note = 'The site has not summarized this deployment yet.' }
+            elseif ([int]$r.ShiftedMinutes -gt 0) { $note = ('Dates moved {0} minutes later at promote.' -f $r.ShiftedMinutes) }
+            elseif ($r.Status -eq 'Created' -and -not $live -and -not $showClosed) { $note = 'Refresh to read live counts.' }
+            if ($r.Status -eq 'Creating') {
+                $note = if ($recoveryNotes.ContainsKey($idx)) { [string]$recoveryNotes[$idx] } else { 'Create outcome unresolved. Refresh and reconcile before retrying.' }
+            }
+
+            $row = [PSCustomObject]@{
+                RunLabel     = $label
+                RunPath      = $f.FullName
+                Index        = $idx
+                Name         = [string]$r.Name
+                CollectionID = [string]$r.CollectionID
+                Status       = [string]$r.Status
+                DeadlineText = Format-RingDate $r.DeadlineDateTime
+                Targeted     = if ($counted) { $s.Targeted }   else { '' }
+                Success      = if ($counted) { $s.Success }    else { '' }
+                Errors       = if ($counted) { $s.Errors }     else { '' }
+                InProgress   = if ($counted) { $s.InProgress } else { '' }
+                Note         = $note
+                ShowPromote  = $false
+                CanPromote   = $false
+                PromoteTip   = ''
+            }
+
+            if (-not $showClosed -and -not $finished -and $idx -eq $next -and $r.Status -eq 'Held') {
+                $row.ShowPromote = $true
+                if ($idx -eq 1) {
+                    $row.CanPromote = $true
+                    $row.PromoteTip = 'Create ring 1.'
+                }
+                else {
+                    $prev = Get-RingRunRing -Run $run -RingIndex ($idx - 1)
+                    $hasThreshold = $null -ne $prev.SuccessThresholdPercent -and ([string]$prev.SuccessThresholdPercent).Trim().Length -gt 0
+                    if (-not $hasThreshold) {
+                        $row.CanPromote = $true
+                        $row.PromoteTip = ('Create ring {0}. Ring {1} has no success threshold.' -f $idx, ($idx - 1))
+                    }
+                    elseif (-not $live) {
+                        $row.PromoteTip = 'Click Refresh and reconcile to read ring counts first.'
+                    }
+                    else {
+                        $t = Test-RingThreshold -Summary $summaries[$idx - 1] -ThresholdPercent $prev.SuccessThresholdPercent
+                        $row.CanPromote = [bool]$t.Met
+                        $row.PromoteTip = if ($t.Met) { ('Create ring {0}. Ring {1} success is {2}%.' -f $idx, ($idx - 1), $t.Percent) } else { $t.Reason }
+                        if (-not $t.Met) { $row.Note = $t.Reason }
+                    }
+                }
+            }
+            $gridRows.Add($row)
+        }
+    }
+    $dgRingRuns.ItemsSource = $gridRows
+}
+
+function Invoke-RingPromote {
+    param([Parameter(Mandatory)][string]$RunPath, [Parameter(Mandatory)][int]$RingIndex)
+
+    if (-not (Connect-IfNeeded)) { return }
+    $lock = $null
+    try { $lock = Enter-RingRunLock -Path $RunPath }
+    catch {
+        [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message $_.Exception.Message -Buttons OK -Icon Warn)
+        return
+    }
+
+    $window.Cursor = [System.Windows.Input.Cursors]::Wait
+    try {
+        # Re-read under the lock: another operator may have promoted or
+        # reconciled this run after the grid was drawn.
+        $run = Read-RingRun -Path $RunPath
+        $check = Test-RingRunPromotable -Run $run -RingIndex $RingIndex
+        if (-not $check.Ok) {
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message $check.Reason -Buttons OK -Icon Warn)
+            return
+        }
+        $ring = Get-RingRunRing -Run $run -RingIndex $RingIndex
+
+        if ($RingIndex -gt 1) {
+            $prev = Get-RingRunRing -Run $run -RingIndex ($RingIndex - 1)
+            $prevSummary = Get-RingLiveSummary -Ring $prev -ObjectType $run.Object.Type
+            $t = Test-RingThreshold -Summary $prevSummary -ThresholdPercent $prev.SuccessThresholdPercent
+            if (-not $t.Met) {
+                [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message ('{0}: {1}' -f (Get-RingLabel -Ring $prev), $t.Reason) -Buttons OK -Icon Warn)
+                return
+            }
+        }
+
+        $pre = Test-RingPreflight -Type $run.Object.Type -ObjectName $run.Object.Name -ProgramName $run.Object.ProgramName `
+            -Rings @($ring) -ExpectedObjectId $run.Object.ID
+        if (-not $pre.Ok) {
+            $why = if ($pre.ObjectMessage) { $pre.ObjectMessage } else { $pre.Rings[0].Message }
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message ('{0}: {1}' -f (Get-RingLabel -Ring $ring), $why) -Buttons OK -Icon Error)
+            return
+        }
+        $collection = $pre.Rings[0].Collection
+
+        $now = Get-RingNow -TimeBasedOn ([string]$run.TimeBasedOn)
+        $shift = Get-RingPromoteShift -Ring $ring -Now $now
+        if ($shift -gt 0) { [void](Move-RingRunSchedule -Run $run -FromIndex $RingIndex -Minutes $shift) }
+        $exp = Test-RingExpansion -Rings @($ring) -Now $now
+        if (@($exp.Errors).Count -gt 0) {
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message (Format-RingMessageList $exp.Errors) -Buttons OK -Icon Error)
+            return
+        }
+
+        $msg = ("Promote ring {0} of plan {1} for {2} '{3}':`n`n{4}" -f $RingIndex, $run.PlanName, $run.Object.Type, $run.Object.Name,
+            (Format-RingLine -Ring $ring -Collection $collection -Type $run.Object.Type))
+        if ($run.TimeBasedOn -eq 'Utc') { $msg += "`n`nAll times are UTC." }
+        if ($shift -gt 0) {
+            $msg += ("`n`nThe planned deadline has passed. This ring and every later held ring move {0} minutes later." -f $shift)
+        }
+        if (@($exp.Warnings).Count -gt 0) { $msg += ("`n`nWarnings:`n" + (Format-RingMessageList $exp.Warnings)) }
+        $msg += "`n`nContinue?"
+        $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm promote' -Message $msg -Buttons OKCancel -Icon Question
+        if ($confirm -ne 'OK') { Add-LogLine -Message 'Promote cancelled by user.'; return }
+
+        $validated = @{
+            Type        = [string]$run.Object.Type
+            Name        = [string]$run.Object.Name
+            ProgramName = [string]$run.Object.ProgramName
+            Object      = $pre.Object
+            Plan        = [PSCustomObject]@{ Name = [string]$run.PlanName; TimeBasedOn = [string]$run.TimeBasedOn }
+        }
+        [void](Set-RingRunRingStatus -Run $run -RingIndex $RingIndex -Status Creating)
+        try { Save-RingRun -Run $run -Path $RunPath }
+        catch {
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote not started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f $_.Exception.Message) -Buttons OK -Icon Error)
+            return
+        }
+        $res = Invoke-RingOneDeployment -Validated $validated -Ring $ring -Collection $collection -RunId ([string]$run.RunId)
+        if (-not $res.Success) {
+            [void](Set-RingRunRingStatus -Run $run -RingIndex $RingIndex -Status Held)
+            try { Save-RingRun -Run $run -Path $RunPath }
+            catch { Add-LogLine -Message ("Ring {0} remains Creating until live reconciliation can confirm no deployment exists: {1}" -f $RingIndex, $_.Exception.Message) }
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote failed' -Message ("{0}`n`nIf the run file could not be updated, refresh Open runs after the create recovery wait." -f $res.Error) -Buttons OK -Icon Error)
+            return
+        }
+        [void](Set-RingRunRingStatus -Run $run -RingIndex $RingIndex -Status Created -DeploymentID (Get-RingRecordedId -Result $res) -AssignmentID $res.DeploymentID)
+        try { Save-RingRun -Run $run -Path $RunPath }
+        catch {
+            [void](Show-ThemedMessage -Owner $window -Title 'Run file not updated' -Message ("Ring {0} was created (DeploymentID {1}), but the run file could not be updated: {2}`n`nThe saved run marks this ring Creating. Refresh Open runs to reconcile and adopt the deployment; do not retry it manually." -f $RingIndex, $res.DeploymentID, $_.Exception.Message) -Buttons OK -Icon Warn)
+            return
+        }
+        Set-StatusText -Text ('Ring {0} created.' -f $RingIndex)
+        Add-LogLine -Message ('Promote: ring {0} of {1} created.' -f $RingIndex, (Split-Path -Path $RunPath -Leaf))
+        if (-not $res.AuditLogged) {
+            $auditMessage = ("Ring {0} exists, but its audit record failed: {1}" -f $RingIndex, $res.AuditError)
+            Add-LogLine -Message $auditMessage
+            Set-StatusText -Text 'Ring created; audit write failed.'
+            [void](Show-ThemedMessage -Owner $window -Title 'Audit log write failed' -Message $auditMessage -Buttons OK -Icon Warn)
+        }
+    }
+    catch {
+        [void](Show-ThemedMessage -Owner $window -Title 'Promote' -Message $_.Exception.Message -Buttons OK -Icon Error)
+    }
+    finally {
+        $window.Cursor = $null
+        Exit-RingRunLock -LockPath $lock
+    }
+    Update-RingRunsGrid -Live
+}
+
+$script:ShowRingView = {
+    $script:CurrentType = 'Rings'
+    $formPane.Visibility         = [System.Windows.Visibility]::Collapsed
+    $ringPane.Visibility         = [System.Windows.Visibility]::Visible
+    $pnlApplyTemplate.Visibility = [System.Windows.Visibility]::Collapsed
+    $txtModuleHeader.Text    = 'Ring Deployment'
+    $txtModuleSubheader.Text = 'Deploy one object to the collections of a ring plan, one ring after another.'
+    if (-not $script:RingViewInitialized) {
+        $script:RingViewInitialized = $true
+        Update-RingPlanCombo
+    }
+    Update-RingRunsGrid -Live:$script:ConnectedToCM
+    Set-StatusText -Text 'Viewing Ring Deployment.'
+}
+
+$cboRingType.Add_SelectionChanged({
+    $isPackage = ((Get-RingSelectedType) -eq 'Package')
+    $vis = if ($isPackage) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+    $lblRingProgram.Visibility = $vis
+    $cboRingProgram.Visibility = $vis
+    $cboRingProgram.Items.Clear()
+    $txtRingObject.Text = ''
+    Reset-RingValidation
+})
+
+$btnRingBrowseObject.Add_Click({
+    if (-not (Connect-IfNeeded)) { return }
+    $type = Get-RingSelectedType
+    $b = $script:RingTypeBrowse[$type]
+    $picked = Show-BrowseDialog -Owner $window -Title $b.Title -Watermark $b.Watermark -Type $b.Browse -NameProperty $b.NameProperty
+    if ($picked) {
+        $txtRingObject.Text = $picked
+        Add-LogLine -Message ('Ring object selected: {0}' -f $picked)
+        if ($type -eq 'Package') { Update-RingProgramCombo }
+    }
+})
+
+$txtRingObject.Add_TextChanged({
+    if ((Get-RingSelectedType) -eq 'Package') { $cboRingProgram.Items.Clear() }
+    Reset-RingValidation
+})
+$cboRingProgram.Add_SelectionChanged({ Reset-RingValidation })
+$chkRingHold.Add_Click({ Reset-RingValidation })
+
+$cboRingPlan.Add_SelectionChanged({
+    if ($script:RingSuppress) { return }
+    Update-RingPlanSelection
+})
+
+$btnRingReloadPlans.Add_Click({ Update-RingPlanCombo })
+
+$btnRingOpenFolder.Add_Click({
+    if (-not (Test-Path -LiteralPath $script:RingPlanDir)) { New-Item -ItemType Directory -Path $script:RingPlanDir -Force | Out-Null }
+    Start-Process -FilePath 'explorer.exe' -ArgumentList ('"{0}"' -f $script:RingPlanDir)
+})
+
+$btnRingExpand.Add_Click({ Update-RingPreview })
+
+$dgRingPreview.Add_CellEditEnding({ Reset-RingValidation })
+
+$btnRingPickCollection.Add_Click({
+    $row = $dgRingPreview.SelectedItem
+    if (-not $row) { Add-LogLine -Message 'Select a ring row in the preview first.'; return }
+    if (-not (Connect-IfNeeded)) { return }
+    $reload = ([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Shift) -ne 0
+    $picked = Show-CollectionBrowseItem -Owner $window -Force:$reload
+    if (-not $picked) { return }
+    if (Test-CollectionIdBuiltIn -CollectionId ([string]$picked.CollectionID)) {
+        [void](Show-ThemedMessage -Owner $window -Title 'Collection blocked' -Message ('{0} ({1}) is a built-in collection. Rings never target built-in collections.' -f $picked.Name, $picked.CollectionID) -Buttons OK -Icon Error)
+        return
+    }
+    $row.CollectionID   = [string]$picked.CollectionID
+    $row.CollectionName = [string]$picked.Name
+    $row.Checks         = ''
+    Reset-RingValidation
+    Update-RingPreviewGrid
+    Add-LogLine -Message ('{0}: collection set to {1} ({2}) for this run.' -f (Get-RingLabel -Ring $row), $picked.Name, $picked.CollectionID)
+})
+
+$btnRingValidate.Add_Click({ Invoke-RingValidate })
+$btnRingCreate.Add_Click({ Invoke-RingCreate })
+
+$btnRingRefreshRuns.Add_Click({
+    if ([bool]$chkRingShowClosed.IsChecked) { Update-RingRunsGrid; return }
+    if (-not (Connect-IfNeeded)) { Update-RingRunsGrid; return }
+    $window.Cursor = [System.Windows.Input.Cursors]::Wait
+    try { Update-RingRunsGrid -Live }
+    finally { $window.Cursor = $null }
+    Set-StatusText -Text 'Ring runs refreshed.'
+})
+
+$chkRingShowClosed.Add_Click({ Update-RingRunsGrid })
+
+$dgRingRuns.AddHandler([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent, [System.Windows.RoutedEventHandler]{
+    $button = $args[1].OriginalSource
+    if ($button -isnot [System.Windows.Controls.Button]) { return }
+    $row = $button.DataContext
+    if ($null -eq $row -or -not $row.RunPath -or -not $row.ShowPromote) { return }
+    Invoke-RingPromote -RunPath ([string]$row.RunPath) -RingIndex ([int]$row.Index)
+})
+
+# =============================================================================
 # Wire handlers
 # =============================================================================
 $btnApps.Add_Click({          & $script:SetCurrentType 'Apps' })
 $btnPackages.Add_Click({      & $script:SetCurrentType 'Packages' })
 $btnTaskSequences.Add_Click({ & $script:SetCurrentType 'TaskSequences' })
 $btnSUG.Add_Click({           & $script:SetCurrentType 'SUG' })
+$btnRings.Add_Click({         & $script:ShowRingView })
 
 $btnOptions.Add_Click({
     Show-OptionsDialog -Owner $window -InitialSection 'Connection'
@@ -3497,7 +4544,16 @@ $window.Add_SourceInitialized({
 })
 
 $window.Add_Loaded({
-    & $script:SetCurrentType $script:SavedType
+    if ($script:SavedType -eq 'Rings') {
+        & $script:SetCurrentType 'Apps'
+        & $script:ShowRingView
+    }
+    elseif ($script:TypeMeta.ContainsKey($script:SavedType)) {
+        & $script:SetCurrentType $script:SavedType
+    }
+    else {
+        & $script:SetCurrentType 'Apps'
+    }
     & $script:RefreshApplyTemplateCombo
     Add-LogLine -Message ('Deployment Helper loaded. Site={0} Provider={1}' -f $global:Prefs['SiteCode'], $global:Prefs['SMSProvider'])
     Add-LogLine -Message ('Tool log: {0}' -f $toolLogPath)

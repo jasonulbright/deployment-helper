@@ -1,5 +1,42 @@
 # Changelog
 
+## [2026.09.26.0010] - 2026-09-26
+
+## One confirmation creates the deployments for all 4 rings of a plan
+
+### Added
+
+- Add a Ring deployment view that deploys one object through a ring plan.
+- Seed two ring plans, Workstation-Rings and Server-Rings, with no target collections.
+- Create every ring at once with future available times and deadlines.
+- Hold later rings on request; Promote creates the next ring.
+- Disable Promote until the previous ring reaches its success threshold.
+- Show targeted, success, error, and in-progress counts for each created ring.
+- Mark deleted ring deployments Removed and close finished runs on Reconcile.
+- Refuse Promote when another session changed or locked the run file.
+- Add a ring run-state folder setting; a UNC path shares runs with a team.
+- Add plan name, ring index, ring name, and run ID to ring audit records.
+- Recover an interrupted ring create on the next Refresh and reconcile.
+- Stop the ring run when an audit record fails after a create.
+
+### Fixed
+
+- Set Required package and task sequence deadlines as a schedule, not an expiry.
+- Block every built-in collection by the SMS ID prefix, including SMSDM collections.
+- Block a deployment when the target collection has no collection ID.
+- Keep ring columns in the CSV export when earlier records do not have them.
+- Check deadlines against UTC time when the time basis is UTC.
+- Detect an existing software update group deployment in the duplicate check.
+- Match names that contain brackets or other wildcard characters literally.
+- Block a deployment when the duplicate check cannot run.
+- Run the duplicate check again right before each deployment is created.
+- Block a deployment when the audit log cannot be written.
+- Show the deployment ID when its audit record cannot be written.
+
+### Changed
+
+- Update the shared SuiteCommon module to 2026.09.25.0036.
+
 ## [2026.09.25.0009] - 2026-09-25
 
 ## Browse opens 5 object types with no search term
