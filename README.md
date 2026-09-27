@@ -52,6 +52,8 @@ Edit, duplicate, or delete via **Options > Templates**. Each template is a simpl
 
 A ring plan is a named, ordered list of rings in `Rings\<plan>.json`. Each ring names one device collection by CollectionID, a purpose, and day offsets from the plan start. A ring run makes one ordinary Configuration Manager deployment per ring. The site does not know that the deployments form a sequence; only the tool's files record it.
 
+![Ring deployment](screenshots/rings-dark.png)
+
 On first run, two plans are written to `Rings\`: **Workstation-Rings** (QA, Pilot, Prod 1, Prod Final) and **Server-Rings** (Test, Prod). The seed plans name no collection. A plan with an empty ring target does not run.
 
 To run a plan:

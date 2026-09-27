@@ -64,7 +64,7 @@ function Search-CMApplicationByName {
         # $apps.Count is $null on exactly-one-match and the log line
         # reads "  result(s)" with the number missing.
         $apps = @(Get-CMApplication -Name "*$SearchText*" -Fast -ErrorAction Stop |
-            Select-Object LocalizedDisplayName, SoftwareVersion, PackageID, DateLastModified |
+            Select-Object LocalizedDisplayName, SoftwareVersion, CI_ID, DateLastModified |
             Sort-Object LocalizedDisplayName)
         Write-Log "Application search '$SearchText': $($apps.Count) result(s)"
         return $apps
@@ -107,10 +107,13 @@ function Get-CMBrowseList {
         [string]$Type
     )
 
+    # -Fast skips lazy properties, which then read as empty: SMS_Application
+    # PackageID and SMS_TaskSequencePackage BootImageID. The rows carry only
+    # properties that -Fast returns.
     $rows = switch ($Type) {
         'Apps' {
             @(Get-CMApplication -Fast -ErrorAction Stop |
-                Select-Object LocalizedDisplayName, SoftwareVersion, PackageID, DateLastModified |
+                Select-Object LocalizedDisplayName, SoftwareVersion, CI_ID, DateLastModified |
                 Sort-Object LocalizedDisplayName)
         }
         'Packages' {
@@ -120,7 +123,7 @@ function Get-CMBrowseList {
         }
         'TaskSequences' {
             @(Get-CMTaskSequence -Fast -ErrorAction Stop |
-                Select-Object Name, PackageID, BootImageID, Description |
+                Select-Object Name, PackageID, Description |
                 Sort-Object Name)
         }
         'SUG' {
@@ -1108,7 +1111,7 @@ function Search-CMTaskSequenceByName {
 
     try {
         $tsList = @(Get-CMTaskSequence -Name "*$SearchText*" -Fast -ErrorAction Stop |
-            Select-Object Name, PackageID, BootImageID, Description |
+            Select-Object Name, PackageID, Description |
             Sort-Object Name)
         Write-Log "Task sequence search '$SearchText': $($tsList.Count) result(s)"
         return $tsList

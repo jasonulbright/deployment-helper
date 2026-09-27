@@ -36,8 +36,8 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 2026.09.26.0010
-    Updated    : 2026-09-26
+    Version    : 2026.09.27.0011
+    Updated    : 2026-09-27
 #>
 
 param(
@@ -3368,7 +3368,7 @@ $script:RingViewInitialized = $false
 $dgRingPreview.ItemsSource  = $script:RingPreviewRows
 
 $script:RingTypeBrowse = @{
-    'Application'  = @{ Browse = 'Apps';          NameProperty = 'LocalizedDisplayName'; Title = 'Browse applications';           Watermark = 'Filter by name, version, or package ID' }
+    'Application'  = @{ Browse = 'Apps';          NameProperty = 'LocalizedDisplayName'; Title = 'Browse applications';           Watermark = 'Filter by name, version, or CI ID' }
     'Package'      = @{ Browse = 'Packages';      NameProperty = 'Name';                 Title = 'Browse packages';               Watermark = 'Filter by name, package ID, manufacturer, or version' }
     'TaskSequence' = @{ Browse = 'TaskSequences'; NameProperty = 'Name';                 Title = 'Browse task sequences';         Watermark = 'Filter by name, package ID, or description' }
     'SUG'          = @{ Browse = 'SUG';           NameProperty = 'LocalizedDisplayName'; Title = 'Browse software update groups'; Watermark = 'Filter by name' }
@@ -4237,7 +4237,7 @@ $btnBrowseTarget.Add_Click({
     switch ($script:CurrentType) {
         'Apps' {
             $picked = Show-BrowseDialog -Owner $window -Title 'Browse applications' `
-                -Watermark 'Filter by name, version, or package ID' `
+                -Watermark 'Filter by name, version, or CI ID' `
                 -Type 'Apps' -NameProperty 'LocalizedDisplayName'
             if ($picked) {
                 $txtTargetName.Text = $picked
