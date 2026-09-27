@@ -1,6 +1,6 @@
 @{
     RootModule        = 'DeploymentHelperCommon.psm1'
-    ModuleVersion     = '2026.09.25.0009'
+    ModuleVersion     = '2026.09.26.0010'
     GUID              = 'c3d4e5f6-a7b8-9012-cdef-345678901234'
     Author            = 'Jason Ulbright'
     Description       = 'Configuration Manager application deployment with pre-execution validation, safety guardrails, and immutable audit logging.'
@@ -31,6 +31,7 @@
         'Test-ContentDistributed'
         'Test-CollectionValid'
         'Test-CollectionSafe'
+        'Test-CollectionIdBuiltIn'
         'Test-DuplicateDeployment'
         'Get-DeploymentPreview'
 
@@ -57,6 +58,7 @@
         # Software Update Groups (extended)
         'Search-CMSoftwareUpdateGroupByName'
         'Test-DuplicateSUGDeployment'
+        'Get-DuplicateCheckFailure'
 
         # Templates
         'Get-DeploymentTemplates'
@@ -64,12 +66,54 @@
         'Remove-DeploymentTemplate'
 
         # Deployment Log
+        'Test-DeploymentLogWritable'
         'Write-DeploymentLog'
         'Get-DeploymentHistory'
 
         # Export
         'Export-DeploymentHistoryCsv'
         'Export-DeploymentHistoryHtml'
+
+        # Ring plans
+        'ConvertFrom-RingDateText'
+        'ConvertTo-RingDateText'
+        'Get-RingPlanSeed'
+        'Initialize-RingPlanFolder'
+        'ConvertTo-RingPlan'
+        'Test-RingPlan'
+        'Import-RingPlan'
+        'Get-RingPlanList'
+        'Get-RingLabel'
+        'Expand-RingPlan'
+        'Get-RingNow'
+        'Test-RingExpansion'
+
+        # Ring runs
+        'New-RingRunId'
+        'Get-RingRunFileName'
+        'Get-RingObjectIdentity'
+        'New-RingRun'
+        'New-RingRunFile'
+        'Save-RingRun'
+        'Read-RingRun'
+        'Get-RingRunRing'
+        'Set-RingRunRingStatus'
+        'Get-RingRunNextHeld'
+        'Test-RingRunFinished'
+        'Test-RingRunPromotable'
+        'Get-RingPromoteShift'
+        'Move-RingRunSchedule'
+        'Enter-RingRunLock'
+        'Exit-RingRunLock'
+        'Get-RingDeploymentSummary'
+        'Get-RingLiveSummary'
+        'Update-RingRunReconcile'
+        'Test-RingThreshold'
+        'Get-RingRunFile'
+        'Close-RingRun'
+        'Test-RingPreflight'
+        'Invoke-RingDeployment'
+        'New-RingAuditRecord'
     )
 
     CmdletsToExport   = @()

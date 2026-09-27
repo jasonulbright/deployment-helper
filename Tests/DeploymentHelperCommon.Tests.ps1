@@ -27,6 +27,11 @@ BeforeAll {
         }
     }
 
+    . (Join-Path $PSScriptRoot 'CMStubs.ps1')
+    Set-CMTestStub -Name 'Get-CMCollection', 'New-CMPackageDeployment', 'New-CMTaskSequenceDeployment', 'New-CMSchedule',
+        'Get-CMApplication', 'Get-CMPackage', 'Get-CMTaskSequence', 'Get-CMSoftwareUpdateGroup',
+        'Get-CMApplicationDeployment', 'Get-CMPackageDeployment', 'Get-CMTaskSequenceDeployment', 'Get-CMUpdateGroupDeployment'
+
     $modulePath = Join-Path $PSScriptRoot '..\Module\DeploymentHelperCommon.psd1'
     Import-Module $modulePath -Force
 
@@ -453,10 +458,124 @@ Describe 'Test-CollectionSafe' {
         $result.IsSafe | Should -BeTrue
     }
 
-    It 'Allows SMSDM-prefixed collections' {
+    It 'Blocks SMSDM-prefixed collections' {
         $col = [PSCustomObject]@{ Name = 'All Desktop and Server Clients'; CollectionID = 'SMSDM003' }
         $result = Test-CollectionSafe -Collection $col
-        $result.IsSafe | Should -BeTrue
+        $result.IsSafe | Should -BeFalse
+        $result.Reason | Should -Match 'SMSDM003'
+    }
+
+    It 'Blocks SMS-prefixed IDs outside SMS000*' {
+        $col = [PSCustomObject]@{ Name = 'Renamed built-in'; CollectionID = 'SMS10000' }
+        (Test-CollectionSafe -Collection $col).IsSafe | Should -BeFalse
+    }
+
+    It 'Blocks by ID, not by name' {
+        $col = [PSCustomObject]@{ Name = 'Pilot Workstations'; CollectionID = 'sms00001' }
+        (Test-CollectionSafe -Collection $col).IsSafe | Should -BeFalse
+        $named = [PSCustomObject]@{ Name = 'All Systems'; CollectionID = 'MCM00022' }
+        (Test-CollectionSafe -Collection $named).IsSafe | Should -BeTrue
+    }
+
+    It 'Blocks a collection with no CollectionID' {
+        $col = [PSCustomObject]@{ Name = 'Pilot Workstations'; CollectionID = '' }
+        (Test-CollectionSafe -Collection $col).IsSafe | Should -BeFalse
+    }
+}
+
+Describe 'Test-CollectionIdBuiltIn' {
+    It 'Returns true for <Id>' -TestCases @(
+        @{ Id = 'SMS00001' }, @{ Id = 'SMS00004' }, @{ Id = 'SMSDM001' }, @{ Id = 'SMSDM003' }, @{ Id = ' smsdm002 ' }
+    ) {
+        Test-CollectionIdBuiltIn -CollectionId $Id | Should -BeTrue
+    }
+
+    It 'Returns false for <Id>' -TestCases @(
+        @{ Id = 'MCM00010' }, @{ Id = 'PS100123' }, @{ Id = '' }, @{ Id = $null }, @{ Id = 'XSMS0001' }
+    ) {
+        Test-CollectionIdBuiltIn -CollectionId $Id | Should -BeFalse
+    }
+}
+
+Describe 'Deployment functions refuse built-in collections' {
+    BeforeAll {
+        Mock New-CMApplicationDeployment -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ AssignmentID = 1 } }
+        Mock New-CMSoftwareUpdateDeployment -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ AssignmentID = 1 } }
+        Mock New-CMPackageDeployment -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ AdvertisementID = 'MCM20001' } }
+        Mock New-CMTaskSequenceDeployment -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ AdvertisementID = 'MCM20002' } }
+        $script:BuiltIn = [PSCustomObject]@{ Name = 'All Systems'; CollectionID = 'SMS00001'; MemberCount = 900 }
+        $script:DmBuiltIn = [PSCustomObject]@{ Name = 'All Desktop and Server Clients'; CollectionID = 'SMSDM003'; MemberCount = 900 }
+    }
+
+    It 'Application: no cmdlet call for <Id>' -TestCases @(@{ Id = 'SMS00001' }, @{ Id = 'SMSDM003' }) {
+        $col = [PSCustomObject]@{ Name = 'x'; CollectionID = $Id; MemberCount = 1 }
+        $r = Invoke-ApplicationDeployment -Application ([PSCustomObject]@{ LocalizedDisplayName = 'A' }) -Collection $col -DeployPurpose Available -AvailableDateTime (Get-Date)
+        $r.Success | Should -BeFalse
+        $r.Error | Should -Match 'Built-in'
+        Should -Invoke New-CMApplicationDeployment -ModuleName DeploymentHelperCommon -Times 0 -Exactly
+    }
+
+    It 'SUG: no cmdlet call' {
+        $r = Invoke-SUGDeployment -SUG ([PSCustomObject]@{ LocalizedDisplayName = 'S' }) -Collection $script:DmBuiltIn -DeployPurpose Available -AvailableDateTime (Get-Date)
+        $r.Success | Should -BeFalse
+        Should -Invoke New-CMSoftwareUpdateDeployment -ModuleName DeploymentHelperCommon -Times 0 -Exactly
+    }
+
+    It 'Package: no cmdlet call' {
+        $r = Invoke-PackageDeployment -Package ([PSCustomObject]@{ Name = 'P'; PackageID = 'MCM00001' }) -ProgramName 'Install' -Collection $script:BuiltIn -DeployPurpose Available -AvailableDateTime (Get-Date)
+        $r.Success | Should -BeFalse
+        Should -Invoke New-CMPackageDeployment -ModuleName DeploymentHelperCommon -Times 0 -Exactly
+    }
+
+    It 'Task sequence: no cmdlet call' {
+        $r = Invoke-TaskSequenceDeployment -TaskSequence ([PSCustomObject]@{ Name = 'T'; PackageID = 'MCM00002' }) -Collection $script:DmBuiltIn -DeployPurpose Available -AvailableDateTime (Get-Date)
+        $r.Success | Should -BeFalse
+        Should -Invoke New-CMTaskSequenceDeployment -ModuleName DeploymentHelperCommon -Times 0 -Exactly
+    }
+}
+
+Describe 'Package and task sequence Required deadline' {
+    BeforeAll {
+        Mock New-CMSchedule -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ Token = 'sched'; Start = $Start; IsUtc = [bool]$IsUtc } }
+        Mock New-CMPackageDeployment -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ AdvertisementID = 'MCM20001' } }
+        Mock New-CMTaskSequenceDeployment -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ AdvertisementID = 'MCM20002' } }
+        $script:Col = [PSCustomObject]@{ Name = 'Pilot'; CollectionID = 'MCM00010'; MemberCount = 5 }
+        $script:Deadline = [datetime]'2026-10-02 08:00'
+    }
+
+    It 'Package passes the deadline as -Schedule and never as -DeadlineDateTime' {
+        $r = Invoke-PackageDeployment -Package ([PSCustomObject]@{ Name = 'P'; PackageID = 'MCM00001' }) -ProgramName 'Install' `
+            -Collection $script:Col -DeployPurpose Required -AvailableDateTime ([datetime]'2026-10-01 08:00') -DeadlineDateTime $script:Deadline
+        $r.Success | Should -BeTrue
+        $r.DeploymentUniqueID | Should -Be 'MCM20001'
+        Should -Invoke New-CMSchedule -ModuleName DeploymentHelperCommon -Times 1 -Exactly -ParameterFilter { $Start -eq $script:Deadline -and $Nonrecurring -and -not $IsUtc }
+        Should -Invoke New-CMPackageDeployment -ModuleName DeploymentHelperCommon -Times 1 -Exactly -ParameterFilter {
+            $null -ne $Schedule -and -not $PSBoundParameters.ContainsKey('DeadlineDateTime')
+        }
+    }
+
+    It 'Task sequence passes the deadline as -Schedule with IsUtc for UTC' {
+        $r = Invoke-TaskSequenceDeployment -TaskSequence ([PSCustomObject]@{ Name = 'T'; PackageID = 'MCM00002' }) -Collection $script:Col `
+            -DeployPurpose Required -AvailableDateTime ([datetime]'2026-10-01 08:00') -DeadlineDateTime $script:Deadline -TimeBasedOn Utc
+        $r.Success | Should -BeTrue
+        Should -Invoke New-CMSchedule -ModuleName DeploymentHelperCommon -Times 1 -Exactly -ParameterFilter { $IsUtc }
+        Should -Invoke New-CMTaskSequenceDeployment -ModuleName DeploymentHelperCommon -Times 1 -Exactly -ParameterFilter {
+            $null -ne $Schedule -and -not $PSBoundParameters.ContainsKey('DeadlineDateTime')
+        }
+    }
+
+    It 'Available package deployment builds no schedule' {
+        Invoke-PackageDeployment -Package ([PSCustomObject]@{ Name = 'P'; PackageID = 'MCM00001' }) -ProgramName 'Install' `
+            -Collection $script:Col -DeployPurpose Available -AvailableDateTime ([datetime]'2026-10-01 08:00') | Out-Null
+        Should -Invoke New-CMSchedule -ModuleName DeploymentHelperCommon -Times 0 -Exactly
+    }
+
+    It 'A schedule failure returns a failed result' {
+        Mock New-CMSchedule -ModuleName DeploymentHelperCommon { throw 'schedule rejected' }
+        $r = Invoke-TaskSequenceDeployment -TaskSequence ([PSCustomObject]@{ Name = 'T'; PackageID = 'MCM00002' }) -Collection $script:Col `
+            -DeployPurpose Required -AvailableDateTime ([datetime]'2026-10-01 08:00') -DeadlineDateTime $script:Deadline
+        $r.Success | Should -BeFalse
+        $r.Error | Should -Match 'schedule rejected'
     }
 }
 
@@ -646,16 +765,17 @@ Describe 'Invoke-ApplicationDeployment' {
 
         It 'Returns success with deployment ID' {
             $app = [PSCustomObject]@{ LocalizedDisplayName = '7-Zip'; SoftwareVersion = '24.09' }
-            $col = [PSCustomObject]@{ Name = 'Pilot'; MemberCount = 5 }
+            $col = [PSCustomObject]@{ Name = 'Pilot'; CollectionID = 'MCM00010'; MemberCount = 5 }
             $result = Invoke-ApplicationDeployment -Application $app -Collection $col `
                 -DeployPurpose 'Available' -AvailableDateTime (Get-Date)
             $result.Success | Should -BeTrue
             $result.DeploymentID | Should -Be 16777300
+            $result.DeploymentUniqueID | Should -Be '{GUID}'
         }
 
         It 'Calls New-CMApplicationDeployment for Available' {
             $app = [PSCustomObject]@{ LocalizedDisplayName = '7-Zip'; SoftwareVersion = '24.09' }
-            $col = [PSCustomObject]@{ Name = 'Pilot'; MemberCount = 5 }
+            $col = [PSCustomObject]@{ Name = 'Pilot'; CollectionID = 'MCM00010'; MemberCount = 5 }
             Invoke-ApplicationDeployment -Application $app -Collection $col `
                 -DeployPurpose 'Available' -AvailableDateTime (Get-Date) `
                 -TimeBasedOn 'Utc' -UserNotification 'DisplaySoftwareCenterOnly'
@@ -665,7 +785,7 @@ Describe 'Invoke-ApplicationDeployment' {
 
         It 'Calls New-CMApplicationDeployment for Required with deadline' {
             $app = [PSCustomObject]@{ LocalizedDisplayName = '7-Zip'; SoftwareVersion = '24.09' }
-            $col = [PSCustomObject]@{ Name = 'Pilot'; MemberCount = 5 }
+            $col = [PSCustomObject]@{ Name = 'Pilot'; CollectionID = 'MCM00010'; MemberCount = 5 }
             $result = Invoke-ApplicationDeployment -Application $app -Collection $col `
                 -DeployPurpose 'Required' -AvailableDateTime (Get-Date) `
                 -DeadlineDateTime (Get-Date).AddHours(24) -UseMeteredNetwork $true
@@ -682,7 +802,7 @@ Describe 'Invoke-ApplicationDeployment' {
 
         It 'Returns failure with error message' {
             $app = [PSCustomObject]@{ LocalizedDisplayName = '7-Zip'; SoftwareVersion = '24.09' }
-            $col = [PSCustomObject]@{ Name = 'Pilot'; MemberCount = 5 }
+            $col = [PSCustomObject]@{ Name = 'Pilot'; CollectionID = 'MCM00010'; MemberCount = 5 }
             $result = Invoke-ApplicationDeployment -Application $app -Collection $col `
                 -DeployPurpose 'Available' -AvailableDateTime (Get-Date)
             $result.Success | Should -BeFalse
@@ -701,7 +821,7 @@ Describe 'Invoke-SUGDeployment' {
 
         It 'Returns success with deployment ID' {
             $sug = [PSCustomObject]@{ LocalizedDisplayName = '2026-04 Updates'; NumberOfUpdates = 15 }
-            $col = [PSCustomObject]@{ Name = 'All Workstations'; MemberCount = 100 }
+            $col = [PSCustomObject]@{ Name = 'All Workstations'; CollectionID = 'MCM00010'; MemberCount = 100 }
             $result = Invoke-SUGDeployment -SUG $sug -Collection $col `
                 -DeployPurpose 'Available' -AvailableDateTime (Get-Date)
             $result.Success | Should -BeTrue
@@ -710,7 +830,7 @@ Describe 'Invoke-SUGDeployment' {
 
         It 'Calls New-CMSoftwareUpdateDeployment for Required with options' {
             $sug = [PSCustomObject]@{ LocalizedDisplayName = '2026-04 Updates'; NumberOfUpdates = 15 }
-            $col = [PSCustomObject]@{ Name = 'All Workstations'; MemberCount = 100 }
+            $col = [PSCustomObject]@{ Name = 'All Workstations'; CollectionID = 'MCM00010'; MemberCount = 100 }
             $result = Invoke-SUGDeployment -SUG $sug -Collection $col `
                 -DeployPurpose 'Required' -AvailableDateTime (Get-Date) `
                 -DeadlineDateTime (Get-Date).AddDays(7) `
@@ -761,6 +881,51 @@ Describe 'Write-DeploymentLog' {
 
         $lines = Get-Content -LiteralPath $logPath
         $lines.Count | Should -Be 2
+    }
+
+    It 'Writes no ring fields for a single deployment' {
+        $logPath = Join-Path $TestDrive 'deploy-single.jsonl'
+        Write-DeploymentLog -LogPath $logPath -Record @{
+            DeploymentType = 'Application'; ApplicationName = 'App1'; ApplicationVersion = '1.0'
+            CollectionName = 'Col1'; CollectionID = 'MCM00010'; MemberCount = 1
+            DeployPurpose = 'Available'; DeadlineDateTime = ''; DeploymentID = '1'; Result = 'Success'
+        }
+        $entry = (Get-Content -LiteralPath $logPath -Raw).Trim() | ConvertFrom-Json
+        $entry.PSObject.Properties.Name | Should -Not -Contain 'PlanName'
+        $entry.PSObject.Properties.Name | Should -Not -Contain 'RunId'
+    }
+
+    It 'Writes PlanName, RingIndex, RingName, RunId for a ring deployment' {
+        $logPath = Join-Path $TestDrive 'deploy-ring.jsonl'
+        Write-DeploymentLog -LogPath $logPath -Record @{
+            DeploymentType = 'Application'; ApplicationName = 'App1'; ApplicationVersion = '1.0'
+            CollectionName = 'Col1'; CollectionID = 'MCM00010'; MemberCount = 1
+            DeployPurpose = 'Required'; DeadlineDateTime = '2026-10-02T08:00:00'; DeploymentID = '1'; Result = 'Success'
+            PlanName = 'Workstation-Rings'; RingIndex = 2; RingName = 'Pilot'; RunId = 'run-1'
+        }
+        $entry = (Get-Content -LiteralPath $logPath -Raw).Trim() | ConvertFrom-Json
+        $entry.PlanName  | Should -Be 'Workstation-Rings'
+        $entry.RingIndex | Should -Be 2
+        $entry.RingName  | Should -Be 'Pilot'
+        $entry.RunId     | Should -Be 'run-1'
+    }
+}
+
+Describe 'Test-CollectionValid by ID' {
+    It 'Looks the collection up with Get-CMCollection -Id' {
+        Mock Get-CMCollection -ModuleName DeploymentHelperCommon {
+            [PSCustomObject]@{ Name = 'Pilot'; CollectionID = 'MCM00010'; CollectionType = 2; MemberCount = 5 }
+        } -ParameterFilter { $Id -eq 'MCM00010' }
+        $col = Test-CollectionValid -CollectionId 'MCM00010'
+        $col.Name | Should -Be 'Pilot'
+        Should -Invoke Get-CMCollection -ModuleName DeploymentHelperCommon -Times 1 -Exactly -ParameterFilter { $Id -eq 'MCM00010' }
+    }
+
+    It 'Returns null for a user collection' {
+        Mock Get-CMCollection -ModuleName DeploymentHelperCommon {
+            [PSCustomObject]@{ Name = 'Users'; CollectionID = 'MCM00011'; CollectionType = 1; MemberCount = 5 }
+        }
+        Test-CollectionValid -CollectionId 'MCM00011' | Should -BeNullOrEmpty
     }
 }
 
@@ -849,6 +1014,18 @@ Describe 'Export-DeploymentHistoryCsv' {
         $imported = Import-Csv -LiteralPath $csvPath
         $imported.Count | Should -Be 2
     }
+
+    It 'Keeps ring columns when the first record has none' {
+        $csvPath = Join-Path $TestDrive 'export-mixed.csv'
+        $records = @(
+            [PSCustomObject]@{ Timestamp = '2026-04-14'; ApplicationName = '7-Zip'; Result = 'Success' },
+            [PSCustomObject]@{ Timestamp = '2026-10-01'; ApplicationName = '7-Zip'; Result = 'Success'; PlanName = 'Workstation-Rings'; RingIndex = 1; RingName = 'QA'; RunId = 'run-1' }
+        )
+        Export-DeploymentHistoryCsv -Records $records -OutputPath $csvPath
+        $imported = @(Import-Csv -LiteralPath $csvPath)
+        $imported[0].PSObject.Properties.Name | Should -Contain 'RunId'
+        $imported[1].RingName | Should -Be 'QA'
+    }
 }
 
 Describe 'Export-DeploymentHistoryHtml' {
@@ -863,5 +1040,109 @@ Describe 'Export-DeploymentHistoryHtml' {
         $content | Should -Match '<table>'
         $content | Should -Match 'success'
         $content | Should -Match 'DeploymentType'
+    }
+}
+
+Describe 'Exact-name lookups treat wildcard characters literally' {
+    It '<Function> passes -DisableWildcardHandling to <Command>' -TestCases @(
+        @{ Function = 'Test-ApplicationExists';  Command = 'Get-CMApplication';          Call = { Test-ApplicationExists -ApplicationName 'Tool [x64]' } }
+        @{ Function = 'Test-PackageExists';      Command = 'Get-CMPackage';              Call = { Test-PackageExists -PackageName 'Tool [x64]' } }
+        @{ Function = 'Test-TaskSequenceExists'; Command = 'Get-CMTaskSequence';         Call = { Test-TaskSequenceExists -TaskSequenceName 'OSD [x64]' } }
+        @{ Function = 'Test-SUGExists';          Command = 'Get-CMSoftwareUpdateGroup';  Call = { Test-SUGExists -SUGName 'Updates [2026-10]' } }
+        @{ Function = 'Test-CollectionValid';    Command = 'Get-CMCollection';           Call = { Test-CollectionValid -CollectionName 'Pilot [EU]' } }
+        @{ Function = 'Test-DuplicateDeployment';             Command = 'Get-CMApplicationDeployment';  Call = { Test-DuplicateDeployment -ApplicationName 'Tool [x64]' -CollectionName 'Pilot [EU]' } }
+        @{ Function = 'Test-DuplicatePackageDeployment';      Command = 'Get-CMPackageDeployment';      Call = { Test-DuplicatePackageDeployment -PackageID 'MCM00050' -ProgramName 'Install [x64]' -CollectionName 'Pilot [EU]' } }
+        @{ Function = 'Test-DuplicateTaskSequenceDeployment'; Command = 'Get-CMTaskSequenceDeployment'; Call = { Test-DuplicateTaskSequenceDeployment -TaskSequencePackageId 'MCM00060' -CollectionName 'Pilot [EU]' } }
+        @{ Function = 'Test-DuplicateSUGDeployment';          Command = 'Get-CMUpdateGroupDeployment';  Call = { Test-DuplicateSUGDeployment -SUGName 'Updates [2026-10]' -CollectionName 'Pilot [EU]' } }
+    ) {
+        Mock $Command -ModuleName DeploymentHelperCommon {
+            [PSCustomObject]@{ Name = 'x'; LocalizedDisplayName = 'x'; CollectionID = 'MCM00010'; CollectionType = 2; MemberCount = 1; NumberOfUpdates = 1; NumberOfExpiredUpdates = 0; PackageID = 'MCM00001' }
+        } -ParameterFilter { $DisableWildcardHandling }
+        & $Call | Should -Not -BeNullOrEmpty
+        Should -Invoke $Command -ModuleName DeploymentHelperCommon -Times 1 -Exactly -ParameterFilter { $DisableWildcardHandling }
+    }
+
+    It 'The update group duplicate check reads update group deployments by group name and collection' {
+        Mock Get-CMUpdateGroupDeployment -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ AssignmentID = 1 } } -ParameterFilter {
+            $Name -eq '2026-10 Updates' -and $CollectionName -eq 'Pilot'
+        }
+        Test-DuplicateSUGDeployment -SUGName '2026-10 Updates' -CollectionName 'Pilot' | Should -Not -BeNullOrEmpty
+        Mock Get-CMUpdateGroupDeployment -ModuleName DeploymentHelperCommon { $null }
+        Test-DuplicateSUGDeployment -SUGName '2026-10 Updates' -CollectionName 'Other' | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Duplicate checks fail closed' {
+    It '<Function> returns a failure marker when <Command> throws' -TestCases @(
+        @{ Function = 'Test-DuplicateDeployment';             Command = 'Get-CMApplicationDeployment';  Call = { Test-DuplicateDeployment -ApplicationName 'A' -CollectionName 'C' } }
+        @{ Function = 'Test-DuplicatePackageDeployment';      Command = 'Get-CMPackageDeployment';      Call = { Test-DuplicatePackageDeployment -PackageID 'MCM00050' -ProgramName 'Install' -CollectionName 'C' } }
+        @{ Function = 'Test-DuplicateTaskSequenceDeployment'; Command = 'Get-CMTaskSequenceDeployment'; Call = { Test-DuplicateTaskSequenceDeployment -TaskSequencePackageId 'MCM00060' -CollectionName 'C' } }
+        @{ Function = 'Test-DuplicateSUGDeployment';          Command = 'Get-CMUpdateGroupDeployment';  Call = { Test-DuplicateSUGDeployment -SUGName 'S' -CollectionName 'C' } }
+    ) {
+        Mock $Command -ModuleName DeploymentHelperCommon { throw 'SMS Provider timed out' }
+        $result = & $Call
+        $result | Should -Not -BeNullOrEmpty
+        $failure = Get-DuplicateCheckFailure -Result $result
+        $failure.Error | Should -Match 'SMS Provider timed out'
+    }
+
+    It 'Get-DuplicateCheckFailure ignores a real deployment and an empty result' {
+        Get-DuplicateCheckFailure -Result ([PSCustomObject]@{ AssignmentID = 1 }) | Should -BeNullOrEmpty
+        Get-DuplicateCheckFailure -Result $null | Should -BeNullOrEmpty
+        Get-DuplicateCheckFailure -Result @([PSCustomObject]@{ AssignmentID = 1 }, [PSCustomObject]@{ DuplicateCheckFailed = $true; Error = 'x' }) | Should -Not -BeNullOrEmpty
+    }
+}
+
+Describe 'Test-DeploymentLogWritable' {
+    It 'Creates a missing folder and file and reports success' {
+        $path = Join-Path $TestDrive 'gate\new\audit.jsonl'
+        (Test-DeploymentLogWritable -LogPath $path).Success | Should -BeTrue
+        $path | Should -Exist
+    }
+
+    It 'Fails for a read-only log' {
+        $path = Join-Path $TestDrive 'gate-ro.jsonl'
+        Set-Content -LiteralPath $path -Value '' -Encoding UTF8
+        (Get-Item -LiteralPath $path).IsReadOnly = $true
+        try { (Test-DeploymentLogWritable -LogPath $path).Success | Should -BeFalse }
+        finally { (Get-Item -LiteralPath $path).IsReadOnly = $false }
+    }
+
+    It 'Fails while a reader holds the log, like the append it protects' {
+        $path = Join-Path $TestDrive 'gate-reader.jsonl'
+        Set-Content -LiteralPath $path -Value '{}' -Encoding UTF8
+        $reader = [System.IO.File]::Open($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        try {
+            (Test-DeploymentLogWritable -LogPath $path).Success | Should -BeFalse
+            { Add-Content -LiteralPath $path -Value '{}' -ErrorAction Stop } | Should -Throw
+        }
+        finally { $reader.Dispose() }
+        (Test-DeploymentLogWritable -LogPath $path).Success | Should -BeTrue
+    }
+}
+
+Describe 'Write-DeploymentLog result' {
+    BeforeAll {
+        $script:Rec = @{
+            DeploymentType = 'Application'; ApplicationName = 'App1'; ApplicationVersion = '1.0'
+            CollectionName = 'Col1'; CollectionID = 'MCM00010'; MemberCount = 1
+            DeployPurpose = 'Available'; DeadlineDateTime = ''; DeploymentID = '1'; Result = 'Success'
+        }
+    }
+
+    It 'Returns Success after the append' {
+        (Write-DeploymentLog -LogPath (Join-Path $TestDrive 'result-ok.jsonl') -Record $script:Rec).Success | Should -BeTrue
+    }
+
+    It 'Returns the error instead of throwing when the log is locked' {
+        $path = Join-Path $TestDrive 'result-locked.jsonl'
+        Set-Content -LiteralPath $path -Value '' -Encoding UTF8
+        $holder = [System.IO.File]::Open($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+        try {
+            $r = Write-DeploymentLog -LogPath $path -Record $script:Rec
+            $r.Success | Should -BeFalse
+            $r.Error | Should -Not -BeNullOrEmpty
+        }
+        finally { $holder.Dispose() }
     }
 }
