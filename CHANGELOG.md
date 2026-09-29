@@ -1,5 +1,31 @@
 # Changelog
 
+## [2026.09.29.0012] - 2026-09-29
+
+## Browse lists show 11 of 11 lab applications instead of 1 row
+
+### Fixed
+
+- Show every object in the browse lists instead of one row of list data.
+- Show plain, full column names in the browse dialogs.
+- Fit the Ring Deployment view in 1320 x 860 without a scroll bar.
+- Leave a gap between the scroll bar and the buttons beside it.
+- Draw an outline around both ring grids.
+- Keep the Note and Promote columns visible in the open-runs grid.
+- Align the Packages network and rerun rows with the other field labels.
+- Fit the template toolbar buttons above the template list.
+
+### Changed
+
+- Call the product Configuration Manager in every label and tooltip.
+- Hide the deadline field for Available deployments instead of disabling it.
+- Use the same checkbox names for every deployment type and in templates.
+- Name the collection ID column the same in both ring grids.
+- Use one muted text color, one button height, and one margin in every dialog.
+- Open at 1320 x 860 by default with shorter ring grids and log drawer.
+- Update the README screenshots.
+- Update the shared SuiteCommon module to 2026.09.27.0037.
+
 ## [2026.09.27.0011] - 2026-09-27
 
 ## The ring view shows the preview and open runs together at 1320 x 820

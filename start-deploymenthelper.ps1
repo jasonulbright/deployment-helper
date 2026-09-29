@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     MahApps.Metro 2.4.10 WPF shell for deploying Apps, Packages, Task Sequences,
-    and Software Update Groups to ConfigMgr device collections.
+    and Software Update Groups to Configuration Manager device collections.
 
     Four deployment types surface via sidebar buttons. All types share a unified
     form pane in the right column. Session 2 fully wires the Apps type
@@ -20,7 +20,7 @@
     Module/DeploymentHelperCommon.psm1 (preserved as-is).
 
 .PARAMETER SiteCode
-    ConfigMgr site code (three alphanumeric characters). Optional on the
+    Configuration Manager site code (three alphanumeric characters). Optional on the
     command line; when omitted, the value from DeploymentHelper.prefs.json
     is used, and Options > Connection lets the user set it at runtime.
 
@@ -36,7 +36,7 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 2026.09.27.0011
+    Version    : 2026.09.29.0012
     Updated    : 2026-09-27
 #>
 
@@ -288,28 +288,28 @@ $script:TypeMeta = @{
         Subheader   = 'Select an application and a device collection, then configure the deployment.'
         TargetLabel = 'Application:'
         Watermark   = 'e.g. 7-Zip 26.00'
-        Check1Text  = 'Application exists in ConfigMgr'
+        Check1Text  = 'Application exists in Configuration Manager'
     }
     'Packages' = @{
         Header      = 'Packages Deployment'
         Subheader   = 'Select a classic package, program, and device collection.'
         TargetLabel = 'Package:'
         Watermark   = 'Classic package name'
-        Check1Text  = 'Package and program exist in ConfigMgr'
+        Check1Text  = 'Package and program exist in Configuration Manager'
     }
     'TaskSequences' = @{
         Header      = 'Task Sequences Deployment'
         Subheader   = 'Select a task sequence and a device collection.'
-        TargetLabel = 'Task Sequence:'
+        TargetLabel = 'Task sequence:'
         Watermark   = 'Task sequence name'
-        Check1Text  = 'Task sequence exists in ConfigMgr'
+        Check1Text  = 'Task sequence exists in Configuration Manager'
     }
     'SUG' = @{
         Header      = 'Software Update Groups Deployment'
         Subheader   = 'Select a software update group and a device collection.'
-        TargetLabel = 'Update Group:'
+        TargetLabel = 'Update group:'
         Watermark   = 'Software update group name'
-        Check1Text  = 'Software update group exists in ConfigMgr'
+        Check1Text  = 'Software update group exists in Configuration Manager'
     }
 }
 
@@ -462,6 +462,7 @@ $chkPkgMetered      = $window.FindName('chkPkgMetered')
 $cboPkgFastNetwork  = $window.FindName('cboPkgFastNetwork')
 $cboPkgSlowNetwork  = $window.FindName('cboPkgSlowNetwork')
 $cboPkgRerun        = $window.FindName('cboPkgRerun')
+$pkgNetworkRows     = @('lblPkgFastNetwork', 'cboPkgFastNetwork', 'lblPkgSlowNetwork', 'cboPkgSlowNetwork', 'lblPkgRerun', 'cboPkgRerun') | ForEach-Object { $window.FindName($_) }
 $pnlTaskSequenceOptions = $window.FindName('pnlTaskSequenceOptions')
 $chkTsOverrideSW    = $window.FindName('chkTsOverrideSW')
 $chkTsRebootOutSW   = $window.FindName('chkTsRebootOutSW')
@@ -540,11 +541,6 @@ Initialize-SuiteTheme -Window $window `
 
 $script:TitleBarBlue         = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#0078D4')
 $script:TitleBarBlueInactive = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#4BA3E0')
-
-# LOG OUTPUT label Foreground per theme. Single hex fails AA on one theme.
-# See reference_srl_wpf_brand.md.
-$script:LogLabelDark  = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#B0B0B0')
-$script:LogLabelLight = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#595959')
 
 $toggleTheme.Add_Toggled({
     if ($toggleTheme.IsOn) {
@@ -817,7 +813,7 @@ function Show-BrowseLoadingDialog {
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Window.Resources>
-    <Grid Margin="16">
+    <Grid Margin="16,12,16,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -891,7 +887,7 @@ function Show-BrowseLoadingDialog {
                 'Collections'   { 'device collections' }
             }
             $State.Step = "Loading $label..."
-            $items   = @(Get-CMBrowseList -Type $Type)
+            $items   = Get-CMBrowseList -Type $Type
             $folders = @()
 
             if ($Type -eq 'Collections') {
@@ -991,6 +987,17 @@ function Get-BrowseList {
 # =============================================================================
 # Themed browse dialog (Application / Package / Task Sequence / SUG)
 # =============================================================================
+$script:BrowseHeaders = @{
+    LocalizedDisplayName   = 'Name'
+    SoftwareVersion        = 'Version'
+    CI_ID                  = 'CI ID'
+    DateLastModified       = 'Modified'
+    PackageID              = 'Package ID'
+    NumberOfUpdates        = 'Updates'
+    NumberOfExpiredUpdates = 'Expired'
+    DateCreated            = 'Created'
+}
+
 function Show-BrowseDialog {
     param(
         [Parameter(Mandatory)]$Owner,
@@ -1025,7 +1032,7 @@ function Show-BrowseDialog {
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Window.Resources>
-    <Grid Margin="12">
+    <Grid Margin="16,12,16,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -1052,15 +1059,16 @@ function Show-BrowseDialog {
                   GridLinesVisibility="Horizontal"
                   HeadersVisibility="Column"
                   RowHeaderWidth="0"
-                  BorderThickness="0"
-                  ColumnHeaderHeight="30"
+                  BorderThickness="1"
+                  BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                  ColumnHeaderHeight="28"
                   EnableRowVirtualization="True"
                   VirtualizingPanel.VirtualizationMode="Recycling"/>
 
         <TextBlock x:Name="txtStatus" Grid.Row="2" Grid.ColumnSpan="2" FontSize="11" Margin="0,8,0,0"
                    Foreground="{DynamicResource MahApps.Brushes.Gray1}" Text=""/>
 
-        <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+        <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button x:Name="btnOK"     Content="OK"     MinWidth="90" Height="32" Margin="0,0,8,0" IsDefault="True"
                     Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
                     Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
@@ -1077,15 +1085,8 @@ function Show-BrowseDialog {
     $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
     Install-TitleBarDragFallback -Window $dlg
 
-    $theme = [ControlzEx.Theming.ThemeManager]::Current.DetectTheme($Owner)
-    if ($theme) { [void][ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($dlg, $theme) }
     $dlg.Owner = $Owner
-    try {
-        $dlg.WindowTitleBrush          = $Owner.WindowTitleBrush
-        $dlg.NonActiveWindowTitleBrush = $Owner.WindowTitleBrush
-        $dlg.GlowBrush                 = $Owner.GlowBrush
-        $dlg.NonActiveGlowBrush        = $Owner.GlowBrush
-    } catch { }
+    Set-DialogTheme -Dialog $dlg
 
     $dlg.Title  = $Title
     $txtFilter  = $dlg.FindName('txtFilter')
@@ -1119,10 +1120,10 @@ function Show-BrowseDialog {
         $props = @($state.All)[0].PSObject.Properties.Name
         foreach ($p in $props) {
             $col = New-Object System.Windows.Controls.DataGridTextColumn
-            $col.Header  = $p
+            $col.Header  = if ($script:BrowseHeaders.ContainsKey($p)) { $script:BrowseHeaders[$p] } else { $p }
             $col.Binding = New-Object System.Windows.Data.Binding($p)
             if ($p -eq $props[0]) { $col.Width = [System.Windows.Controls.DataGridLength]::new(1, [System.Windows.Controls.DataGridLengthUnitType]::Star) }
-            else                  { $col.Width = [System.Windows.Controls.DataGridLength]::SizeToCells }
+            else                  { $col.Width = [System.Windows.Controls.DataGridLength]::Auto }
             $dgResults.Columns.Add($col) | Out-Null
         }
     }
@@ -1762,7 +1763,7 @@ $script:InvokeTaskSequencesValidate = {
         # content isn't on a reachable DP. User confirmed "content is
         # fully distributed" surface via the console for this case.
         Set-CheckGlyph -Index 2 -State 'Pass'
-        Add-LogLine -Message 'Check 2 (content) skipped for TS: referenced-content distribution enforced by ConfigMgr at deploy time. Verify in console if unsure.'
+        Add-LogLine -Message 'Check 2 (content) skipped for TS: referenced-content distribution enforced by Configuration Manager at deploy time. Verify in console if unsure.'
 
         # Check 3: collection valid
         $col = Test-CollectionValid -CollectionName $collName
@@ -2108,7 +2109,7 @@ function Show-DPGroupPickerDialog {
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Window.Resources>
-    <Grid Margin="14">
+    <Grid Margin="16,12,16,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -2119,10 +2120,10 @@ function Show-DPGroupPickerDialog {
         <TextBlock Grid.Row="0" Text="Check the distribution point groups to distribute content to. Groups that already have this content are pre-checked." FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-            <Button x:Name="btnSelectAll"  Content="Select all"  MinWidth="100" Height="26" Margin="0,0,8,0"
+            <Button x:Name="btnSelectAll"  Content="Select all"  MinWidth="100" Height="28" Margin="0,0,8,0"
                     Style="{DynamicResource MahApps.Styles.Button.Square}"
                     Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
-            <Button x:Name="btnSelectNone" Content="Select none" MinWidth="100" Height="26"
+            <Button x:Name="btnSelectNone" Content="Select none" MinWidth="100" Height="28"
                     Style="{DynamicResource MahApps.Styles.Button.Square}"
                     Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
         </StackPanel>
@@ -2134,17 +2135,17 @@ function Show-DPGroupPickerDialog {
                         <CheckBox IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding Name}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding Badge}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource MahApps.Brushes.Gray2}"/>
+                                   Foreground="{DynamicResource MahApps.Brushes.Gray1}"/>
                     </StackPanel>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="btnOK"     Content="OK"     MinWidth="90" Height="30" Margin="0,0,8,0" IsDefault="True"
+            <Button x:Name="btnOK"     Content="OK"     MinWidth="90" Height="32" Margin="0,0,8,0" IsDefault="True"
                     Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
                     Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
-            <Button x:Name="btnCancel" Content="Cancel" MinWidth="90" Height="30" IsCancel="True"
+            <Button x:Name="btnCancel" Content="Cancel" MinWidth="90" Height="32" IsCancel="True"
                     Style="{DynamicResource MahApps.Styles.Button.Square}"
                     Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
         </StackPanel>
@@ -2157,15 +2158,8 @@ function Show-DPGroupPickerDialog {
     $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
     Install-TitleBarDragFallback -Window $dlg
 
-    $theme = [ControlzEx.Theming.ThemeManager]::Current.DetectTheme($Owner)
-    if ($theme) { [void][ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($dlg, $theme) }
     $dlg.Owner = $Owner
-    try {
-        $dlg.WindowTitleBrush          = $Owner.WindowTitleBrush
-        $dlg.NonActiveWindowTitleBrush = $Owner.WindowTitleBrush
-        $dlg.GlowBrush                 = $Owner.GlowBrush
-        $dlg.NonActiveGlowBrush        = $Owner.GlowBrush
-    } catch { }
+    Set-DialogTheme -Dialog $dlg
 
     $btnSelectAll  = $dlg.FindName('btnSelectAll')
     $btnSelectNone = $dlg.FindName('btnSelectNone')
@@ -2242,13 +2236,13 @@ function New-ConnectionPanel {
         $rd.Height = 'Auto'
         [void]$g.RowDefinitions.Add($rd)
     }
-    $c1 = New-Object System.Windows.Controls.ColumnDefinition; $c1.Width = '120'
+    $c1 = New-Object System.Windows.Controls.ColumnDefinition; $c1.Width = '140'
     $c2 = New-Object System.Windows.Controls.ColumnDefinition; $c2.Width = '*'
     [void]$g.ColumnDefinitions.Add($c1)
     [void]$g.ColumnDefinitions.Add($c2)
 
     $lblSite = New-Object System.Windows.Controls.TextBlock
-    $lblSite.Text = 'Site Code:'
+    $lblSite.Text = 'Site code:'
     $lblSite.FontSize = 12
     $lblSite.VerticalAlignment = 'Center'
     $lblSite.Margin = '0,4,8,4'
@@ -2296,8 +2290,7 @@ function New-ConnectionPanel {
     $note = New-Object System.Windows.Controls.TextBlock
     $note.Text = 'Connect reattempts on OK if the site code or provider changed.'
     $note.FontSize = 11
-    # Muted-note Foreground pair per theme -- #808080 fails AA on both.
-    $note.Foreground = if ($toggleTheme.IsOn) { $script:LogLabelDark } else { $script:LogLabelLight }
+    $note.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'MahApps.Brushes.Gray1')
     $note.TextWrapping = 'Wrap'
     $note.Margin = '0,10,0,16'
     [void]$grid.Children.Add($note)
@@ -2664,21 +2657,21 @@ function New-TemplatesPanel {
 
     $btnNew = New-Object System.Windows.Controls.Button
     $btnNew.Name = 'btnNew'
-    $btnNew.Content = 'New'; $btnNew.MinWidth = 56; $btnNew.Height = 24; $btnNew.FontSize = 11; $btnNew.Margin = '0,0,4,0'
+    $btnNew.Content = 'New'; $btnNew.MinWidth = 68; $btnNew.Height = 28; $btnNew.FontSize = 12; $btnNew.Margin = '0,0,4,0'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnNew, [System.Windows.Controls.CharacterCasing]::Normal)
     $btnNew.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
     [void]$tb.Children.Add($btnNew)
 
     $btnDup = New-Object System.Windows.Controls.Button
     $btnDup.Name = 'btnDup'
-    $btnDup.Content = 'Duplicate'; $btnDup.MinWidth = 72; $btnDup.Height = 24; $btnDup.FontSize = 11; $btnDup.Margin = '0,0,4,0'
+    $btnDup.Content = 'Duplicate'; $btnDup.MinWidth = 68; $btnDup.Height = 28; $btnDup.FontSize = 12; $btnDup.Margin = '0,0,4,0'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnDup, [System.Windows.Controls.CharacterCasing]::Normal)
     $btnDup.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
     [void]$tb.Children.Add($btnDup)
 
     $btnDel = New-Object System.Windows.Controls.Button
     $btnDel.Name = 'btnDelete'
-    $btnDel.Content = 'Delete'; $btnDel.MinWidth = 56; $btnDel.Height = 24; $btnDel.FontSize = 11
+    $btnDel.Content = 'Delete'; $btnDel.MinWidth = 68; $btnDel.Height = 28; $btnDel.FontSize = 12
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnDel, [System.Windows.Controls.CharacterCasing]::Normal)
     $btnDel.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
     [void]$tb.Children.Add($btnDel)
@@ -2817,12 +2810,12 @@ function New-TemplatesPanel {
     # Row 6: Checkboxes (WrapPanel so they flow on narrow editors)
     $chkPane = New-Object System.Windows.Controls.WrapPanel
     $chkPane.Margin = '0,6,0,0'
-    $chkOverride = New-Object System.Windows.Controls.CheckBox; $chkOverride.Name = 'chkOverride'; $chkOverride.Content = 'Override Service Window'; $chkOverride.FontSize = 12; $chkOverride.Margin = '0,0,12,6'; [void]$chkPane.Children.Add($chkOverride)
-    $chkReboot   = New-Object System.Windows.Controls.CheckBox; $chkReboot.Name = 'chkReboot';     $chkReboot.Content   = 'Reboot outside SW';       $chkReboot.FontSize   = 12; $chkReboot.Margin   = '0,0,12,6'; [void]$chkPane.Children.Add($chkReboot)
-    $chkMetered  = New-Object System.Windows.Controls.CheckBox; $chkMetered.Name = 'chkMetered';   $chkMetered.Content  = 'Allow metered';           $chkMetered.FontSize  = 12; $chkMetered.Margin  = '0,0,12,6'; [void]$chkPane.Children.Add($chkMetered)
-    $chkBoundary = New-Object System.Windows.Controls.CheckBox; $chkBoundary.Name = 'chkBoundary'; $chkBoundary.Content = 'Boundary fallback';       $chkBoundary.FontSize = 12; $chkBoundary.Margin = '0,0,12,6'; $chkBoundary.IsChecked = $true; [void]$chkPane.Children.Add($chkBoundary)
-    $chkMsUpd    = New-Object System.Windows.Controls.CheckBox; $chkMsUpd.Name = 'chkMsUpd';       $chkMsUpd.Content    = 'Allow MS Update';         $chkMsUpd.FontSize    = 12; $chkMsUpd.Margin    = '0,0,12,6'; [void]$chkPane.Children.Add($chkMsUpd)
-    $chkFull     = New-Object System.Windows.Controls.CheckBox; $chkFull.Name = 'chkFull';         $chkFull.Content     = 'Full scan post-reboot';   $chkFull.FontSize     = 12; $chkFull.Margin     = '0,0,12,6'; $chkFull.IsChecked = $true; [void]$chkPane.Children.Add($chkFull)
+    $chkOverride = New-Object System.Windows.Controls.CheckBox; $chkOverride.Name = 'chkOverride'; $chkOverride.Content = 'Override maintenance window'; $chkOverride.FontSize = 12; $chkOverride.Margin = '0,0,12,6'; [void]$chkPane.Children.Add($chkOverride)
+    $chkReboot   = New-Object System.Windows.Controls.CheckBox; $chkReboot.Name = 'chkReboot';     $chkReboot.Content   = 'Allow restart outside maintenance window'; $chkReboot.FontSize   = 12; $chkReboot.Margin   = '0,0,12,6'; [void]$chkPane.Children.Add($chkReboot)
+    $chkMetered  = New-Object System.Windows.Controls.CheckBox; $chkMetered.Name = 'chkMetered';   $chkMetered.Content  = 'Allow download on metered network'; $chkMetered.FontSize  = 12; $chkMetered.Margin  = '0,0,12,6'; [void]$chkPane.Children.Add($chkMetered)
+    $chkMsUpd    = New-Object System.Windows.Controls.CheckBox; $chkMsUpd.Name = 'chkMsUpd';       $chkMsUpd.Content    = 'Fall back to Microsoft Update'; $chkMsUpd.FontSize    = 12; $chkMsUpd.Margin    = '0,0,12,6'; [void]$chkPane.Children.Add($chkMsUpd)
+    $chkBoundary = New-Object System.Windows.Controls.CheckBox; $chkBoundary.Name = 'chkBoundary'; $chkBoundary.Content = 'Allow fallback to neighbor boundary groups'; $chkBoundary.FontSize = 12; $chkBoundary.Margin = '0,0,12,6'; $chkBoundary.IsChecked = $true; [void]$chkPane.Children.Add($chkBoundary)
+    $chkFull     = New-Object System.Windows.Controls.CheckBox; $chkFull.Name = 'chkFull';         $chkFull.Content     = 'Require post-reboot full scan'; $chkFull.FontSize     = 12; $chkFull.Margin     = '0,0,12,6'; $chkFull.IsChecked = $true; [void]$chkPane.Children.Add($chkFull)
     [System.Windows.Controls.Grid]::SetRow($chkPane, 6); [System.Windows.Controls.Grid]::SetColumn($chkPane, 0); [System.Windows.Controls.Grid]::SetColumnSpan($chkPane, 3)
     [void]$form.Children.Add($chkPane)
 
@@ -2840,7 +2833,7 @@ function New-TemplatesPanel {
     $lblStatus = New-Object System.Windows.Controls.TextBlock
     $lblStatus.Name = 'lblTemplatesStatus'
     $lblStatus.FontSize = 11; $lblStatus.Margin = '0,8,0,0'; $lblStatus.TextWrapping = 'Wrap'
-    $lblStatus.Foreground = if ($toggleTheme.IsOn) { $script:LogLabelDark } else { $script:LogLabelLight }
+    $lblStatus.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'MahApps.Brushes.Gray1')
     [System.Windows.Controls.Grid]::SetRow($lblStatus, 8); [System.Windows.Controls.Grid]::SetColumn($lblStatus, 0); [System.Windows.Controls.Grid]::SetColumnSpan($lblStatus, 3)
     [void]$form.Children.Add($lblStatus)
 
@@ -3201,15 +3194,8 @@ function Show-OptionsDialog {
     $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
     Install-TitleBarDragFallback -Window $dlg
 
-    $theme = [ControlzEx.Theming.ThemeManager]::Current.DetectTheme($Owner)
-    if ($theme) { [void][ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($dlg, $theme) }
     $dlg.Owner = $Owner
-    try {
-        $dlg.WindowTitleBrush          = $Owner.WindowTitleBrush
-        $dlg.NonActiveWindowTitleBrush = $Owner.WindowTitleBrush
-        $dlg.GlowBrush                 = $Owner.GlowBrush
-        $dlg.NonActiveGlowBrush        = $Owner.GlowBrush
-    } catch { }
+    Set-DialogTheme -Dialog $dlg
 
     $lstNav      = $dlg.FindName('lstNav')
     $contentArea = $dlg.FindName('contentArea')
@@ -3333,6 +3319,7 @@ $script:SetCurrentType = {
     $pnlTaskSequenceOptions.Visibility = if ($showTs)       { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
     $pnlSUGOptions.Visibility          = if ($showSug)      { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
     $pnlPackageOptions.Visibility      = if ($showPkg)      { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+    foreach ($row in $pkgNetworkRows) { $row.Visibility = $pnlPackageOptions.Visibility }
     $pnlRequiredOptions.Visibility     = if ($showRequired) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
 
     # Distribution row: Apps + Packages + TaskSequences. SUG excluded -- update content
@@ -3759,7 +3746,7 @@ function Invoke-RingCreateAll {
     }
     if (-not $failure) {
         Set-StatusText -Text ('Created {0} ring deployment(s).' -f $created.Count)
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring deployment' -Message ("Created {0} of {0} deployment(s). Run ID {1}. ConfigMgr enforces each ring's dates." -f $created.Count, $RunId) -Buttons OK -Icon Info)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring deployment' -Message ("Created {0} of {0} deployment(s). Run ID {1}. Configuration Manager enforces each ring's dates." -f $created.Count, $RunId) -Buttons OK -Icon Info)
         return
     }
     $notCreated = @($rows | Where-Object { $created -notcontains $_ } | ForEach-Object { Get-RingLabel -Ring $_ })
@@ -4215,8 +4202,8 @@ $btnOptions.Add_Click({
 })
 
 $radRequired.Add_Checked({
-    $dtpDeadline.IsEnabled = $true
-    $lblDeadline.Opacity   = 1.0
+    $lblDeadline.Visibility = [System.Windows.Visibility]::Visible
+    $dtpDeadline.Visibility = [System.Windows.Visibility]::Visible
     # pnlRequiredOptions is Apps-only now. TS/SUG/Packages each own
     # their Required-extras checkboxes inside their own Grid.Row=9
     # panels (chkTs* / chkSug* / chkPkg*). Gating here prevents
@@ -4227,8 +4214,8 @@ $radRequired.Add_Checked({
 })
 
 $radAvailable.Add_Checked({
-    $dtpDeadline.IsEnabled = $false
-    $lblDeadline.Opacity   = 0.5
+    $lblDeadline.Visibility = [System.Windows.Visibility]::Collapsed
+    $dtpDeadline.Visibility = [System.Windows.Visibility]::Collapsed
     $pnlRequiredOptions.Visibility = [System.Windows.Visibility]::Collapsed
 })
 
