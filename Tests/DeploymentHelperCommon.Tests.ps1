@@ -237,6 +237,14 @@ Describe 'Get-CMBrowseList' {
             @($rows[0].PSObject.Properties.Name) | Should -Be @('LocalizedDisplayName', 'SoftwareVersion', 'CI_ID', 'DateLastModified')
             $rows[0].CI_ID | Should -Be 8
         }
+
+        # @() around the call wraps the returned array a second time; the
+        # browse dialog then shows one row of array properties.
+        It 'Returns the rows as one array object that callers assign without @()' {
+            @(Get-CMBrowseList -Type Apps).Count | Should -Be 1
+            $entry = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\start-deploymenthelper.ps1') -Raw
+            $entry | Should -Not -Match '@\(\s*Get-CMBrowseList'
+        }
     }
 
     Context 'Packages, task sequences, update groups' {
