@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026.10.07.0013] - 2026-10-07
+
+### Changed
+
+- Sync the shared SuiteCommon module to 2026.10.07.0049.
+
 ## [2026.09.29.0012] - 2026-09-29
 
 ## Browse lists show 11 of 11 lab applications instead of 1 row

@@ -36,7 +36,7 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 2026.09.29.0012
+    Version    : 2026.10.07.0013
     Updated    : 2026-09-27
 #>
 
