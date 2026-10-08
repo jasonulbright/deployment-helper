@@ -1,6 +1,6 @@
 @{
     RootModule        = 'DeploymentHelperCommon.psm1'
-    ModuleVersion     = '2026.09.29.0012'
+    ModuleVersion     = '2026.10.07.0013'
     GUID              = 'c3d4e5f6-a7b8-9012-cdef-345678901234'
     Author            = 'Jason Ulbright'
     Description       = 'Configuration Manager application deployment with pre-execution validation, safety guardrails, and immutable audit logging.'
