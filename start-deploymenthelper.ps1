@@ -36,7 +36,7 @@
       - ConfigurationManager admin console (for CM cmdlets)
 
     ScriptName : start-deploymenthelper.ps1
-    Version    : 2026.10.07.0013
+    Version    : 2026.10.11.0014
     Updated    : 2026-09-27
 #>
 
@@ -4607,4 +4607,6 @@ $window.Dispatcher.Add_UnhandledException({
     & $global:__writeCrash 'AppDomainUnhandledException' ([Exception]$e.ExceptionObject)
 })
 
+# Suite update notice: one shared daily lookup across the suite tools; the launcher installs.
+$null = Start-SuiteUpdateNotice -Path $PSScriptRoot -OnResult { param($u) if ($u.Available) { Add-LogLine ('Suite update available: v{0}. Update from the AppPackager Suite Launcher.' -f $u.Latest) } }
 [void]$window.ShowDialog()
