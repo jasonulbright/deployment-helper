@@ -6,7 +6,8 @@
 
 ### Fixed
 
-- Read ring run, plan and log dates as text under PowerShell 7.,Match the log write check to the running host so PowerShell 7 is not blocked by a reader.
+- Read ring run, plan and log dates as text under PowerShell 7.
+- Match the log write check to the running host so PowerShell 7 is not blocked by a reader.
 
 ## [2026.10.12.0016] - 2026-10-12
 
