@@ -1121,13 +1121,26 @@ Describe 'Test-DeploymentLogWritable' {
     It 'Fails while a reader holds the log, like the append it protects' {
         $path = Join-Path $TestDrive 'gate-reader.jsonl'
         Set-Content -LiteralPath $path -Value '{}' -Encoding UTF8
-        $reader = [System.IO.File]::Open($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        # Windows PowerShell's Add-Content fails against any reader; PowerShell 7's
+        # fails only against a reader that shares nothing. The probe must agree
+        # with the append on the running host, so the reader's share follows it.
+        $readerShare = $(if ($PSVersionTable.PSEdition -eq 'Core') { [System.IO.FileShare]::None } else { [System.IO.FileShare]::ReadWrite })
+        $reader = [System.IO.File]::Open($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, $readerShare)
         try {
             (Test-DeploymentLogWritable -LogPath $path).Success | Should -BeFalse
             { Add-Content -LiteralPath $path -Value '{}' -ErrorAction Stop } | Should -Throw
         }
         finally { $reader.Dispose() }
         (Test-DeploymentLogWritable -LogPath $path).Success | Should -BeTrue
+        if ($PSVersionTable.PSEdition -eq 'Core') {
+            # A reader that shares writes blocks neither the probe nor the append under PowerShell 7.
+            $open = [System.IO.File]::Open($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+            try {
+                (Test-DeploymentLogWritable -LogPath $path).Success | Should -BeTrue
+                { Add-Content -LiteralPath $path -Value '{}' -ErrorAction Stop } | Should -Not -Throw
+            }
+            finally { $open.Dispose() }
+        }
     }
 }
 
