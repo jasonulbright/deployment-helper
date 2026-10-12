@@ -1,14 +1,20 @@
 # Changelog
 
+## [2026.10.12.0017] - 2026-10-12
+
+## 2 PowerShell 7 fixes
+
+### Fixed
+
+- Read ring run, plan and log dates as text under PowerShell 7.,Match the log write check to the running host so PowerShell 7 is not blocked by a reader.
+
 ## [2026.10.12.0016] - 2026-10-12
 
-## 3 PowerShell 7 fixes
+## 1 PowerShell 7 fix
 
 ### Fixed
 
 - Keep the PowerShell 7 module roots when the tool runs under PowerShell 7.
-- Read ring run, plan and log dates as text under PowerShell 7.
-- Match the log write check to the running host so PowerShell 7 is not blocked by a reader.
 
 ## [2026.10.11.0015] - 2026-10-11
 

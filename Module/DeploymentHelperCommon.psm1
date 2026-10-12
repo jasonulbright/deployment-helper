@@ -780,11 +780,14 @@ function Test-DeploymentLogWritable {
         if ($parentDir -and -not (Test-Path -LiteralPath $parentDir)) {
             New-Item -ItemType Directory -Path $parentDir -Force -ErrorAction Stop | Out-Null
         }
-        # FileShare.None matches Add-Content on PS 5.1, which fails while any
-        # reader holds the log open; a looser probe passes and the append
-        # after the create then fails.
+        # The probe shares the file the way the host's Add-Content does, so
+        # it fails exactly when the append after it would: Windows
+        # PowerShell opens with FileShare.None and fails while any reader
+        # holds the log; PowerShell 7 opens with FileShare.ReadWrite and
+        # fails only against a reader that shares nothing.
+        $share = $(if ($PSVersionTable.PSEdition -eq 'Core') { [System.IO.FileShare]::ReadWrite } else { [System.IO.FileShare]::None })
         $stream = [System.IO.File]::Open($LogPath, [System.IO.FileMode]::OpenOrCreate,
-            [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            [System.IO.FileAccess]::Write, $share)
         $stream.Flush()
         $stream.Dispose()
         $stream = $null
@@ -857,7 +860,7 @@ function Get-DeploymentHistory {
     foreach ($line in $lines) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         try {
-            $records += ($line | ConvertFrom-Json)
+            $records += (ConvertTo-RingJsonText -InputObject ($line | ConvertFrom-Json))
         } catch {
             Write-Log "Skipped malformed log entry" -Level WARN
         }
@@ -883,7 +886,7 @@ function Get-DeploymentTemplates {
     $files = Get-ChildItem -LiteralPath $TemplatePath -Filter '*.json' -ErrorAction SilentlyContinue
     foreach ($f in $files) {
         try {
-            $t = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json
+            $t = ConvertTo-RingJsonText -InputObject (Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json)
             $templates += $t
         } catch {
             Write-Log "Failed to parse template $($f.Name): $_" -Level WARN
@@ -1377,6 +1380,38 @@ $script:RingFastNetwork    = @('DownloadContentFromDistributionPointAndRunLocall
 $script:RingSlowNetwork    = @('DoNotRunProgram', 'DownloadContentFromDistributionPointAndLocally', 'RunProgramFromDistributionPoint')
 $script:RingRerun          = @('NeverRerunDeployedProgram', 'AlwaysRerunProgram', 'RerunIfFailedPreviousAttempt', 'RerunIfSucceededOnPreviousAttempt')
 
+function ConvertTo-RingJsonText {
+    <#
+    .SYNOPSIS
+        Turns every DateTime inside an object read by ConvertFrom-Json back
+        into the text the file held. PowerShell 7 parses date-shaped strings
+        into DateTime; Windows PowerShell leaves them as text, which the
+        ring code and its callers compare and print as text.
+    #>
+    param([AllowNull()]$InputObject)
+    if ($null -eq $InputObject) { return $null }
+    if ($InputObject -is [datetime]) {
+        $d = [datetime]$InputObject
+        if ($d.Kind -eq [System.DateTimeKind]::Unspecified) { return $d.ToString($script:RingDateFormat, [System.Globalization.CultureInfo]::InvariantCulture) }
+        return $d.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture)
+    }
+    if ($InputObject -is [string] -or $InputObject -is [System.ValueType]) { return $InputObject }
+    if ($InputObject -is [System.Collections.IDictionary]) {
+        foreach ($k in @($InputObject.Keys)) { $InputObject[$k] = ConvertTo-RingJsonText -InputObject $InputObject[$k] }
+        return $InputObject
+    }
+    if ($InputObject -is [System.Collections.IList]) {
+        for ($i = 0; $i -lt $InputObject.Count; $i++) { $InputObject[$i] = ConvertTo-RingJsonText -InputObject $InputObject[$i] }
+        return $InputObject
+    }
+    if ($InputObject -is [System.Management.Automation.PSCustomObject]) {
+        foreach ($p in @($InputObject.PSObject.Properties)) {
+            if ($p.IsSettable) { $p.Value = ConvertTo-RingJsonText -InputObject $p.Value }
+        }
+    }
+    return $InputObject
+}
+
 function ConvertFrom-RingDateText {
     <#
     .SYNOPSIS
@@ -1664,7 +1699,7 @@ function Import-RingPlan {
     $leaf = Split-Path -Path $Path -Leaf
     try {
         $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
-        $obj = $raw | ConvertFrom-Json -ErrorAction Stop
+        $obj = ConvertTo-RingJsonText -InputObject ($raw | ConvertFrom-Json -ErrorAction Stop)
     }
     catch {
         throw ("Plan {0} failed to load: {1}" -f $leaf, $_.Exception.Message)
@@ -1991,7 +2026,7 @@ function New-RingRun {
         Object         = $Object
         Rings          = @($ringRows)
     }
-    $copy = $run | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $copy = ConvertTo-RingJsonText -InputObject ($run | ConvertTo-Json -Depth 8 | ConvertFrom-Json)
     $copy.Rings = @($copy.Rings)
     return $copy
 }
@@ -2027,7 +2062,7 @@ function Read-RingRun {
     param([Parameter(Mandatory)][string]$Path)
 
     if (-not (Test-Path -LiteralPath $Path)) { throw "Run file not found: $Path" }
-    $run = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+    $run = ConvertTo-RingJsonText -InputObject (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json)
     if ($null -eq $run -or $null -eq $run.PSObject.Properties['RunId'] -or $null -eq $run.PSObject.Properties['Rings']) {
         throw "Run file is not a ring run: $Path"
     }
