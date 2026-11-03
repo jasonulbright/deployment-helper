@@ -63,9 +63,9 @@ try {
         if (-not (Test-Path -LiteralPath $__txDir)) { New-Item -ItemType Directory -Path $__txDir -Force | Out-Null }
         $__tx = Join-Path $__txDir ('DeploymentHelper-startup-{0}.txt' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
         Start-Transcript -LiteralPath $__tx -Force | Out-Null
-    } catch { }
+    } catch { <# Starting the startup transcript is best-effort, and the tool runs without it. #> $null = $_ }
 }
-catch { }
+catch { <# The outer guard around the transcript setup is best-effort, and the tool runs without a transcript. #> $null = $_ }
 
 # STA guard: WPF requires STA. Some hosts launch MTA.
 if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
@@ -74,7 +74,7 @@ if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
     if (-not [string]::IsNullOrWhiteSpace($SiteCode))    { $fwd += @('-SiteCode',    $SiteCode) }
     if (-not [string]::IsNullOrWhiteSpace($SMSProvider)) { $fwd += @('-SMSProvider', $SMSProvider) }
     Start-Process -FilePath $psExe -ArgumentList $fwd | Out-Null
-    try { Stop-Transcript | Out-Null } catch { }
+    try { Stop-Transcript | Out-Null } catch { <# Stopping the transcript before the restart in STA mode is cleanup, and the result does not change. #> $null = $_ }
     exit 0
 }
 
@@ -2354,7 +2354,7 @@ function New-ConnectionPanel {
     # SessionState instead of the stripped closure scope.
     $applyConnectionChange = {
         param([string]$Site, [string]$Prov)
-        try { Disconnect-CMSite } catch { }
+        try { Disconnect-CMSite } catch { <# Disconnecting from the CM site is cleanup, and the connection state is reset on the next line. #> $null = $_ }
         $script:ConnectedToCM = $false
         Add-LogLine -Message ('Connection settings updated: Site={0} Provider={1}' -f $Site, $Prov)
     }
@@ -4555,7 +4555,7 @@ $window.Add_Closing({
     Stop-BgWork
     Close-SuiteBgRunspace -Runspace $script:BgRunspace
     $script:BgRunspace = $null
-    try { Disconnect-CMSite } catch { }
+    try { Disconnect-CMSite } catch { <# Disconnecting from the CM site when the window closes is cleanup. #> $null = $_ }
 })
 
 # =============================================================================
@@ -4590,7 +4590,7 @@ $__writeCrash = {
             $depth++
         }
         [System.IO.File]::AppendAllText($global:__crashLog, (($lines -join [Environment]::NewLine) + [Environment]::NewLine))
-    } catch { }
+    } catch { <# Writing the crash log is best-effort, and a failure here must not hide the original error. #> $null = $_ }
 }
 $global:__writeCrash = $__writeCrash
 
