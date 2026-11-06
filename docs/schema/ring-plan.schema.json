@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/jasonulbright/update-planner/docs/schema/ring-plan.schema.json",
+  "title": "Suite ring plan",
+  "description": "A Deployment Helper ring plan with extra fields. Update Planner writes it. Deployment Helper loads it as a ring plan and ignores the fields that it does not know.",
+  "type": "object",
+  "required": ["Format", "SchemaVersion", "Name", "TimeBasedOn", "Rings"],
+  "properties": {
+    "Format": { "enum": ["SuiteRingPlan"] },
+    "SchemaVersion": { "enum": [1] },
+    "Name": { "type": "string", "minLength": 1 },
+    "Description": { "type": "string" },
+    "HoldLaterRings": { "type": "boolean" },
+    "TimeBasedOn": { "enum": ["LocalTime", "Utc"] },
+    "Rings": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/ring" }
+    },
+    "UpdatePlanner": { "$ref": "#/definitions/updatePlanner" }
+  },
+  "definitions": {
+    "ring": {
+      "type": "object",
+      "required": ["Name", "CollectionID", "CollectionName", "Purpose", "AvailableOffsetDays", "DeadlineOffsetDays", "UserNotification", "OverrideServiceWindow", "RebootOutsideServiceWindow", "AllowMeteredConnection", "DPGroup", "SuccessThresholdPercent"],
+      "properties": {
+        "Name": { "type": "string", "minLength": 1 },
+        "CollectionID": { "type": "string", "pattern": "^[A-Za-z0-9]{8}$|^$" },
+        "CollectionName": { "type": "string" },
+        "Purpose": { "enum": ["Available", "Required"] },
+        "AvailableOffsetDays": { "type": "number", "minimum": 0 },
+        "DeadlineOffsetDays": { "type": ["number", "null"], "minimum": 0 },
+        "UserNotification": { "type": "string" },
+        "OverrideServiceWindow": { "type": "boolean" },
+        "RebootOutsideServiceWindow": { "type": "boolean" },
+        "AllowMeteredConnection": { "type": "boolean" },
+        "DPGroup": { "type": "string" },
+        "SuccessThresholdPercent": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "MemberCount": { "type": "integer", "minimum": 0 },
+        "MaintenanceWindows": { "type": "array", "items": { "type": "string" } },
+        "StartDate": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "DeadlineDate": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "Updates": { "type": "array", "items": { "$ref": "#/definitions/update" } }
+      }
+    },
+    "update": {
+      "type": "object",
+      "required": ["CIId", "Title"],
+      "properties": {
+        "Sequence": { "type": "integer", "minimum": 1 },
+        "CIId": { "type": "integer" },
+        "ArticleId": { "type": "string" },
+        "Title": { "type": "string" },
+        "Severity": { "type": "integer" },
+        "SeverityName": { "type": "string" },
+        "NeededDevices": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "updatePlanner": {
+      "type": "object",
+      "required": ["PlanId", "SiteCode"],
+      "properties": {
+        "PlanId": { "type": "string" },
+        "GeneratedAt": { "type": "string" },
+        "ComputerName": { "type": "string" },
+        "SiteCode": { "type": "string", "pattern": "^[A-Za-z0-9]{3}$" },
+        "Parameters": { "type": "object" },
+        "Summary": { "type": "object" },
+        "Sync": { "type": ["object", "null"] },
+        "Wsus": { "type": ["object", "null"] },
+        "Skipped": { "type": "array", "items": { "type": "object" } }
+      }
+    }
+  }
+}

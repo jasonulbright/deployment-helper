@@ -1,0 +1,85 @@
+{
+  "Format": "SuiteRingPlan",
+  "SchemaVersion": 1,
+  "Name": "UpdatePlanner-a1b2c3d4",
+  "Description": "Update Planner plan a1b2c3d4, 3 waves, start 2026-12-01.",
+  "HoldLaterRings": false,
+  "TimeBasedOn": "LocalTime",
+  "Rings": [
+    {
+      "Name": "Wave 1 - Zone 01",
+      "CollectionID": "MCM00346",
+      "CollectionName": "Zone 01",
+      "Purpose": "Required",
+      "AvailableOffsetDays": 0,
+      "DeadlineOffsetDays": 3,
+      "UserNotification": "DisplayAll",
+      "OverrideServiceWindow": false,
+      "RebootOutsideServiceWindow": false,
+      "AllowMeteredConnection": false,
+      "DPGroup": "",
+      "SuccessThresholdPercent": null,
+      "MemberCount": 1,
+      "MaintenanceWindows": [ "Occurs every 1 weeks on Saturday effective 11/7/2026 10:00 PM" ],
+      "StartDate": "2026-12-01",
+      "DeadlineDate": "2026-12-04",
+      "Updates": [
+        { "Sequence": 1, "CIId": 16777772, "ArticleId": "5012170", "Title": "2022-08 Security Update (KB5012170)", "Severity": 10, "SeverityName": "Critical", "NeededDevices": 1 },
+        { "Sequence": 2, "CIId": 16777774, "ArticleId": "5012171", "Title": "2022-08 Cumulative Update (KB5012171)", "Severity": 8, "SeverityName": "Important", "NeededDevices": 1 }
+      ]
+    },
+    {
+      "Name": "Wave 2 - Zone 02",
+      "CollectionID": "MCM00347",
+      "CollectionName": "Zone 02",
+      "Purpose": "Required",
+      "AvailableOffsetDays": 7,
+      "DeadlineOffsetDays": 10,
+      "UserNotification": "DisplayAll",
+      "OverrideServiceWindow": false,
+      "RebootOutsideServiceWindow": false,
+      "AllowMeteredConnection": false,
+      "DPGroup": "",
+      "SuccessThresholdPercent": null,
+      "MemberCount": 1,
+      "MaintenanceWindows": [],
+      "StartDate": "2026-12-08",
+      "DeadlineDate": "2026-12-11",
+      "Updates": [
+        { "Sequence": 1, "CIId": 16777772, "ArticleId": "5012170", "Title": "2022-08 Security Update (KB5012170)", "Severity": 10, "SeverityName": "Critical", "NeededDevices": 1 }
+      ]
+    },
+    {
+      "Name": "Wave 3 - Zone 03",
+      "CollectionID": "MCM00348",
+      "CollectionName": "Zone 03",
+      "Purpose": "Required",
+      "AvailableOffsetDays": 14,
+      "DeadlineOffsetDays": 17,
+      "UserNotification": "DisplayAll",
+      "OverrideServiceWindow": false,
+      "RebootOutsideServiceWindow": false,
+      "AllowMeteredConnection": false,
+      "DPGroup": "",
+      "SuccessThresholdPercent": null,
+      "MemberCount": 1,
+      "MaintenanceWindows": [],
+      "StartDate": "2026-12-15",
+      "DeadlineDate": "2026-12-18",
+      "Updates": []
+    }
+  ],
+  "UpdatePlanner": {
+    "PlanId": "a1b2c3d4",
+    "GeneratedAt": "2026-11-06 12:00:00",
+    "ComputerName": "cm01.contoso.com",
+    "SiteCode": "MCM",
+    "Parameters": { "StartDate": "2026-12-01", "WaveSpacingDays": 7, "DeadlineDays": 3, "MinimumSeverity": 0, "MaxUpdatesPerWave": 1000 },
+    "Summary": { "TotalUpdates": 519, "NeededUpdates": 2, "InstalledUpdates": 0, "SupersededUpdates": 0, "ExpiredUpdates": 0, "ExistingDeployments": 2, "UpdatesNotCandidates": 517, "WavesPlanned": 3, "UpdateAssignmentsPlanned": 3, "SkippedListed": 1 },
+    "Sync": { "WsusServerName": "cm01.contoso.com", "Source": "Microsoft Update", "LastSuccessfulSyncTime": "2026-11-06T02:02:21", "LastSyncErrorCode": 0 },
+    "Wsus": null,
+    "Skipped": [
+      { "Reason": "AlreadyDeployed", "Wave": "Wave 1 - Zone 01", "CIId": 16778052, "ArticleId": "5012172", "Title": "2022-08 Preview Update (KB5012172)" }
+    ]
+  }
+}
