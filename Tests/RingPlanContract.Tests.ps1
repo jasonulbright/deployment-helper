@@ -27,6 +27,7 @@ BeforeAll {
 
 Describe 'Suite ring plan contract' {
     It 'keeps the same fixture and schema as Update Planner' {
+        # The hashes pin the files of Update Planner v2026.11.06.0003 (docs/schema and Tests/Fixtures).
         Get-NormalizedHash -Path $script:FixturePath | Should -Be 'd2ea422e6b647ed1c90e619ba6ddd7330ae9826e2e87d5dab1e3e16bf1f85964'
         Get-NormalizedHash -Path $script:SchemaPath | Should -Be '15546c44bb86c9da095d2873986b93ceedc45ea3c62f3cc266a24bec43a3dba8'
     }
@@ -66,6 +67,7 @@ Describe 'Suite ring plan contract' {
 
     It 'validates the fixture against the schema' -Skip:($PSVersionTable.PSVersion.Major -lt 7) {
         $strSchema = Get-Content -LiteralPath $script:SchemaPath -Raw
+        { $strSchema | ConvertFrom-Json -ErrorAction Stop } | Should -Not -Throw -Because 'a malformed schema must fail, not skip'
         try { '{}' | Test-Json -Schema $strSchema -ErrorAction Stop | Out-Null } catch { if ($_.Exception.Message -like '*parse the JSON schema*') { Set-ItResult -Skipped -Because 'This PowerShell version cannot parse the schema.'; return } }
         (Get-Content -LiteralPath $script:FixturePath -Raw) | Test-Json -Schema $strSchema | Should -BeTrue
     }
