@@ -57,6 +57,7 @@ $failed = New-Object System.Collections.Generic.List[string]
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('guide-capture-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $tmp | Out-Null
 $session = New-PSSession -ComputerName $Target -Credential $LabCredential
+$succeeded = $false
 try {
     foreach ($run in @(@{ Steps = 'steps-guide.ps1'; Prefs = $false }, @{ Steps = 'steps-console-missing.ps1'; Prefs = $true })) {
         $dest = "C:\guide\$app"
@@ -68,7 +69,7 @@ try {
             if (Test-Path $d) { Remove-Item $d -Recurse -Force }
             New-Item -ItemType Directory $d, 'C:\guide\ui' -Force | Out-Null
         } -ArgumentList $dest, $app
-        foreach ($item in Get-ChildItem -LiteralPath $repo -Force | Where-Object { $_.Name -notin '.git', '.claude', '.github', 'Logs', 'History', 'Reports', 'screenshots', 'TestResults', 'docs', 'Tests', 'tools' -and $_.Name -notlike '*.prefs.json' -and $_.Name -notlike '*.windowstate.json' -and $_.Name -notlike '*.lastscan.json' -and $_.Name -notlike '*.suppressions.json' -and $_.Name -notlike '*.local.*' -and $_.Name -notlike '*.png' }) {
+        foreach ($item in Get-ChildItem -LiteralPath $repo -Force | Where-Object { $_.Name -notin '.git', '.claude', '.github', 'Logs', 'History', 'Reports', 'Templates', 'Rings', 'screenshots', 'TestResults', 'docs', 'Tests', 'tools' -and $_.Name -notlike '*.prefs.json' -and $_.Name -notlike '*.windowstate.json' -and $_.Name -notlike '*.lastscan.json' -and $_.Name -notlike '*.suppressions.json' -and $_.Name -notlike '*.local.*' -and $_.Name -notlike '*.png' }) {
             Copy-Item -LiteralPath $item.FullName -Destination "$dest\$($item.Name)" -ToSession $session -Recurse -Force
         }
         Copy-Item (Join-Path $here 'guilib.ps1') 'C:\guide\ui\guilib.ps1' -ToSession $session -Force
@@ -79,7 +80,7 @@ try {
             param($a, $user, $json, $prefsName)
             if ($json) { Set-Content "C:\guide\$a\$prefsName" $json -Encoding UTF8 }
             Remove-Item C:\guide\ui\out -Recurse -Force -ErrorAction SilentlyContinue
-            $act = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\guide\ui\main.ps1 -App $a"
+            $act = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\guide\ui\main.ps1 -App `"$a`""
             $pr = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
             Register-ScheduledTask -TaskName GuideShots -Action $act -Principal $pr -Force | Out-Null
             Start-ScheduledTask GuideShots
@@ -113,12 +114,13 @@ try {
     foreach ($png in $captured) {
         if ($AddNew -or (Test-Path (Join-Path $images $png.Name))) { Copy-Item $png.FullName (Join-Path $images $png.Name) -Force }
     }
+    $succeeded = $true
 }
 finally {
     # Each cleanup runs on its own, so that a failed cleanup cannot replace the original error.
     try { Invoke-Command $session { Unregister-ScheduledTask GuideShots -Confirm:$false -ErrorAction SilentlyContinue } } catch { Write-Warning "Cleanup of the scheduled task failed: $($_.Exception.Message)" }
     try { Invoke-Command $session { Remove-Item C:\guide -Recurse -Force -ErrorAction SilentlyContinue } } catch { Write-Warning "Cleanup of C:\guide failed: $($_.Exception.Message)" }
     try { Remove-PSSession $session } catch { Write-Warning "Closing the session failed: $($_.Exception.Message)" }
-    if ($failed.Count) { Write-Warning "The captured files stay in $tmp for inspection." }
+    if (-not $succeeded) { Write-Warning "The captured files stay in $tmp for inspection." }
     else { try { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue } catch { Write-Warning "Cleanup of $tmp failed: $($_.Exception.Message)" } }
 }

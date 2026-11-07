@@ -26,7 +26,7 @@ None.
 | `Templates\*.json` | The deployment templates. Four are written at the first start. | You save a template in Options. |
 | `Rings\*.json` | The ring plans. Two are written at the first start. | You edit a plan file. |
 | `Rings\runs\*.json` | The run state of held ring runs. `closed\` holds finished runs. | A held ring run changes. |
-| `Reports\*.csv` and `Reports\*.html` | The history exports. | **Export CSV...** or **Export HTML...** in Options. |
+| The file that you save in the Save As dialog (CSV or HTML) | The history export. The dialog starts in `Reports`, and you can choose another folder. | **Export CSV...** or **Export HTML...** in Options. |
 
 The paths of the audit log and of the run-state folder come from the **Logging** page.
 

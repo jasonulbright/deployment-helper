@@ -15,7 +15,7 @@ Use it after a change that alters the window, and before a release.
 - A lab computer with the Configuration Manager console, an SMS Provider that you can read, and PowerShell remoting for an account.
 - A script, outside the repository, that sets `$LabCredential` to the credential of that account.
 - A domain account that has an interactive session on the lab computer. The capture runs as a scheduled task with an interactive logon.
-- Lab data only. The capture reads the site. It opens the Run Fix dialog and selects **No**. It never confirms a fix.
+- Lab data only. The capture reads the site. It validates an existing lab application against a lab collection. When **Deploy** shows, it selects **Deploy** and answers **Cancel** to `Confirm deployment`, **No** to `Check deployment schedule` and **OK** to `Deployment blocked`. It never confirms a deployment.
 
 ## Steps
 

@@ -4,7 +4,7 @@ The **Packages**, **Task Sequences** and **Software Update Groups** views use th
 
 ## What it does
 
-Each view picks an object and a device collection and runs five checks before it creates the deployment. The first check names the type: `Package and program exist`, `Task sequence exists` or `Software update group exists`. The other four checks are the same.
+Each view picks an object and a device collection and runs five checks before it creates the deployment. The first check names the type: `Package and program exist`, `Task sequence exists` or `Software update group exists`. The other four checks are the same. For a task sequence and a software update group, the content check passes without checking the distribution. Five passing checks do not confirm that the content is distributed. Verify the content distribution separately.
 
 ## When to use it
 

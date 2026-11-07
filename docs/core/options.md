@@ -4,7 +4,7 @@ The Options dialog sets the connection, the log paths, the history exports and t
 
 ## What it does
 
-The dialog has five pages: **Connection**, **Logging**, **History**, **Templates** and **About**. **OK** saves. **Cancel** closes the dialog and keeps the old values.
+The dialog has five pages: **Connection**, **Logging**, **History**, **Templates** and **About**. **OK** saves. **Cancel** closes the dialog and keeps the old values of the Connection and Logging pages. It does not undo template changes: **Save template**, **New**, **Duplicate** and **Delete** take effect at once.
 
 ## When to use it
 
@@ -24,7 +24,7 @@ None.
 | **SMS Provider** | The server with the SMS Provider role. |
 | **Reload DP groups** | Reads the distribution point groups again. |
 
-The tool connects again on **OK** when the site code or the provider changed.
+**OK** disconnects the current connection when the site code or the provider changed. The next action that needs a connection connects again with the saved settings.
 
 ![The Connection page](../images/options-connection.png)
 

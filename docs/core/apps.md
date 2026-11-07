@@ -64,7 +64,7 @@ A check mark means pass and a cross means fail. The status bar shows `Validation
 
 ### Distribute content
 
-If the content check fails, select **Select DP groups...** and check the groups. Groups that already have the content are checked. Then select **Distribute content**. This guide did not distribute content.
+If the content check fails, select **Select DP groups...** and check the groups. Groups that already have the content are checked. Then select **Distribute content**. A checked group can still be distributing the content, and a check mark does not confirm that the distribution is complete. Wait until the distribution is complete, then select **Validate** again. This guide did not distribute content.
 
 ![The Select DP groups dialog](../images/dialog-dp-groups.png)
 
@@ -75,7 +75,7 @@ If the content check fails, select **Select DP groups...** and check the groups.
 
 ![The Confirm deployment dialog](../images/dialog-confirm-deployment.png)
 
-3. After **OK**, the tool writes the record to the audit log and creates the deployment. If the duplicate check cannot run or the audit log cannot be written, the tool blocks the deployment.
+3. After **OK**, the tool checks that the audit log can be opened for writing, creates the deployment and then writes the audit record. The tool blocks the deployment before it creates it when the duplicate check cannot run or the audit log check fails. If the audit record cannot be written after the site created the deployment, the tool reports the deployment ID. The deployment stays. The tool does not undo it.
 
 This guide opened the dialog and selected **Cancel**. It did not create a deployment. The result of **OK** was not checked.
 

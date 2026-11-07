@@ -18,7 +18,7 @@ Use it to set up an account, or to find out why a read or a deployment is refuse
 | Browse, Validate | The Configuration Manager console on the computer, and read access to the SMS Provider under your Configuration Manager role. |
 | **Deploy** of an application, a package, a task sequence or a software update group | The right to create a deployment of that type for the collection. |
 | **Distribute content** | The right to distribute content to the distribution point groups. |
-| Ring runs and Promote | The rights of the deployment type for each ring collection. |
+| Ring runs and Promote | The rights of the deployment type for each ring collection. A ring with a `DPGroup` also needs the right to distribute content to that group. |
 | The audit log and the run-state folder | Write access to the path. A UNC run-state folder needs write access to the share. |
 
 ## Steps

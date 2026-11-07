@@ -71,7 +71,7 @@ function Dump-Tree($Scope, [string]$Name) {
 }
 function Start-App([string]$Script, [string]$Title) {
     [void][NativeUi]::SetCursorPos(1900, 1060)
-    $script:proc = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', (Join-Path $appDir $Script)) -PassThru
+    $script:proc = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', ('"' + (Join-Path $appDir $Script) + '"')) -PassThru
     [void](Find-Top $Title 60); Start-Sleep -Seconds 3; Find-Top $Title 10
 }
 function Stop-App([string]$Script) {

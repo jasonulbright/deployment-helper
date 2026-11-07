@@ -21,9 +21,9 @@ None.
 | `SiteCode` | **Site code** | Empty. |
 | `SMSProvider` | **SMS Provider** | Empty. |
 | `DeploymentAuditLogPath` | **Deployment audit log (JSONL)** | `Logs\deployment-audit.jsonl` beside the script. |
-| The ring run-state folder | **Ring run-state folder** | `Rings\runs` beside the script. |
+| `RingRunStatePath` | **Ring run-state folder** | `Rings\runs` beside the script. |
 
-`DeploymentHelper.windowstate.json` keeps the size, the place, the theme and the last used deployment type. The command line parameters `-SiteCode` and `-SMSProvider` override the file for one start.
+`DeploymentHelper.windowstate.json` keeps the size, the place, the theme and the last used deployment type. A non-empty command line parameter `-SiteCode` or `-SMSProvider` overrides the saved value at the start. When you then select **OK** in Options, the tool saves the current values, including the overrides, to `DeploymentHelper.prefs.json`.
 
 ## Steps
 
