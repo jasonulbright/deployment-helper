@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026.11.07.0019] - 2026-11-07
+
+## 1 user guide ships with the release
+
+### Added
+
+- Add the user guide (docs/index.md) with images of the running window.
+- Add tools/guide-capture, one command that regenerates every image of the guide on a lab computer.
+
 ## [2026.10.25.0018] - 2026-10-25
 
 ## 1 fix

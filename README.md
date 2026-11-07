@@ -26,6 +26,10 @@ Safe Configuration Manager deployment for Applications, Packages, Task Sequences
 - CSV + HTML history export
 - Dark and light themes with runtime toggle
 
+## User guide
+
+The [user guide](docs/index.md) walks every view, dialog and setting with images of the running window. [Capture the images again](docs/reference/capture-images.md) shows the one command that regenerates them.
+
 ## Requirements
 
 - PowerShell 5.1
