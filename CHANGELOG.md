@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026.11.10.0020] - 2026-11-10
+
+## 1 test check
+
+### Added
+
+- Add the GitHub Actions workflow `checks.yml`. It runs PSScriptAnalyzer and the Pester 5.7.1 tests under Windows PowerShell 5.1 and PowerShell 7 on each pull request and each push to `main`.
+- Add `Invoke-Checks.ps1`, one command that runs the same lint and tests on a computer.
+- Add a Testing section to the README.
+
 ## [2026.11.07.0019] - 2026-11-07
 
 ## 1 user guide ships with the release

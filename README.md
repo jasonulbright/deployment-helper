@@ -149,6 +149,18 @@ Before creating a deployment, the tool checks that the configured audit log can 
 | `Rings\runs\*.json` | Run state of held ring runs (`closed\` holds finished runs); folder set in Options |
 | `Reports\*.csv` / `Reports\*.html` | History exports |
 
+## Testing
+
+The tests use Pester 5 and mock the Configuration Manager cmdlets. They need no Configuration Manager site. The checks also run PSScriptAnalyzer with `Tests\PSScriptAnalyzerSettings.psd1`.
+
+```powershell
+Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -SkipPublisherCheck
+Install-Module PSScriptAnalyzer -Scope CurrentUser
+.\Invoke-Checks.ps1
+```
+
+`Invoke-Checks.ps1` fails on a lint finding of severity Error or Warning, on a failed test, and on a run that finds no test. The `Checks` workflow runs it on each pull request and each push to `main`, in two jobs: Windows PowerShell 5.1 and PowerShell 7.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
