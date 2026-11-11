@@ -4,7 +4,7 @@
     Runs the linter and the tests of Deployment Helper.
 
 .DESCRIPTION
-    One command for developers and for CI:
+    One command for CI and for a test computer:
       1. PSScriptAnalyzer on the module, the start script and the tests. Any finding
          of severity Error or Warning fails the run.
       2. Pester on Tests\. A failed test fails the run. A run that finds no test
@@ -44,13 +44,16 @@ if (-not $SkipLint) {
     )
     $settings = Join-Path $root 'Tests\PSScriptAnalyzerSettings.psd1'
     # Test files pass state to mock bodies through a global variable, and they define stub commands in the global scope. Both are intended.
+    # Pester sets variables in BeforeAll that the It blocks read. The unused-variable rule reports them.
     $testOnlyExclude = 'PSAvoidGlobalVars', 'PSUseDeclaredVarsMoreThanAssignments', 'PSUseShouldProcessForStateChangingFunctions'
-    # The window script keeps its state in global variables that every event handler reads, and the module and the script confirm each destructive step in their own dialog or 
-    # in the ring flow, so the commands take no -WhatIf. Both are by design. A change would alter the public commands.
+    # The start script keeps its window state in global variables. Event handlers read them.
+    # The window asks the user to confirm each destructive step. The functions of the start script take no -WhatIf.
+    # The exclusions apply to the start script only. A module function that needs the rule carries its own SuppressMessageAttribute.
     $appExclude = 'PSAvoidGlobalVars', 'PSUseShouldProcessForStateChangingFunctions'
     $findings = @(foreach ($t in $targets) {
         if ($t.FullName -like '*\Tests\*' -or $t.Name -like '*.Tests.ps1') { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings -ExcludeRule $testOnlyExclude }
-        else { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings -ExcludeRule $appExclude }
+        elseif ($t.Name -like 'start-*.ps1') { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings -ExcludeRule $appExclude }
+        else { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings }
     })
     $blocking = @($findings | Where-Object { $_.Severity -in 'Error', 'Warning' })
     Write-Host ('Lint: {0} files, {1} findings ({2} Error or Warning)' -f $targets.Count, $findings.Count, $blocking.Count)

@@ -27,7 +27,7 @@ jobs:
         shell: powershell
         run: |
           Install-Module Pester -RequiredVersion 5.7.1 -Force -Scope CurrentUser -SkipPublisherCheck
-          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser
       - name: Run the checks
         shell: powershell
         run: .\Invoke-Checks.ps1
@@ -44,7 +44,7 @@ jobs:
         shell: pwsh
         run: |
           Install-Module Pester -RequiredVersion 5.7.1 -Force -Scope CurrentUser -SkipPublisherCheck
-          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser
       - name: Run the checks
         shell: pwsh
         run: .\Invoke-Checks.ps1

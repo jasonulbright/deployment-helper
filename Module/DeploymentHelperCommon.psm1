@@ -279,6 +279,7 @@ function Get-DPGroupList {
 }
 
 function Start-ContentDistributionToGroups {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'The window asks the user to confirm each distribution. The command takes no -WhatIf.')]
     param(
         [Parameter(Mandatory)]$Application,
         [Parameter(Mandatory)][string[]]$DPGroupNames
@@ -755,6 +756,7 @@ function Save-DeploymentTemplate {
 }
 
 function Remove-DeploymentTemplate {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'The window asks the user to confirm each removal. The command takes no -WhatIf.')]
     param(
         [Parameter(Mandatory)][string]$TemplatePath
     )
