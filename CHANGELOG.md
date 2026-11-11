@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026.11.11.0020] - 2026-11-11
+
+## 243 tests run in CI on 2 PowerShell versions
+
+### Added
+
+- Add the GitHub Actions workflow `checks.yml`. It runs PSScriptAnalyzer and the Pester 5.7.1 tests under Windows PowerShell 5.1 and PowerShell 7 on each pull request and each push to `main`.
+- Add `Invoke-Checks.ps1`, the command that the `Checks` workflow runs.
+- Add a Testing section to the README.
+
+### Fixed
+
+- Link the ring plan page from the documentation index. The documentation test found it missing.
+- Mark three intentional empty catch blocks in the start script, and remove one unused variable.
+
 ## [2026.11.07.0019] - 2026-11-07
 
 ## 1 user guide ships with the release
