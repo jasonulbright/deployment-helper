@@ -153,7 +153,7 @@ Before creating a deployment, the tool checks that the configured audit log can 
 
 The tests use Pester 5 and mock the Configuration Manager cmdlets. They need no Configuration Manager site. The checks also run PSScriptAnalyzer with `Tests\PSScriptAnalyzerSettings.psd1`.
 
-The `Checks` workflow runs `Invoke-Checks.ps1` in GitHub Actions. To run the same command by hand, use a test computer, not a computer that holds a production Configuration Manager console:
+The `Checks` workflow runs `Invoke-Checks.ps1` in GitHub Actions. To run the same command by hand, use a lab computer only:
 
 ```powershell
 Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -SkipPublisherCheck

@@ -279,7 +279,7 @@ function Get-DPGroupList {
 }
 
 function Start-ContentDistributionToGroups {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'The window asks the user to confirm each distribution. The command takes no -WhatIf.')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'The window does not call this function. It calls Invoke-ContentDistributionToGroups. The command takes no -WhatIf.')]
     param(
         [Parameter(Mandatory)]$Application,
         [Parameter(Mandatory)][string[]]$DPGroupNames
