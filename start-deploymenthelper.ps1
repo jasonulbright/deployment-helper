@@ -140,7 +140,10 @@ function Get-DhPreferences {
                     $defaults[$k] = $val
                 }
             }
-        } catch { }
+        } catch {
+            # The saved defaults are optional. The built-in defaults stay in use.
+            $null = $_
+        }
     }
     return $defaults
 }
@@ -249,7 +252,10 @@ if (-not (Get-ChildItem -LiteralPath $__templatesDir -Filter '*.json' -ErrorActi
         $__fpath = Join-Path $__templatesDir $__fname
         try {
             $t | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $__fpath -Encoding UTF8
-        } catch { }
+        } catch {
+            # A template that cannot be written is skipped. The seed continues with the next one.
+            $null = $_
+        }
     }
 }
 
@@ -1347,7 +1353,6 @@ $script:InvokePackagesValidate = {
             Set-StatusText -Text 'Program selection required.'
             return
         }
-        $programInfo = $cboProgram.SelectedItem.Tag
         $programName = [string]$cboProgram.SelectedItem.Content
         Set-CheckGlyph -Index 1 -State 'Pass'
 
@@ -2536,7 +2541,10 @@ function New-HistoryPanel {
 
     $count = 0
     if (Test-Path -LiteralPath $script:DeploymentAuditLog) {
-        try { $count = @(Get-DeploymentHistory -LogPath $script:DeploymentAuditLog).Count } catch { }
+        try { $count = @(Get-DeploymentHistory -LogPath $script:DeploymentAuditLog).Count } catch {
+            # An unreadable audit log shows a count of 0.
+            $null = $_
+        }
     }
     $info = New-Object System.Windows.Controls.TextBlock
     $info.Name = 'lblHistoryInfo'

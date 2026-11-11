@@ -45,9 +45,12 @@ if (-not $SkipLint) {
     $settings = Join-Path $root 'Tests\PSScriptAnalyzerSettings.psd1'
     # Test files pass state to mock bodies through a global variable, and they define stub commands in the global scope. Both are intended.
     $testOnlyExclude = 'PSAvoidGlobalVars', 'PSUseDeclaredVarsMoreThanAssignments', 'PSUseShouldProcessForStateChangingFunctions'
+    # The window script keeps its state in global variables that every event handler reads, and the module and the script confirm each destructive step in their own dialog or 
+    # in the ring flow, so the commands take no -WhatIf. Both are by design. A change would alter the public commands.
+    $appExclude = 'PSAvoidGlobalVars', 'PSUseShouldProcessForStateChangingFunctions'
     $findings = @(foreach ($t in $targets) {
         if ($t.FullName -like '*\Tests\*' -or $t.Name -like '*.Tests.ps1') { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings -ExcludeRule $testOnlyExclude }
-        else { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings }
+        else { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings -ExcludeRule $appExclude }
     })
     $blocking = @($findings | Where-Object { $_.Severity -in 'Error', 'Warning' })
     Write-Host ('Lint: {0} files, {1} findings ({2} Error or Warning)' -f $targets.Count, $findings.Count, $blocking.Count)

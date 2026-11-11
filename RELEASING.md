@@ -2,11 +2,7 @@
 
 ## 1. Test
 
-Run the full suite under Windows PowerShell 5.1 with Pester 5. The release stops if a test fails. Never run the suite under PowerShell 7.
-
-```powershell
-powershell -NoProfile -Command "Import-Module Pester -MinimumVersion 5.0; $r = Invoke-Pester -Path Tests -PassThru -Output None; 'passed {0} failed {1}' -f $r.PassedCount, $r.FailedCount"
-```
+The `Checks` workflow runs the lint and the Pester 5 tests under Windows PowerShell 5.1 and PowerShell 7 on each pull request. The release stops if one job fails. The command that the workflow runs is `.\Invoke-Checks.ps1`.
 
 ## 2. Version
 
