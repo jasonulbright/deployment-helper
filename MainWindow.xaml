@@ -23,14 +23,17 @@
             <!-- One template and one set of button styles for the window and for every dialog. The dialogs
                  take the styles from this file (Get-SharedStyleXaml in the start script), so each style exists
                  once. The colors come from SuiteCommon (Set-ButtonTheme) and from MahApps resources, never from
-                 a literal here. Hover, pressed and disabled change only the opacity, so they work in both themes. -->
+                 a literal here. Hover shows the theme foreground as border color. Pressed swaps the theme foreground
+                 and the theme background. No state changes the opacity, because an opacity below 1 washes the text out.
+                 A disabled button shows MahApps.Brushes.Gray.MouseOver text and a Gray2 border (4.5:1 or more in both themes). -->
             <ControlTemplate x:Key="ThemedButtonTemplate" TargetType="Button">
                 <Border x:Name="Bd"
                         Background="{TemplateBinding Background}"
                         BorderBrush="{TemplateBinding BorderBrush}"
                         BorderThickness="{TemplateBinding BorderThickness}"
                         SnapsToDevicePixels="True">
-                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                    <ContentPresenter Name="Cp"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                       VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                       Margin="{TemplateBinding Padding}"
                                       RecognizesAccessKey="True"
@@ -38,16 +41,14 @@
                 </Border>
                 <ControlTemplate.Triggers>
                     <Trigger Property="IsMouseOver" Value="True">
-                        <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
                     </Trigger>
                     <Trigger Property="IsKeyboardFocused" Value="True">
                         <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
                     </Trigger>
                     <Trigger Property="IsPressed" Value="True">
-                        <Setter TargetName="Bd" Property="Opacity" Value="0.7"/>
-                    </Trigger>
-                    <Trigger Property="IsEnabled" Value="False">
-                        <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
+                        <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource MahApps.Brushes.ThemeBackground}"/>
                     </Trigger>
                 </ControlTemplate.Triggers>
             </ControlTemplate>
@@ -57,6 +58,12 @@
                 <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
                 <Setter Property="BorderThickness" Value="1"/>
                 <Setter Property="Controls:ControlsHelper.ContentCharacterCasing" Value="Normal"/>
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.Gray.MouseOver}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Gray2}"/>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
             <Style x:Key="WorkflowButtonStyle" TargetType="Button" BasedOn="{StaticResource ThemedButtonStyle}">
@@ -77,6 +84,13 @@
                 <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
                 <Setter Property="MinWidth" Value="90"/><Setter Property="Height" Value="32"/>
                 <Setter Property="Margin" Value="0,0,8,0"/>
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Gray10}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.Gray.MouseOver}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Gray2}"/>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
             <!-- The one secondary style, for Cancel, Browse and every other button that is not primary: a gray fill,
@@ -574,7 +588,7 @@
                             <DataGridTextColumn Header="Targeted" Binding="{Binding Targeted}" Width="90"/>
                             <DataGridTextColumn Header="Success" Binding="{Binding Success}" Width="82"/>
                             <DataGridTextColumn Header="Error" Binding="{Binding Errors}" Width="66"/>
-                            <DataGridTextColumn Header="In progress" Binding="{Binding InProgress}" Width="110"/>
+                            <DataGridTextColumn Header="In Progress" Binding="{Binding InProgress}" Width="110"/>
                             <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="2*" MinWidth="80">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">

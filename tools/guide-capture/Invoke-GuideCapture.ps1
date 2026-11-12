@@ -62,6 +62,9 @@ $root = "C:\guide\$app"
 $taskName = "GuideShots-$app"
 $lockFile = 'C:\guide\capture.lock'
 $haveLock = $false
+# The remote step that ends a capture: stop the task, then kill the runner and the app of this capture (the processes whose
+# command line holds the lab folder). It runs before the task is unregistered, the folder is removed and the lock is released.
+$stopRunner = 'param($t, $r) Stop-ScheduledTask $t -ErrorAction SilentlyContinue; Get-CimInstance Win32_Process -Filter "Name=''powershell.exe''" | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like "*$r\*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }'
 $settings = @{ SiteCode = $SiteCode; SMSProvider = $SmsProvider } | ConvertTo-Json
 $failed = New-Object System.Collections.Generic.List[string]
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('guide-capture-' + [guid]::NewGuid().ToString('N'))
@@ -82,7 +85,16 @@ try {
                 return 'acquired'
             }
             catch [System.IO.IOException] {
-                if (((Get-Date) - (Get-Item -LiteralPath $l -ErrorAction Stop).LastWriteTime).TotalMinutes -gt 60) { Remove-Item -LiteralPath $l -Force -ErrorAction Stop; return 'stale' }
+                # The lock can vanish or change between the failed create and this read. Then the answer is 'busy' and the loop tries again.
+                $item = Get-Item -LiteralPath $l -ErrorAction SilentlyContinue
+                if (-not $item) { return 'busy' }
+                if (((Get-Date) - $item.LastWriteTime).TotalMinutes -gt 60) {
+                    # Rename first: only one session wins the rename. A lost rename means another session took the lock.
+                    $old = $l + '.stale'
+                    try { Move-Item -LiteralPath $l -Destination $old -Force -ErrorAction Stop } catch { return 'busy' }
+                    Remove-Item -LiteralPath $old -Force -ErrorAction SilentlyContinue
+                    return 'stale'
+                }
                 return 'busy'
             }
         } -ArgumentList $lockFile -ErrorAction Stop
@@ -126,13 +138,13 @@ try {
         } while (-not $done -and (Get-Date) -lt $end)
         if (-not $done) {
             # The task keeps running after the wait ends. Stop it, so that it does not touch the lab after this command.
-            try { Invoke-Command $session { param($t) Stop-ScheduledTask $t -ErrorAction SilentlyContinue } -ArgumentList $taskName } catch { Write-Warning "Stopping the scheduled task failed: $($_.Exception.Message)" }
+            try { Invoke-Command $session { param($code, $t, $r) & ([scriptblock]::Create($code)) $t $r } -ArgumentList $stopRunner, $taskName, $root } catch { Write-Warning "Stopping the capture failed: $($_.Exception.Message)" }
             throw "The capture did not finish: $($run.Steps)"
         }
         $out = Join-Path $tmp ([IO.Path]::GetFileNameWithoutExtension($run.Steps))
         New-Item -ItemType Directory $out | Out-Null
         Copy-Item (Join-Path $root 'ui\out\*') $out -FromSession $session -Recurse -Force
-        # The flag file holds inished or ailed: <reason>. A failure is reported even when the log could not be written.
+        # The flag file holds the word finished, or the word failed with the reason. A failure is reported even when the log could not be written.
         $flagText = (Get-Content (Join-Path $out 'finished.flag') -Raw -ErrorAction SilentlyContinue)
         if ($flagText -and $flagText.Trim() -like 'failed:*') { $failed.Add($flagText.Trim()) }
         $log = Join-Path $out 'run.log'
@@ -156,7 +168,9 @@ finally {
     # Each cleanup runs on its own, so that a failed cleanup cannot replace the original error.
     if ($session) {
         if ($haveLock) {
-            try { Invoke-Command $session { param($t) Stop-ScheduledTask $t -ErrorAction SilentlyContinue; Unregister-ScheduledTask $t -Confirm:$false -ErrorAction SilentlyContinue } -ArgumentList $taskName } catch { Write-Warning "Cleanup of the scheduled task failed: $($_.Exception.Message)" }
+            # Order: stop the task and kill the processes, unregister the task, remove the folder, release the lock.
+            try { Invoke-Command $session { param($code, $t, $r) & ([scriptblock]::Create($code)) $t $r } -ArgumentList $stopRunner, $taskName, $root } catch { Write-Warning "Stopping the capture failed: $($_.Exception.Message)" }
+            try { Invoke-Command $session { param($t) Unregister-ScheduledTask $t -Confirm:$false -ErrorAction SilentlyContinue } -ArgumentList $taskName } catch { Write-Warning "Cleanup of the scheduled task failed: $($_.Exception.Message)" }
             try { Invoke-Command $session { param($r) Remove-Item $r -Recurse -Force -ErrorAction SilentlyContinue } -ArgumentList $root } catch { Write-Warning "Cleanup of $root failed: $($_.Exception.Message)" }
             try { Invoke-Command $session { param($l) Remove-Item $l -Force -ErrorAction SilentlyContinue } -ArgumentList $lockFile } catch { Write-Warning "Removing $lockFile failed: $($_.Exception.Message)" }
         }

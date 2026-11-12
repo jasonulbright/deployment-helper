@@ -39,6 +39,19 @@ Describe 'Blue backgrounds have white text (a)' {
         $bad | Should -BeNullOrEmpty
     }
 
+    It 'recognizes the system highlight color as blue' {
+        Test-BlueBrush '{DynamicResource {x:Static SystemColors.HighlightBrushKey}}' | Should -BeTrue
+        Test-BlueBrush 'SystemColors.HighlightColor' | Should -BeTrue
+    }
+
+    It 'flags a blue nested Background property element that has no white Foreground' {
+        $ns = 'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"'
+        $bad = "<Border $ns><Border.Background><SolidColorBrush Color=`"{DynamicResource MahApps.Colors.AccentBase}`"/></Border.Background></Border>"
+        $ok = "<Border $ns TextElement.Foreground=`"White`"><Border.Background><SolidColorBrush Color=`"#0078D4`"/></Border.Background></Border>"
+        @(Get-BlueWithoutWhite -Text $bad -Source 'sample').Count | Should -Be 1
+        @(Get-BlueWithoutWhite -Text $ok -Source 'sample').Count | Should -Be 0
+    }
+
     It 'recognizes blue and white brushes' {
         Test-BlueBrush '{DynamicResource MahApps.Brushes.Accent}' | Should -BeTrue
         Test-BlueBrush '{DynamicResource MahApps.Colors.Accent}' | Should -BeTrue
@@ -570,6 +583,54 @@ Describe 'Every button takes the shared themed style (e)' {
         @($x.SelectNodes('//*[local-name()="ControlTemplate"]')).Count | Should -BeGreaterThan 0
     }
 
+    It 'changes no opacity in a hover, pressed, disabled, focus or selected state of <_.Source>' -ForEach $script:XamlDocsD {
+        @(Get-OpacityInStateTrigger -Text $_.Text) | Should -BeNullOrEmpty
+    }
+
+    It 'detects an opacity in a state trigger (the check itself)' {
+        $ns = 'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"'
+        $bad = "<ControlTemplate $ns TargetType=`"Button`"><ControlTemplate.Triggers><Trigger Property=`"IsMouseOver`" Value=`"True`"><Setter TargetName=`"Bd`" Property=`"Opacity`" Value=`"0.85`"/></Trigger></ControlTemplate.Triggers></ControlTemplate>"
+        $ok = "<ControlTemplate $ns TargetType=`"Button`"><ControlTemplate.Triggers><Trigger Property=`"IsMouseOver`" Value=`"True`"><Setter TargetName=`"Bd`" Property=`"BorderBrush`" Value=`"{DynamicResource MahApps.Brushes.ThemeForeground}`"/></Trigger></ControlTemplate.Triggers></ControlTemplate>"
+        @(Get-OpacityInStateTrigger -Text $bad).Count | Should -Be 1
+        @(Get-OpacityInStateTrigger -Text $ok).Count | Should -Be 0
+    }
+
+    It 'shows hover as a border, pressed as swapped theme colors, and disabled as gray text in the button template and styles' {
+        $doc = @($script:XamlDocs | Where-Object { $_.Source -eq 'MainWindow.xaml' })[0]
+        [xml]$x = $doc.Text
+        $tpl = $x.SelectSingleNode("//*[local-name()='ControlTemplate'][@*[local-name()='Key']='ThemedButtonTemplate']")
+        $tpl | Should -Not -BeNullOrEmpty
+        $hover = $tpl.SelectSingleNode(".//*[local-name()='Trigger'][@Property='IsMouseOver']/*[local-name()='Setter']")
+        $hover.GetAttribute('Property') | Should -Be 'BorderBrush'
+        $hover.GetAttribute('Value') | Should -Match 'ThemeForeground'
+        $pressed = @($tpl.SelectNodes(".//*[local-name()='Trigger'][@Property='IsPressed']/*[local-name()='Setter']") | ForEach-Object { $_.GetAttribute('Value') }) -join ' '
+        $pressed | Should -Match 'ThemeForeground'
+        $pressed | Should -Match 'ThemeBackground'
+        foreach ($key in 'ThemedButtonStyle', 'DialogAccentButton') {
+            $st = $x.SelectSingleNode(("//*[local-name()='Style'][@*[local-name()='Key']='{0}']" -f $key))
+            $dis = @($st.SelectNodes(".//*[local-name()='Trigger'][@Property='IsEnabled']/*[local-name()='Setter'][@Property='Foreground']"))
+            $dis.Count | Should -Be 1 -Because $key
+            $dis[0].GetAttribute('Value') | Should -Match 'Gray\.MouseOver' -Because $key
+        }
+        $doc.Text | Should -Not -Match 'change only the opacity'
+    }
+
+    It 'documents each known theme limit with a reason, and the limit holds' {
+        . "$PSScriptRoot\KnownThemeLimits.ps1"
+        @($script:KnownThemeLimit).Count | Should -BeGreaterOrEqual 1
+        foreach ($l in $script:KnownThemeLimit) {
+            foreach ($field in 'Id', 'Where', 'Reason', 'Source') { [string]$l[$field] | Should -Not -BeNullOrEmpty -Because ('{0} needs {1}' -f $l.Id, $field) }
+            ([string]$l.Reason).Length | Should -BeGreaterOrEqual 60 -Because ('{0} needs a reason that says why' -f $l.Id)
+        }
+        $limit = @($script:KnownThemeLimit | Where-Object { $_.Id -eq 'sidebar-disabled-white-on-blue' })
+        $limit.Count | Should -Be 1
+        # The limit stays inert while the app never disables a sidebar button, and while SuiteCommon sets the local foreground.
+        $shell = Get-Content -LiteralPath $script:ShellPath -Raw
+        $shell | Should -Not -Match '\$(btnApps|btnPackages|btnTaskSequences|btnSUG|btnRings|btnOptions)\.IsEnabled'
+        $suite = Get-Content -LiteralPath (Join-Path $script:RepoRoot 'Lib\SuiteCommon\SuiteCommon.psm1') -Raw
+        $suite | Should -Match '\.Foreground\s*=\s*\$OnBlue'
+    }
+
     It 'detects a color literal in a style, a template and an attribute (the check itself)' {
         [xml]$x = '<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"><Style x:Key="S" TargetType="Button"><Setter Property="Foreground" Value="White"/><Setter Property="Background"><Setter.Value><SolidColorBrush Color="#1E1E1E"/></Setter.Value></Setter><Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Accent}"/></Style><ControlTemplate x:Key="T" TargetType="Button"><Border BorderBrush="#555555" Background="{TemplateBinding Background}"><Border.Background><SolidColorBrush Color="#123456"/></Border.Background></Border></ControlTemplate></ResourceDictionary>'
         $nodes = @($x.SelectNodes('//*[local-name()="Style" or local-name()="ControlTemplate"]'))
@@ -582,6 +643,16 @@ Describe 'Every button takes the shared themed style (e)' {
         ($found -join ' ') | Should -Match 'White'
         ($found -join ' ') | Should -Match '#1E1E1E'
         ($found -join ' ') | Should -Match '#555555'
+    }
+}
+
+Describe 'Every test file requires Pester 5.1.0' {
+    It 'has the #Requires line in <_.Name>' -ForEach @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.Tests.ps1' -File -Recurse | ForEach-Object { @{ Name = $_.Name; Path = $_.FullName } }) {
+        (Get-Content -LiteralPath $Path -TotalCount 5) -join "`n" | Should -Match "(?m)^#Requires -Modules @\{ ModuleName = 'Pester'; ModuleVersion = '5\.1\.0' \}"
+    }
+
+    It 'finds the test files (the scan is not empty)' {
+        @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.Tests.ps1' -File -Recurse).Count | Should -BeGreaterOrEqual 6
     }
 }
 
@@ -619,6 +690,15 @@ Describe 'No raw exception text in the UI (f)' {
 
     It 'sends no raw exception text to the UI from <Name>' -ForEach $script:AppPsFilesD {
         @(Get-RawExceptionToUi -Path $Path) | Should -BeNullOrEmpty
+    }
+
+    It 'keeps the raw detail in ErrorDetail, and only the audit record reads it' {
+        $shellLines = @(Get-Content -LiteralPath $script:ShellPath | Where-Object { $_ -match 'ErrorDetail' })
+        $shellLines.Count | Should -BeGreaterOrEqual 4
+        foreach ($l in $shellLines) { $l | Should -Match '^\s*Result\s*=' }
+        $moduleLines = @(Get-Content -LiteralPath $script:ModulePath | Where-Object { $_ -match 'ErrorDetail' -and $_ -notmatch 'function Get-ErrorDetailText|ErrorDetail \(|a result carries it in ErrorDetail' })
+        $moduleLines.Count | Should -BeGreaterOrEqual 5
+        foreach ($l in $moduleLines) { $l | Should -Match 'ErrorDetail\s*=\s*\(Get-ErrorDetailText -ErrorRecord \$_\)|^\s*Result\s*=' }
     }
 
     It 'uses Get-UserErrorText in the start script and in the module, and exports it' {

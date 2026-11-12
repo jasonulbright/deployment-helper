@@ -1,4 +1,4 @@
-#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.1.0' }
 
 <#
 .SYNOPSIS

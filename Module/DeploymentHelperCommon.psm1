@@ -48,17 +48,36 @@ function Get-UserErrorText {
         through. Any other error (a Configuration Manager, WMI, file or .NET exception) is raw
         exception text. It goes to the log file and the caller gets the fallback sentence.
         Every catch block that feeds the window, a dialog or a result property uses this function.
+        Only a throw statement of this tool has the category OperationStopped. An engine error, such as
+        a method call on $null, is a RuntimeException too, but it has another category and it never shows.
+        -LogDetail writes the raw text to the log file. A caller that logs the error itself leaves it out.
     #>
     param(
         [Parameter(Mandatory)]$ErrorRecord,
-        [Parameter(Mandatory)][string]$Fallback
+        [Parameter(Mandatory)][string]$Fallback,
+        [switch]$LogDetail
     )
     $ex = $ErrorRecord.Exception
-    if ($null -ne $ex -and $ex.GetType().FullName -eq 'System.Management.Automation.RuntimeException' -and $null -eq $ex.InnerException) {
+    if ($null -ne $ex -and $ErrorRecord.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::OperationStopped -and
+        $ex.GetType().FullName -eq 'System.Management.Automation.RuntimeException' -and $null -eq $ex.InnerException) {
         return [string]$ex.Message
     }
-    if ($null -ne $ex) { Write-Log ('Error detail kept out of the window: {0}' -f $ex.Message) -Level ERROR }
+    if ($LogDetail -and $null -ne $ex) { Write-Log ('Error detail kept out of the window: {0}' -f $ex.Message) -Level ERROR }
     return $Fallback
+}
+
+function Get-ErrorDetailText {
+    <#
+    .SYNOPSIS
+        Returns the raw text of an error, for the audit record and nothing else.
+
+    .DESCRIPTION
+        The audit log is a file. It keeps the reason of a failed deployment. The window never reads this text:
+        a result carries it in ErrorDetail, and only the audit record takes it.
+    #>
+    param([Parameter(Mandatory)]$ErrorRecord)
+    if ($null -eq $ErrorRecord.Exception) { return '' }
+    return [string]$ErrorRecord.Exception.Message
 }
 
 # ---------------------------------------------------------------------------
@@ -668,6 +687,7 @@ function Invoke-ApplicationDeployment {
             DeploymentID       = $null
             DeploymentUniqueID = $null
             Error              = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be created. See the log file.')
+            ErrorDetail        = (Get-ErrorDetailText -ErrorRecord $_)
         }
     }
 }
@@ -745,6 +765,7 @@ function Invoke-SUGDeployment {
             DeploymentID       = $null
             DeploymentUniqueID = $null
             Error              = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be created. See the log file.')
+            ErrorDetail        = (Get-ErrorDetailText -ErrorRecord $_)
         }
     }
 }
@@ -822,7 +843,7 @@ function Test-DeploymentLogWritable {
         return @{ Success = $true; Error = $null }
     }
     catch {
-        return @{ Success = $false; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The audit log file cannot be written. See the log file.') }
+        return @{ Success = $false; Error = (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The audit log file cannot be written. See the log file.') }
     }
     finally {
         if ($null -ne $stream) { try { $stream.Dispose() } catch { $null = $_ } }
@@ -1273,6 +1294,7 @@ function Invoke-TaskSequenceDeployment {
             DeploymentID       = $null
             DeploymentUniqueID = $null
             Error              = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be created. See the log file.')
+            ErrorDetail        = (Get-ErrorDetailText -ErrorRecord $_)
         }
     }
 }
@@ -1389,6 +1411,7 @@ function Invoke-PackageDeployment {
             DeploymentID       = $null
             DeploymentUniqueID = $null
             Error              = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be created. See the log file.')
+            ErrorDetail        = (Get-ErrorDetailText -ErrorRecord $_)
         }
     }
 }
@@ -1729,7 +1752,7 @@ function Import-RingPlan {
         $obj = ConvertTo-RingJsonText -InputObject ($raw | ConvertFrom-Json -ErrorAction Stop)
     }
     catch {
-        throw ("Plan {0} failed to load: {1}" -f $leaf, (Get-UserErrorText -ErrorRecord $_ -Fallback 'The file cannot be read or is not valid JSON.'))
+        throw ("Plan {0} failed to load: {1}" -f $leaf, (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The file cannot be read or is not valid JSON.'))
     }
     $result = ConvertTo-RingPlan -InputObject $obj
     if (@($result.Errors).Count -gt 0) {
@@ -2357,7 +2380,7 @@ function Test-RingDeploymentExist {
         }
     }
     catch {
-        return @{ Exists = $null; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be read from the site. See the log file.') }
+        return @{ Exists = $null; Error = (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The deployment could not be read from the site. See the log file.') }
     }
     return @{ Exists = (@($found | Where-Object { $null -ne $_ }).Count -gt 0); Error = $null }
 }
@@ -2417,7 +2440,7 @@ function Get-RingLiveSummary {
         }
         catch {
             $s.Found = $null
-            $s.Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployments of the collection could not be read. See the log file.')
+            $s.Error = (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The deployments of the collection could not be read. See the log file.')
             return $s
         }
         $recordedAssignment = [string]$Ring.AssignmentID
@@ -2495,7 +2518,7 @@ function Update-RingRunReconcile {
                 $recoveryNotes[$idx] = ('Recovered the existing deployment {0} into the run.' -f $reference.DeploymentID)
             }
             catch {
-                $recoveryNotes[$idx] = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The existing deployment could not be recovered into the run. See the log file.')
+                $recoveryNotes[$idx] = (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The existing deployment could not be recovered into the run. See the log file.')
             }
             continue
         }
@@ -2740,7 +2763,7 @@ function New-RingAuditRecord {
         DeployPurpose      = [string]$Ring.Purpose
         DeadlineDateTime   = if ($deadline) { $deadline.ToString('yyyy-MM-ddTHH:mm:ss') } else { $null }
         DeploymentID       = $Result.DeploymentID
-        Result             = if ($Result.Success) { 'Success' } else { ('Failed: {0}' -f $Result.Error) }
+        Result             = if ($Result.Success) { 'Success' } else { ('Failed: {0}' -f $(if ($Result.ErrorDetail) { $Result.ErrorDetail } else { $Result.Error })) }
         PlanName           = $PlanName
         RingIndex          = [int]$Ring.Index
         RingName           = [string]$Ring.Name

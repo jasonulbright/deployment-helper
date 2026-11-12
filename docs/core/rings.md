@@ -26,16 +26,16 @@ Select **Ring Deployment** in the sidebar.
 
 ### Pick the object and the plan
 
-1. Open the **Object type** list and select **Application**, **Package**, **Task Sequence** or **Software Update Group**.
+1. Open the **Object Type** list and select **Application**, **Package**, **Task Sequence** or **Software Update Group**.
 
 ![The object type list](../images/rings-type-list.png)
 
 2. Type the object name in **Object**, or select **Browse...**. For a package, select the program.
-3. Open the **Ring plan** list and select a plan. **Reload** reads the plan files again. **Open Folder** opens the `Rings` folder.
+3. Open the **Ring Plan** list and select a plan. **Reload** reads the plan files again. **Open Folder** opens the `Rings` folder.
 
 ![The ring plan list](../images/rings-plan-list.png)
 
-4. Set the **Plan start**. Select **Hold later rings** to create ring 1 now and promote the others later.
+4. Set the **Plan Start**. Select **Hold later rings** to create ring 1 now and promote the others later.
 
 ### Expand and check the plan
 
@@ -99,9 +99,9 @@ Every ring deployment writes one audit record with `PlanName`, `RingIndex`, `Rin
 
 | Control | Effect |
 |---|---|
-| **Object type**, **Object**, **Browse...** | Pick the object. |
-| **Ring plan**, **Reload**, **Open Folder** | Pick, reload and find the plans. |
-| **Plan start**, **Expand** | Compute the dates of each ring. |
+| **Object Type**, **Object**, **Browse...** | Pick the object. |
+| **Ring Plan**, **Reload**, **Open Folder** | Pick, reload and find the plans. |
+| **Plan Start**, **Expand** | Compute the dates of each ring. |
 | **Hold later rings** | Create ring 1 now and promote the others later. |
 | **Set Collection...**, **Validate**, **Create Deployments** | Set the collections, check and create. |
 | **Refresh and Reconcile**, **Show closed runs** | Read the live counts and show finished runs. |

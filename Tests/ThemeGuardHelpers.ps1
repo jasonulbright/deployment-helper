@@ -20,6 +20,8 @@ function Test-BlueBrush {
     param([string]$Value)
     if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
     if ($Value -match 'MahApps\.(Brushes|Colors)\.(Accent\d*|AccentBase|Highlight|Button\.Flat\.Background\.Pressed)\b') { return $true }
+    # The system selection color is a blue in the default Windows theme.
+    if ($Value -match 'SystemColors\.Highlight(Brush)?(Key|Color)?\b') { return $true }
     if ($Value -match '(?i)^\s*(blue|dodgerblue|royalblue|steelblue|navy|mediumblue|darkblue|cornflowerblue)\s*$') { return $true }
     if ($Value -match '^\s*#(?:[0-9A-Fa-f]{2})?([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})\s*$') {
         $r = [Convert]::ToInt32($Matches[1], 16) / 255.0
@@ -107,6 +109,17 @@ function Get-BlueWithoutWhite {
                 }
             }
         }
+        elseif ($el.LocalName -match '\.Background$' -and $el.LocalName -ne 'Setter.Background') {
+            # A nested property element, such as Border.Background with a SolidColorBrush inside. The owner needs a white Foreground.
+            $nested = $el.SelectSingleNode('.//*[@Color]')
+            if ($nested -and (Test-BlueBrush $nested.GetAttribute('Color'))) {
+                $owner = $el.ParentNode
+                $fg = if ($owner.HasAttribute('Foreground')) { $owner.GetAttribute('Foreground') } else { $owner.GetAttribute('TextElement.Foreground') }
+                if (-not (Test-WhiteBrush $fg)) {
+                    [void]$found.Add(('{0}: <{1}> nested Background {2} has no white Foreground' -f $Source, $el.LocalName, $nested.GetAttribute('Color')))
+                }
+            }
+        }
         elseif ($el.HasAttribute('Background') -and $el.LocalName -ne 'Setter') {
             if (Test-BlueBrush $el.GetAttribute('Background')) {
                 if (-not (Test-WhiteBrush $el.GetAttribute('Foreground'))) {
@@ -188,7 +201,7 @@ function Get-RawExceptionToUi {
     param([string]$Path, [string]$ScriptText)
     $ast = if ($ScriptText) { [System.Management.Automation.Language.Parser]::ParseInput($ScriptText, [ref]$null, [ref]$null) } else { [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$null, [ref]$null) }
     $errorName = @('_', 'PSItem', 'Error', 'ex', 'err')
-    $safeCommand = @('Write-Log', 'Write-LogErrorRecord', 'Get-UserErrorText')
+    $safeCommand = @('Write-Log', 'Write-LogErrorRecord', 'Get-UserErrorText', 'Get-ErrorDetailText')
     $found = @()
     foreach ($c in @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CatchClauseAst] }, $true))) {
         $vars = @($c.Body.FindAll({ param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] -and $errorName -contains $n.VariablePath.UserPath }, $true))
@@ -344,5 +357,17 @@ function Get-ButtonWithoutSharedStyle {
             if ($st -and $st.GetAttribute('BasedOn') -match 'MahApps\.Styles\.Button') { $based = $true }
         }
         if (-not $based) { 'Button {0} has no shared style' -f $b.GetAttribute('Name', $script:XamlKeyNamespace) }
+    }
+}
+
+# One text per state trigger that sets the opacity. An opacity below 1 washes the text out, in hover, pressed and disabled states.
+function Get-OpacityInStateTrigger {
+    param([string]$Text)
+    [xml]$x = $Text
+    foreach ($trigger in @($x.SelectNodes("//*[local-name()='Trigger']"))) {
+        if ($trigger.GetAttribute('Property') -notin 'IsMouseOver', 'IsPressed', 'IsEnabled', 'IsKeyboardFocused', 'IsSelected', 'IsHighlighted') { continue }
+        foreach ($s in @($trigger.SelectNodes("*[local-name()='Setter'][@Property='Opacity']"))) {
+            'Trigger {0} sets Opacity {1}' -f $trigger.GetAttribute('Property'), $s.GetAttribute('Value')
+        }
     }
 }

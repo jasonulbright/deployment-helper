@@ -859,7 +859,7 @@ function Show-BrowseLoadingDialog {
         Initialize-BgRunspace
     }
     catch {
-        $loadText = Get-UserErrorText -ErrorRecord $_ -Fallback 'The background load could not start. See the log file.'
+        $loadText = Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The background load could not start. See the log file.'
         Add-LogLine -Message ('Browse load failed: {0}' -f $loadText)
         [void](Show-ThemedMessage -Owner $Owner -Title 'Browse' -Message ('Browse load failed: {0}' -f $loadText) -Buttons OK -Icon Error)
         return $null
@@ -923,7 +923,7 @@ function Show-BrowseLoadingDialog {
             $State.Result = [PSCustomObject]@{ Items = $items; Folders = $folders }
         }
         catch {
-            $State.ErrorMsg = Get-UserErrorText -ErrorRecord $_ -Fallback 'The site read failed. See the log file.'
+            $State.ErrorMsg = Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The site read failed. See the log file.'
         }
         finally {
             $State.Done = $true
@@ -1513,7 +1513,7 @@ $script:InvokePackagesDeploy = {
             DeployPurpose      = $purpose
             DeadlineDateTime   = if ($deadline) { $deadline.ToString('yyyy-MM-ddTHH:mm:ss') } else { $null }
             DeploymentID       = $result.DeploymentID
-            Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $result.Error) }
+            Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $(if ($result.ErrorDetail) { $result.ErrorDetail } else { $result.Error })) }
         }
         $auditResult = Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
 
@@ -1714,7 +1714,7 @@ $script:InvokeSUGDeploy = {
             DeployPurpose      = $purpose
             DeadlineDateTime   = if ($deadline) { $deadline.ToString('yyyy-MM-ddTHH:mm:ss') } else { $null }
             DeploymentID       = $result.DeploymentID
-            Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $result.Error) }
+            Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $(if ($result.ErrorDetail) { $result.ErrorDetail } else { $result.Error })) }
         }
         $auditResult = Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
 
@@ -1911,7 +1911,7 @@ $script:InvokeTaskSequencesDeploy = {
             DeployPurpose      = $purpose
             DeadlineDateTime   = if ($deadline) { $deadline.ToString('yyyy-MM-ddTHH:mm:ss') } else { $null }
             DeploymentID       = $result.DeploymentID
-            Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $result.Error) }
+            Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $(if ($result.ErrorDetail) { $result.ErrorDetail } else { $result.Error })) }
         }
         $auditResult = Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
 
@@ -2020,7 +2020,7 @@ $script:InvokeAppsDeploy = {
             DeployPurpose      = $purpose
             DeadlineDateTime   = if ($deadline) { $deadline.ToString('yyyy-MM-ddTHH:mm:ss') } else { $null }
             DeploymentID       = $result.DeploymentID
-            Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $result.Error) }
+            Result             = if ($result.Success) { 'Success' } else { ('Failed: {0}' -f $(if ($result.ErrorDetail) { $result.ErrorDetail } else { $result.Error })) }
         }
         $auditResult = Write-DeploymentLog -LogPath $script:DeploymentAuditLog -Record $record
 
@@ -3039,7 +3039,7 @@ function New-TemplatesPanel {
             & $refreshList
             & $refreshMainCombo
         } catch {
-            [void](& $showThemed -Owner $ownerWindow -Title 'Delete Failed' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The template could not be deleted. See the log file.') -Buttons OK -Icon Error)
+            [void](& $showThemed -Owner $ownerWindow -Title 'Delete Failed' -Message (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The template could not be deleted. See the log file.') -Buttons OK -Icon Error)
         }
     }.GetNewClosure())
 
@@ -3072,7 +3072,7 @@ function New-TemplatesPanel {
             }
             & $refreshMainCombo
         } catch {
-            [void](& $showThemed -Owner $ownerWindow -Title 'Save Failed' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The template could not be saved. See the log file.') -Buttons OK -Icon Error)
+            [void](& $showThemed -Owner $ownerWindow -Title 'Save Failed' -Message (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The template could not be saved. See the log file.') -Buttons OK -Icon Error)
         }
     }.GetNewClosure())
 
@@ -3249,7 +3249,7 @@ function Show-OptionsDialog {
             $script:OptionsDlgResult = $true
             $dlg.Close()
         } catch {
-            [void](Show-ThemedMessage -Owner $dlg -Title 'Save Failed' -Message ('The options could not be saved: {0}' -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Error)
+            [void](Show-ThemedMessage -Owner $dlg -Title 'Save Failed' -Message ('The options could not be saved: {0}' -f (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'See the log file.')) -Buttons OK -Icon Error)
         }
     })
 
@@ -3496,10 +3496,10 @@ function Get-RingPreviewSubmission {
         $label = Get-RingLabel -Ring $row
         $row.CollectionID = ([string]$row.CollectionID).Trim().ToUpperInvariant()
         try { $row.AvailableDateTime = ConvertFrom-RingDateText $row.AvailableText }
-        catch { $errors.Add(('{0} available: {1}' -f $label, (Get-UserErrorText -ErrorRecord $_ -Fallback 'The date is not valid.'))) }
+        catch { $errors.Add(('{0} available: {1}' -f $label, (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The date is not valid.'))) }
         if ($row.Purpose -eq 'Required') {
             try { $row.DeadlineDateTime = ConvertFrom-RingDateText $row.DeadlineText }
-            catch { $errors.Add(('{0} deadline: {1}' -f $label, (Get-UserErrorText -ErrorRecord $_ -Fallback 'The date is not valid.'))) }
+            catch { $errors.Add(('{0} deadline: {1}' -f $label, (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The date is not valid.'))) }
         }
         else {
             $row.DeadlineDateTime = $null
@@ -3786,7 +3786,7 @@ function Invoke-RingCreateHeld {
     # still leaves a run that Promote can find.
     try { $path = New-RingRunFile -Run $run -Folder $script:RingRunStatePath -FileName $fileName }
     catch {
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring Run Not Started' -Message ("The run file could not be written: {0}`n`nNothing was created." -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Run Not Started' -Message ("The run file could not be written: {0}`n`nNothing was created." -f (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'See the log file.')) -Buttons OK -Icon Error)
         return
     }
     Add-LogLine -Message ('Run file written: {0}' -f $path)
@@ -3799,14 +3799,14 @@ function Invoke-RingCreateHeld {
         [void](Set-RingRunRingStatus -Run $run -RingIndex 1 -Status Creating)
         try { Save-RingRun -Run $run -Path $path }
         catch {
-            [void](Show-ThemedMessage -Owner $window -Title 'Ring Run Not Started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Error)
+            [void](Show-ThemedMessage -Owner $window -Title 'Ring Run Not Started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'See the log file.')) -Buttons OK -Icon Error)
             return
         }
         $res = Invoke-RingOneDeployment -Validated $Validated -Ring $ring1 -Collection $Validated.Collections[1] -RunId $RunId
         if (-not $res.Success) {
             [void](Set-RingRunRingStatus -Run $run -RingIndex 1 -Status Held)
             try { Save-RingRun -Run $run -Path $path }
-            catch { Add-LogLine -Message ("Ring 1 remains Creating until live reconciliation can confirm no deployment exists: {0}" -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) }
+            catch { Add-LogLine -Message ("Ring 1 remains Creating until live reconciliation can confirm no deployment exists: {0}" -f (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'See the log file.')) }
             $row1.Checks = ('Failed: {0}' -f $res.Error)
             [void](Show-ThemedMessage -Owner $window -Title 'Ring 1 Failed' -Message ("{0}`n`nThe run stays open. If the run file could not be updated, refresh Open Runs after the create recovery wait." -f $res.Error) -Buttons OK -Icon Error)
             return
@@ -3815,7 +3815,7 @@ function Invoke-RingCreateHeld {
         [void](Set-RingRunRingStatus -Run $run -RingIndex 1 -Status Created -DeploymentID (Get-RingRecordedId -Result $res) -AssignmentID $res.DeploymentID)
         try { Save-RingRun -Run $run -Path $path }
         catch {
-            [void](Show-ThemedMessage -Owner $window -Title 'Run File Not Updated' -Message ("Ring 1 was created (DeploymentID {0}), but the run file could not be updated: {1}`n`nThe saved run marks ring 1 Creating. Refresh Open Runs to reconcile and adopt the deployment; do not retry it manually." -f $res.DeploymentID, (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Warn)
+            [void](Show-ThemedMessage -Owner $window -Title 'Run File Not Updated' -Message ("Ring 1 was created (DeploymentID {0}), but the run file could not be updated: {1}`n`nThe saved run marks ring 1 Creating. Refresh Open Runs to reconcile and adopt the deployment; do not retry it manually." -f $res.DeploymentID, (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'See the log file.')) -Buttons OK -Icon Warn)
             return
         }
         Set-StatusText -Text 'Ring 1 created; later rings held.'
@@ -3824,7 +3824,7 @@ function Invoke-RingCreateHeld {
         [void](Show-ThemedMessage -Owner $window -Title 'Ring Deployment' -Message $message -Buttons OK -Icon $(if ($res.AuditLogged) { 'Info' } else { 'Warn' }))
     }
     catch {
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring Deployment' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The ring deployment failed. See the log file.') -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Deployment' -Message (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The ring deployment failed. See the log file.') -Buttons OK -Icon Error)
     }
     finally {
         Exit-RingRunLock -LockPath $lock
@@ -3896,7 +3896,7 @@ function Update-RingRunsGrid {
                 }
             }
             catch {
-                $runNote = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The run state could not be saved. See the log file.')
+                $runNote = (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The run state could not be saved. See the log file.')
                 if ($rec) {
                     foreach ($i in $rec.Recovered) {
                         $recoveryNotes[[int]$i] = ("A matching deployment was found, but the recovered run state could not be saved: {0}" -f $runNote)
@@ -3912,7 +3912,7 @@ function Update-RingRunsGrid {
             }
         }
         else {
-            try { $run = Read-RingRun -Path $f.FullName } catch { $runNote = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The run file could not be read. See the log file.') }
+            try { $run = Read-RingRun -Path $f.FullName } catch { $runNote = (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The run file could not be read. See the log file.') }
         }
 
         if (-not $run) {
@@ -3995,7 +3995,7 @@ function Invoke-RingPromote {
     $lock = $null
     try { $lock = Enter-RingRunLock -Path $RunPath }
     catch {
-        [void](Show-ThemedMessage -Owner $window -Title 'Promote Refused' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The run file could not be locked. See the log file.') -Buttons OK -Icon Warn)
+        [void](Show-ThemedMessage -Owner $window -Title 'Promote Refused' -Message (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The run file could not be locked. See the log file.') -Buttons OK -Icon Warn)
         return
     }
 
@@ -4060,21 +4060,21 @@ function Invoke-RingPromote {
         [void](Set-RingRunRingStatus -Run $run -RingIndex $RingIndex -Status Creating)
         try { Save-RingRun -Run $run -Path $RunPath }
         catch {
-            [void](Show-ThemedMessage -Owner $window -Title 'Promote Not Started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Error)
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote Not Started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'See the log file.')) -Buttons OK -Icon Error)
             return
         }
         $res = Invoke-RingOneDeployment -Validated $validated -Ring $ring -Collection $collection -RunId ([string]$run.RunId)
         if (-not $res.Success) {
             [void](Set-RingRunRingStatus -Run $run -RingIndex $RingIndex -Status Held)
             try { Save-RingRun -Run $run -Path $RunPath }
-            catch { Add-LogLine -Message ("Ring {0} remains Creating until live reconciliation can confirm no deployment exists: {1}" -f $RingIndex, (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) }
+            catch { Add-LogLine -Message ("Ring {0} remains Creating until live reconciliation can confirm no deployment exists: {1}" -f $RingIndex, (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'See the log file.')) }
             [void](Show-ThemedMessage -Owner $window -Title 'Promote Failed' -Message ("{0}`n`nIf the run file could not be updated, refresh Open Runs after the create recovery wait." -f $res.Error) -Buttons OK -Icon Error)
             return
         }
         [void](Set-RingRunRingStatus -Run $run -RingIndex $RingIndex -Status Created -DeploymentID (Get-RingRecordedId -Result $res) -AssignmentID $res.DeploymentID)
         try { Save-RingRun -Run $run -Path $RunPath }
         catch {
-            [void](Show-ThemedMessage -Owner $window -Title 'Run File Not Updated' -Message ("Ring {0} was created (DeploymentID {1}), but the run file could not be updated: {2}`n`nThe saved run marks this ring Creating. Refresh Open Runs to reconcile and adopt the deployment; do not retry it manually." -f $RingIndex, $res.DeploymentID, (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Warn)
+            [void](Show-ThemedMessage -Owner $window -Title 'Run File Not Updated' -Message ("Ring {0} was created (DeploymentID {1}), but the run file could not be updated: {2}`n`nThe saved run marks this ring Creating. Refresh Open Runs to reconcile and adopt the deployment; do not retry it manually." -f $RingIndex, $res.DeploymentID, (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'See the log file.')) -Buttons OK -Icon Warn)
             return
         }
         Set-StatusText -Text ('Ring {0} created.' -f $RingIndex)
@@ -4087,7 +4087,7 @@ function Invoke-RingPromote {
         }
     }
     catch {
-        [void](Show-ThemedMessage -Owner $window -Title 'Promote' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The promote failed. See the log file.') -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Promote' -Message (Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The promote failed. See the log file.') -Buttons OK -Icon Error)
     }
     finally {
         $window.Cursor = $null

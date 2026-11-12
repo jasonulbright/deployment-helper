@@ -105,6 +105,6 @@ Section 'light' {
 Section 'persist' { Invoke-El (Get-El $win 'btnRings'); Start-Sleep -Milliseconds 600; Invoke-El (Get-El $win 'Close'); Start-Sleep -Seconds 8; $win = Start-App 'start-deploymenthelper.ps1' 'Deployment Helper'; Shot $win 'start-reopen' }
 Section 'files' {
   New-Item -ItemType Directory "$OutDir\files" -Force | Out-Null
-  Get-ChildItem $appDir -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notlike '*\ui\*' -and $_.FullName -notlike '*\Lib\*' -and $_.FullName -notlike '*\Module\*' -and $_.Extension -in '.json', '.jsonl', '.log', '.csv', '.html', '.txt' } | ForEach-Object { Log ('file: ' + $_.FullName.Substring($appDir.Length) + ' ' + $_.Length); Copy-Item $_.FullName ("$OutDir\files\" + $_.Name) -Force }
+  Get-ChildItem $appDir -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName.Substring($appDir.Length) -notmatch '^\\(ui|Lib|Module)\\' -and $_.Extension -in '.json', '.jsonl', '.log', '.csv', '.html', '.txt' } | ForEach-Object { Log ('file: ' + $_.FullName.Substring($appDir.Length) + ' ' + $_.Length); Copy-Item $_.FullName ("$OutDir\files\" + $_.Name) -Force }
 }
 Stop-App 'start-deploymenthelper.ps1'

@@ -1,4 +1,4 @@
-#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.1.0' }
 
 <#
 .SYNOPSIS
@@ -1193,12 +1193,48 @@ Describe 'Get-UserErrorText' {
         Get-UserErrorText -ErrorRecord $e -Fallback 'Fixed sentence.' | Should -Be 'Fixed sentence.'
     }
 
+    It 'returns the fixed sentence for an engine error, such as a method call on $null' {
+        try { $null.Foo() } catch { $e = $_ }
+        $e.Exception.GetType().FullName | Should -Be 'System.Management.Automation.RuntimeException'
+        $e.CategoryInfo.Category | Should -Not -Be 'OperationStopped'
+        $text = Get-UserErrorText -ErrorRecord $e -Fallback 'Fixed sentence.'
+        $text | Should -Be 'Fixed sentence.'
+        $text | Should -Not -Match 'Foo'
+    }
+
+    It 'returns the fixed sentence for an undefined command and for a failed cast' {
+        try { Invoke-NoSuchCommandForTheTest } catch { $e = $_ }
+        Get-UserErrorText -ErrorRecord $e -Fallback 'Fixed sentence.' | Should -Be 'Fixed sentence.'
+        try { [int]'not a number' } catch { $e = $_ }
+        Get-UserErrorText -ErrorRecord $e -Fallback 'Fixed sentence.' | Should -Be 'Fixed sentence.'
+    }
+
+    It 'writes the raw text to the log only with -LogDetail' {
+        Mock Write-Log -ModuleName DeploymentHelperCommon { }
+        try { $null.Foo() } catch { $e = $_ }
+        [void](Get-UserErrorText -ErrorRecord $e -Fallback 'Fixed sentence.')
+        Should -Invoke Write-Log -ModuleName DeploymentHelperCommon -Times 0 -Exactly
+        [void](Get-UserErrorText -ErrorRecord $e -LogDetail -Fallback 'Fixed sentence.')
+        Should -Invoke Write-Log -ModuleName DeploymentHelperCommon -Times 1 -Exactly
+    }
+
     It 'is exported by the module' {
         (Get-Command Get-UserErrorText).Source | Should -Be 'DeploymentHelperCommon'
+        (Get-Command Get-ErrorDetailText).Source | Should -Be 'DeploymentHelperCommon'
     }
 }
 
 Describe 'Result errors keep raw exception text out of the window' {
+    It 'Invoke-ApplicationDeployment keeps the reason in ErrorDetail for the audit record, and the fixed sentence in Error' {
+        Mock New-CMApplicationDeployment -ModuleName DeploymentHelperCommon { throw [System.TimeoutException]::new('raw provider detail') }
+        $app = [PSCustomObject]@{ LocalizedDisplayName = '7-Zip'; SoftwareVersion = '24.09' }
+        $col = [PSCustomObject]@{ Name = 'Pilot'; CollectionID = 'MCM00010'; MemberCount = 5 }
+        $r = Invoke-ApplicationDeployment -Application $app -Collection $col -DeployPurpose 'Available' -AvailableDateTime (Get-Date)
+        $r.Success | Should -BeFalse
+        $r.Error | Should -Be 'The deployment could not be created. See the log file.'
+        $r.ErrorDetail | Should -Match 'raw provider detail'
+    }
+
     It 'Test-DuplicateDeployment returns the fixed sentence for a .NET exception' {
         Mock Get-CMApplicationDeployment -ModuleName DeploymentHelperCommon { throw [System.TimeoutException]::new('raw provider detail') }
         $r = Test-DuplicateDeployment -ApplicationName 'App1' -CollectionName 'Col1'
