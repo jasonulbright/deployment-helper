@@ -26,11 +26,11 @@ C:\projects\app-packager-suite\sync-suitecommon.ps1 -Consumer C:\projects\deploy
 
 ## 4. Commit, tag, and package
 
-Commit to `main`. Every commit to `main` is part of a release: the suite installer build refuses a component whose `main` is ahead of its latest tag. Tag the commit `v<ver>` with an annotated tag. Build the zip from the tag. The zip excludes the tests and this file.
+Commit to `main`. Every commit to `main` is part of a release: the suite installer build refuses a component whose `main` is ahead of its latest tag. Tag the commit `v<ver>` with an annotated tag. Build the zip from the tag. The zip excludes the tests, this file, `Invoke-Checks.ps1` and `.github`.
 
 ```bash
 git tag -a v<ver> -m v<ver>
-git archive --format=zip -o DeploymentHelper-<ver>.zip v<ver> -- . ':(exclude)Tests' ':(exclude)*.Tests.ps1' ':(exclude)RELEASING.md'
+git archive --format=zip -o DeploymentHelper-<ver>.zip v<ver> -- . ':(exclude)Tests' ':(exclude)*.Tests.ps1' ':(exclude)RELEASING.md' ':(exclude)Invoke-Checks.ps1' ':(exclude).github'
 sha256sum DeploymentHelper-<ver>.zip | sed 's/ \*/  /' > checksums.txt
 ```
 
