@@ -30,6 +30,17 @@ $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $failed = $false
 
+# Every path filter works on the path relative to the repository root. A worktree lives under .claude,
+# so a filter on the full path would match files of other worktrees or of the wrong folder.
+function Get-RepoRelativePath {
+    param([Parameter(Mandatory)][string]$FullName)
+    return $FullName.Substring($root.Length).TrimStart([char]92, [char]47)
+}
+function Test-RepoFile {
+    param([Parameter(Mandatory)][string]$FullName)
+    return ((Get-RepoRelativePath $FullName) -notmatch '^(\.claude|\.git)([\\/]|$)')
+}
+
 # Pester 5 only: the tests use the 5.x configuration and syntax, and Pester 6 changes them.
 Import-Module Pester -MinimumVersion 5.0 -MaximumVersion 5.99.99 -ErrorAction Stop
 
@@ -41,7 +52,7 @@ if (-not $SkipLint) {
         Get-ChildItem -LiteralPath $root -Filter 'start-*.ps1' -File
         Get-ChildItem -LiteralPath (Join-Path $root 'Tests') -Filter '*.ps1' -File -Recurse
         Get-Item -LiteralPath (Join-Path $root 'Invoke-Checks.ps1')
-    )
+    ) | Where-Object { Test-RepoFile $_.FullName }
     $settings = Join-Path $root 'Tests\PSScriptAnalyzerSettings.psd1'
     # Test files pass state to mock bodies through a global variable, and they define stub commands in the global scope. Both are intended.
     # Pester sets variables in BeforeAll that the It blocks read. The unused-variable rule reports them.
@@ -51,8 +62,8 @@ if (-not $SkipLint) {
     # The exclusions apply to the start script only. A module function that needs the rule carries its own SuppressMessageAttribute.
     $appExclude = 'PSAvoidGlobalVars', 'PSUseShouldProcessForStateChangingFunctions'
     $findings = @(foreach ($t in $targets) {
-        if ($t.FullName -like '*\Tests\*' -or $t.Name -like '*.Tests.ps1') { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings -ExcludeRule $testOnlyExclude }
-        elseif ($t.Name -like 'start-*.ps1') { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings -ExcludeRule $appExclude }
+        if ((Get-RepoRelativePath $t.FullName) -like 'Tests\*' -or $t.Name -like '*.Tests.ps1') { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings -ExcludeRule $testOnlyExclude }
+        elseif ((Get-RepoRelativePath $t.FullName) -notlike '*\*' -and $t.Name -like 'start-*.ps1') { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings -ExcludeRule $appExclude }
         else { Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings }
     })
     $blocking = @($findings | Where-Object { $_.Severity -in 'Error', 'Warning' })
@@ -64,7 +75,7 @@ if (-not $SkipLint) {
 # ---- 2. Tests and coverage -------------------------------------------------
 $cfg = New-PesterConfiguration
 # Only Tests is searched, so a vendored folder cannot add a test.
-$testFiles = @(Get-ChildItem -LiteralPath (Join-Path $root 'Tests') -Recurse -Filter '*.Tests.ps1' -File)
+$testFiles = @(Get-ChildItem -LiteralPath (Join-Path $root 'Tests') -Recurse -Filter '*.Tests.ps1' -File | Where-Object { Test-RepoFile $_.FullName })
 if ($testFiles.Count -eq 0) { Write-Host 'No test file found.'; exit 1 }
 $cfg.Run.Path = $testFiles.FullName
 $cfg.Run.PassThru = $true

@@ -1,3 +1,5 @@
+#Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.1.0' }
+
 param ()
 
 BeforeAll {

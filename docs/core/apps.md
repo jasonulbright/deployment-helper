@@ -19,16 +19,20 @@ Use it to deploy an application with checks and a log. The other types use the s
 
 ### Fill the form
 
-1. Type the application name in **Application**, or select **Browse...**. The dialog `Browse applications` loads the full list in the background. A filter box narrows the list as you type.
+1. Type the application name in **Application**, or select **Browse...**. The dialog `Browse Applications` loads the full list in the background. A filter box narrows the list as you type.
 
-![The Browse applications dialog](../images/dialog-browse-application.png)
+![The Browse Applications dialog](../images/dialog-browse-application.png)
 
-2. Type the collection name in **Collection**, or select **Browse...**. The dialog `Pick device collection` shows the collections in their console folders. A folder is not selectable.
+In the light theme a selected row has white text on the blue background.
 
-![The Pick device collection dialog](../images/dialog-browse-collection.png)
+![The Browse Applications dialog in the light theme with a selected row](../images/light-dialog-browse-application.png)
+
+2. Type the collection name in **Collection**, or select **Browse...**. The dialog `Pick Device Collection` shows the collections in their console folders. A folder is not selectable.
+
+![The Pick Device Collection dialog](../images/dialog-browse-collection.png)
 
 3. Select the purpose, **Available** or **Required**. **Required** shows the **Deadline** field.
-4. Set **Available** and **Deadline**, the **Notification** and the **Time basis**, **Local time** or **UTC**.
+4. Set **Available** and **Deadline**, the **Notification** and the **Time Basis**, **Local time** or **UTC**.
 
 ![The empty Apps form](../images/apps-empty.png)
 
@@ -38,7 +42,7 @@ Use it to deploy an application with checks and a log. The other types use the s
 
 ### Apply a template
 
-1. Open the **Apply template** list at the top right.
+1. Open the **Apply Template** list at the top right.
 
 ![The template list](../images/apps-template-list.png)
 
@@ -62,18 +66,18 @@ A check mark means pass and a cross means fail. The status bar shows `Validation
 
 ![A validation where all checks pass](../images/apps-validated-pass.png)
 
-### Distribute content
+### Distribute Content
 
-If the content check fails, select **Select DP groups...** and check the groups. Groups that already have the content are checked. Then select **Distribute content**. A checked group can still be distributing the content, and a check mark does not confirm that the distribution is complete. Wait until the distribution is complete, then select **Validate** again. This guide did not distribute content.
+If the content check fails, select **Select DP Groups...** and check the groups. Groups that already have the content are checked. Then select **Distribute Content**. A checked group can still be distributing the content, and a check mark does not confirm that the distribution is complete. Wait until the distribution is complete, then select **Validate** again. This guide did not distribute content.
 
-![The Select DP groups dialog](../images/dialog-dp-groups.png)
+![The Select DP Groups dialog](../images/dialog-dp-groups.png)
 
 ### Create the deployment
 
-1. Select **Deploy**. The tool checks the schedule. A deadline before the available time stops the step with the message `Deployment blocked`. A backdated available time asks `Check deployment schedule` with **Yes** and **No**.
-2. The dialog `Confirm deployment` shows the object, the collection with its member count and the purpose. Select **OK** to create the deployment or **Cancel**.
+1. Select **Deploy**. The tool checks the schedule. A deadline before the available time stops the step with the message `Deployment Blocked`. A backdated available time asks `Check Deployment Schedule` with **Yes** and **No**.
+2. The dialog `Confirm Deployment` shows the object, the collection with its member count and the purpose. Select **OK** to create the deployment or **Cancel**.
 
-![The Confirm deployment dialog](../images/dialog-confirm-deployment.png)
+![The Confirm Deployment dialog](../images/dialog-confirm-deployment.png)
 
 3. After **OK**, the tool checks that the audit log can be opened for writing, creates the deployment and then writes the audit record. The tool blocks the deployment before it creates it when the duplicate check cannot run or the audit log check fails. If the audit record cannot be written after the site created the deployment, the tool reports the deployment ID. The deployment stays. The tool does not undo it.
 
@@ -83,13 +87,13 @@ This guide opened the dialog and selected **Cancel**. It did not create a deploy
 
 | Control | Effect |
 |---|---|
-| **Apply template** | Fills the form from a template. |
+| **Apply Template** | Fills the form from a template. |
 | **Browse...** | Opens a list of the objects or collections of the site. |
 | **Available**, **Required** | Set the purpose. |
 | **Available**, **Deadline** | Set the dates. |
 | **Notification** | The user experience of the deployment. |
 | **Local time**, **UTC** | The time basis of the dates. |
-| **Select DP groups...**, **Distribute content** | Choose distribution point groups and distribute the content. |
+| **Select DP Groups...**, **Distribute Content** | Choose distribution point groups and distribute the content. |
 | **Override maintenance window**, **Allow restart outside maintenance window**, **Allow download on metered network** | Options of a Required deployment. |
 | **Validate** | Runs the five checks. |
 | **Deploy** | Confirms and creates the deployment. It shows after all checks pass. |
@@ -106,8 +110,8 @@ This guide opened the dialog and selected **Cancel**. It did not create a deploy
 |---|---|---|
 | The **Deploy** button is missing. | Not all checks passed, or no validation ran. | Select **Validate** and fix the failing checks. |
 | The log shows `Run Validate first.` | **Deploy** ran without a validation. | Select **Validate**. |
-| The log shows `Content not fully distributed: 0/0 DP(s) succeeded.` | The content is on no distribution point. | Select the DP groups and **Distribute content**. |
-| `Deployment blocked` | The schedule or the notification is not valid. | Read the text of the dialog and change the form. |
+| The log shows `Content not fully distributed: 0/0 DP(s) succeeded.` | The content is on no distribution point. | Select the DP groups and **Distribute Content**. |
+| `Deployment Blocked` | The schedule or the notification is not valid. | Read the text of the dialog and change the form. |
 
 ## Links
 

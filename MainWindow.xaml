@@ -20,111 +20,151 @@
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- Sidebar button template: shade-lift on Pressed instead of the MahApps
-                 Square default (which inverts colors via VSM and renders white text
-                 invisible on the dark-theme sidebar). Foreground stays White;
-                 #3A3A3A reads correctly under either theme during the brief press.
-                 See reference_srl_wpf_brand.md S11. -->
-            <ControlTemplate x:Key="SidebarButtonTemplate" TargetType="Button">
+            <!-- One template and one set of button styles for the window and for every dialog. The dialogs
+                 take the styles from this file (Get-SharedStyleXaml in the start script), so each style exists
+                 once. The colors come from SuiteCommon (Set-ButtonTheme) and from MahApps resources, never from
+                 a literal here. Hover shows the theme foreground as border color. Pressed swaps the theme foreground
+                 and the theme background. No state changes the opacity, because an opacity below 1 washes the text out.
+                 A disabled button shows MahApps.Brushes.Gray.MouseOver text and a Gray2 border (4.5:1 or more in both themes). -->
+            <ControlTemplate x:Key="ThemedButtonTemplate" TargetType="Button">
                 <Border x:Name="Bd"
                         Background="{TemplateBinding Background}"
                         BorderBrush="{TemplateBinding BorderBrush}"
                         BorderThickness="{TemplateBinding BorderThickness}"
                         SnapsToDevicePixels="True">
-                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                    <ContentPresenter Name="Cp"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                       VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                       Margin="{TemplateBinding Padding}"
                                       RecognizesAccessKey="True"
                                       SnapsToDevicePixels="True"/>
                 </Border>
                 <ControlTemplate.Triggers>
-                    <Trigger Property="IsPressed" Value="True">
-                        <Setter TargetName="Bd" Property="Background">
-                            <Setter.Value>
-                                <SolidColorBrush Color="#3A3A3A"/>
-                            </Setter.Value>
-                        </Setter>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
                     </Trigger>
-                    <Trigger Property="IsEnabled" Value="False">
-                        <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+                    <Trigger Property="IsKeyboardFocused" Value="True">
+                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
+                    </Trigger>
+                    <Trigger Property="IsPressed" Value="True">
+                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
+                        <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource MahApps.Brushes.ThemeBackground}"/>
                     </Trigger>
                 </ControlTemplate.Triggers>
             </ControlTemplate>
 
-            <Style x:Key="WorkflowButtonStyle" TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button.Square}">
-                <Setter Property="Template" Value="{StaticResource SidebarButtonTemplate}"/>
-                <Setter Property="Height" Value="42"/>
-                <Setter Property="Margin" Value="8,3,8,3"/>
-                <Setter Property="Padding" Value="12,0,12,0"/>
-                <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                <Setter Property="FontSize" Value="13"/>
-                <Setter Property="FontWeight" Value="Bold"/>
-                <Setter Property="Controls:ControlsHelper.ContentCharacterCasing" Value="Normal"/>
-                <Setter Property="Foreground" Value="White"/>
-                <Setter Property="Background">
-                    <Setter.Value>
-                        <SolidColorBrush Color="#1E1E1E"/>
-                    </Setter.Value>
-                </Setter>
-                <Setter Property="BorderBrush">
-                    <Setter.Value>
-                        <SolidColorBrush Color="#555555"/>
-                    </Setter.Value>
-                </Setter>
+            <Style x:Key="ThemedButtonStyle" TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button.Square}">
+                <Setter Property="Template" Value="{StaticResource ThemedButtonTemplate}"/>
+                <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
                 <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Controls:ControlsHelper.ContentCharacterCasing" Value="Normal"/>
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.Gray.MouseOver}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Gray2}"/>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
-            <Style x:Key="OptionsButtonStyle" TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button.Square}">
-                <Setter Property="Template" Value="{StaticResource SidebarButtonTemplate}"/>
+            <Style x:Key="WorkflowButtonStyle" TargetType="Button" BasedOn="{StaticResource ThemedButtonStyle}">
                 <Setter Property="Height" Value="42"/>
                 <Setter Property="Margin" Value="8,3,8,3"/>
                 <Setter Property="Padding" Value="12,0,12,0"/>
                 <Setter Property="HorizontalContentAlignment" Value="Left"/>
                 <Setter Property="FontSize" Value="13"/>
                 <Setter Property="FontWeight" Value="Bold"/>
-                <Setter Property="Controls:ControlsHelper.ContentCharacterCasing" Value="Normal"/>
-                <Setter Property="Foreground" Value="White"/>
-                <Setter Property="Background">
-                    <Setter.Value>
-                        <SolidColorBrush Color="#1E1E1E"/>
-                    </Setter.Value>
-                </Setter>
-                <Setter Property="BorderBrush">
-                    <Setter.Value>
-                        <SolidColorBrush Color="#555555"/>
-                    </Setter.Value>
-                </Setter>
-                <Setter Property="BorderThickness" Value="1"/>
+            </Style>
+
+            <Style x:Key="OptionsButtonStyle" TargetType="Button" BasedOn="{StaticResource WorkflowButtonStyle}"/>
+
+            <!-- The primary button: the accent blue with white text. Deploy, Create Deployments, Promote, OK and Save Template use it. -->
+            <Style x:Key="DialogAccentButton" TargetType="Button" BasedOn="{StaticResource ThemedButtonStyle}">
+                <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent}"/>
+                <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.IdealForeground}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
+                <Setter Property="MinWidth" Value="90"/><Setter Property="Height" Value="32"/>
+                <Setter Property="Margin" Value="0,0,8,0"/>
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Gray10}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.Gray.MouseOver}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Gray2}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- The one secondary style, for Cancel, Browse and every other button that is not primary: a gray fill,
+                 the theme text color and a visible border. It has the size of the primary style. -->
+            <Style x:Key="DialogButton" TargetType="Button" BasedOn="{StaticResource ThemedButtonStyle}">
+                <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Gray10}"/>
+                <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
+                <Setter Property="MinWidth" Value="90"/><Setter Property="Height" Value="32"/>
+                <Setter Property="Margin" Value="0,0,8,0"/>
+            </Style>
+
+            <!-- The secondary style at the height of a form row (28). Same colors, same template. -->
+            <Style x:Key="InlineButtonStyle" TargetType="Button" BasedOn="{StaticResource DialogButton}">
+                <Setter Property="Height" Value="28"/>
+                <Setter Property="FontSize" Value="12"/>
+            </Style>
+
+            <!-- Selected and highlighted items: white text on the accent blue, in both themes. -->
+            <Style TargetType="ComboBoxItem" BasedOn="{StaticResource MahApps.Styles.ComboBoxItem}">
+                <Style.Triggers>
+                    <Trigger Property="IsHighlighted" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.IdealForeground}"/>
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.IdealForeground}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style TargetType="ListBoxItem" BasedOn="{StaticResource MahApps.Styles.ListBoxItem}">
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.IdealForeground}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="GridRowStyle" TargetType="DataGridRow" BasedOn="{StaticResource MahApps.Styles.DataGridRow}">
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.IdealForeground}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="GridCellStyle" TargetType="DataGridCell" BasedOn="{StaticResource MahApps.Styles.DataGridCell}">
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.IdealForeground}"/>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
             <!-- Section header: Gray1 is the only theme-adaptive MahApps greyscale
-                 brush. Gray2 is static #7F7F7F and fails WCAG AA. See
-                 reference_srl_wpf_brand.md. -->
+                 brush. Gray2 is static #7F7F7F and fails WCAG AA. Titles are bold in both themes. -->
             <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="10"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="FontWeight" Value="Bold"/>
                 <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.Gray1}"/>
                 <Setter Property="Margin" Value="12,16,0,6"/>
             </Style>
 
             <Style x:Key="FormLabelStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="12"/>
+                <Setter Property="FontWeight" Value="Bold"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
                 <Setter Property="Margin" Value="0,0,12,0"/>
             </Style>
 
-            <Style x:Key="BrowseButtonStyle" TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button.Square}">
-                <Setter Property="MinWidth" Value="80"/>
-                <Setter Property="Height" Value="28"/>
-                <Setter Property="Margin" Value="8,0,0,0"/>
-                <Setter Property="Controls:ControlsHelper.ContentCharacterCasing" Value="Normal"/>
-                <Setter Property="FontSize" Value="12"/>
-            </Style>
-
-            <!-- Validation glyph: color stays at ThemeForeground per brand rule
-                 (feedback_no_red_green_in_brand.md). State is carried by the
-                 glyph shape alone (checkmark / ballot-x / horizontal-ellipsis),
-                 never by Foreground. -->
+            <!-- Validation glyph: the color stays at ThemeForeground. State is carried by the
+                 glyph shape alone (checkmark, ballot x, horizontal ellipsis), never by Foreground. -->
             <Style x:Key="CheckGlyphStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="13"/>
                 <Setter Property="Width" Value="20"/>
@@ -167,7 +207,7 @@
                                                OnContent="" OffContent=""
                                                Margin="0,0,0,0"
                                                MinWidth="0"
-                                               ToolTip="Toggle dark / light theme"/>
+                                               ToolTip="Switch between the dark theme and the light theme."/>
                     </DockPanel>
                 </StackPanel>
 
@@ -175,19 +215,19 @@
                     <StackPanel>
 
                         <Button x:Name="btnApps"            Content="Apps"                   Style="{StaticResource WorkflowButtonStyle}"
-                                ToolTip="Deploy an application to a device collection"/>
+                                ToolTip="Deploy an application to a device collection."/>
                         <Button x:Name="btnPackages"        Content="Packages"               Style="{StaticResource WorkflowButtonStyle}"
-                                ToolTip="Deploy a classic package and program to a device collection"/>
+                                ToolTip="Deploy a package and program to a device collection."/>
                         <Button x:Name="btnTaskSequences"   Content="Task Sequences"         Style="{StaticResource WorkflowButtonStyle}"
-                                ToolTip="Deploy a task sequence to a device collection"/>
+                                ToolTip="Deploy a task sequence to a device collection."/>
                         <Button x:Name="btnSUG"             Content="Software Update Groups" Style="{StaticResource WorkflowButtonStyle}"
-                                ToolTip="Deploy a software update group to a device collection"/>
+                                ToolTip="Deploy a software update group to a device collection."/>
                         <Button x:Name="btnRings"           Content="Ring Deployment"        Style="{StaticResource WorkflowButtonStyle}"
-                                ToolTip="Deploy one object to several collections in rings from a ring plan"/>
+                                ToolTip="Deploy one object to several device collections in rings."/>
 
                         <Button x:Name="btnOptions"         Content="Options"                Style="{StaticResource OptionsButtonStyle}"
                                 Margin="8,16,8,3"
-                                ToolTip="Connection, Logging, History, Templates, About"/>
+                                ToolTip="Set the connection, the logs, the history and the templates."/>
 
                     </StackPanel>
                 </ScrollViewer>
@@ -212,11 +252,11 @@
             <!-- Module header + Apply Template -->
             <DockPanel Grid.Row="0" Margin="16,14,16,6" LastChildFill="True">
                 <StackPanel x:Name="pnlApplyTemplate" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                    <TextBlock Text="Apply template:" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="Apply Template:" Style="{StaticResource FormLabelStyle}" Margin="0,0,8,0"/>
                     <ComboBox x:Name="cboApplyTemplate" Width="220" Height="28" FontSize="12" VerticalContentAlignment="Center"/>
                 </StackPanel>
                 <StackPanel>
-                    <TextBlock x:Name="txtModuleHeader" Text="Apps Deployment" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="txtModuleHeader" Text="Apps Deployment" FontSize="18" FontWeight="Bold"/>
                     <TextBlock x:Name="txtModuleSubheader"
                                Text="Select an application and a device collection, then configure the deployment."
                                FontSize="12"
@@ -261,8 +301,8 @@
                         <TextBlock x:Name="lblTargetName" Grid.Row="0" Grid.Column="0" Text="Application:" Style="{StaticResource FormLabelStyle}" Margin="0,8,12,8"/>
                         <TextBox x:Name="txtTargetName" Grid.Row="0" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,8,0,8"
                                  Controls:TextBoxHelper.Watermark="e.g. 7-Zip 26.00"/>
-                        <Button x:Name="btnBrowseTarget" Grid.Row="0" Grid.Column="2" Content="Browse..." Style="{StaticResource BrowseButtonStyle}" Margin="8,8,0,8"
-                                ToolTip="Pick an application, package, task sequence, or SUG from Configuration Manager"/>
+                        <Button x:Name="btnBrowseTarget" Grid.Row="0" Grid.Column="2" Content="Browse..." Style="{StaticResource InlineButtonStyle}" Margin="8,8,0,8"
+                                ToolTip="Pick the object from the site."/>
 
                         <!-- Program (Packages type only) -->
                         <TextBlock x:Name="lblProgram" Grid.Row="1" Grid.Column="0" Text="Program:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
@@ -274,8 +314,8 @@
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Collection:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <TextBox x:Name="txtCollection" Grid.Row="2" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"
                                  Controls:TextBoxHelper.Watermark="Device collection name (e.g. Workstations - Pilot)"/>
-                        <Button x:Name="btnBrowseCollection" Grid.Row="2" Grid.Column="2" Content="Browse..." Style="{StaticResource BrowseButtonStyle}" Margin="8,0,0,8"
-                                ToolTip="Pick a device collection from Configuration Manager"/>
+                        <Button x:Name="btnBrowseCollection" Grid.Row="2" Grid.Column="2" Content="Browse..." Style="{StaticResource InlineButtonStyle}" Margin="8,0,0,8"
+                                ToolTip="Pick a device collection from the site."/>
 
                         <!-- Purpose -->
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Purpose:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
@@ -304,23 +344,21 @@
                         </ComboBox>
 
                         <!-- Time basis -->
-                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Time basis:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Time Basis:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <StackPanel Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
                             <RadioButton x:Name="radLocalTime" Content="Local time" GroupName="TimeBasis" IsChecked="True" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0"/>
                             <RadioButton x:Name="radUtc"       Content="UTC"        GroupName="TimeBasis" FontSize="12" VerticalAlignment="Center"/>
                         </StackPanel>
 
                         <!-- Distribute content (Apps/Packages/TS only; SUG distributes via SUDP separately) -->
-                        <TextBlock x:Name="lblDistribute" Grid.Row="8" Grid.Column="0" Text="Distribute to:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
+                        <TextBlock x:Name="lblDistribute" Grid.Row="8" Grid.Column="0" Text="Distribute To:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <StackPanel x:Name="pnlDistribute" Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed">
-                            <Button x:Name="btnDPPicker" Content="Select DP groups..." MinWidth="220" Height="28" HorizontalContentAlignment="Left" Padding="10,0,10,0"
-                                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                    ToolTip="Pick distribution point groups for content distribution"/>
-                            <Button x:Name="btnDistributeContent" Content="Distribute content" MinWidth="140" Height="28" Margin="8,0,0,0"
-                                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                    ToolTip="Send content to the selected DP groups now"/>
+                            <Button x:Name="btnDPPicker" Content="Select DP Groups..." MinWidth="220" HorizontalContentAlignment="Left" Padding="10,0,10,0"
+                                    Style="{StaticResource InlineButtonStyle}"
+                                    ToolTip="Pick the distribution point groups for the content."/>
+                            <Button x:Name="btnDistributeContent" Content="Distribute Content" MinWidth="140" Margin="8,0,0,0"
+                                    Style="{StaticResource InlineButtonStyle}"
+                                    ToolTip="Distribute the content to the selected distribution point groups."/>
                         </StackPanel>
 
                         <!-- Required-only: override service window + reboot outside -->
@@ -337,18 +375,18 @@
                             <CheckBox x:Name="chkPkgMetered"      Content="Allow download on metered network"       FontSize="12" Margin="0,0,0,0"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="lblPkgFastNetwork" Grid.Row="10" Grid.Column="0" Text="Fast network:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
+                        <TextBlock x:Name="lblPkgFastNetwork" Grid.Row="10" Grid.Column="0" Text="Fast Network:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <ComboBox  x:Name="cboPkgFastNetwork" Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
                             <ComboBoxItem Tag="DownloadContentFromDistributionPointAndRunLocally" Content="Download content from DP and run locally" IsSelected="True"/>
                             <ComboBoxItem Tag="RunProgramFromDistributionPoint"                    Content="Run program from DP"/>
                         </ComboBox>
-                        <TextBlock x:Name="lblPkgSlowNetwork" Grid.Row="11" Grid.Column="0" Text="Slow network:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
+                        <TextBlock x:Name="lblPkgSlowNetwork" Grid.Row="11" Grid.Column="0" Text="Slow Network:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <ComboBox  x:Name="cboPkgSlowNetwork" Grid.Row="11" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
                             <ComboBoxItem Tag="DoNotRunProgram"                                 Content="Do not run program" IsSelected="True"/>
                             <ComboBoxItem Tag="DownloadContentFromDistributionPointAndLocally"  Content="Download content from DP and run locally"/>
                             <ComboBoxItem Tag="RunProgramFromDistributionPoint"                 Content="Run program from DP"/>
                         </ComboBox>
-                        <TextBlock x:Name="lblPkgRerun" Grid.Row="12" Grid.Column="0" Text="Rerun behavior:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
+                        <TextBlock x:Name="lblPkgRerun" Grid.Row="12" Grid.Column="0" Text="Rerun Behavior:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <ComboBox  x:Name="cboPkgRerun" Grid.Row="12" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
                             <ComboBoxItem Tag="NeverRerunDeployedProgram"         Content="Never rerun deployed program" IsSelected="True"/>
                             <ComboBoxItem Tag="AlwaysRerunProgram"                Content="Always rerun program"/>
@@ -376,7 +414,7 @@
                     </Grid>
 
                     <!-- Validation panel -->
-                    <TextBlock Text="VALIDATION" Style="{StaticResource SectionHeaderStyle}" Margin="0,16,0,6"/>
+                    <TextBlock Text="Validation" Style="{StaticResource SectionHeaderStyle}" Margin="0,16,0,6"/>
                     <Border BorderBrush="{DynamicResource MahApps.Brushes.Gray8}" BorderThickness="0,1,0,1" Padding="8,10,8,10">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
@@ -407,14 +445,12 @@
 
                 <!-- Action buttons (fixed at bottom, outside scrollviewer) -->
                 <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,4">
-                    <Button x:Name="btnValidate" Content="Validate" MinWidth="110" Height="32" Margin="0,0,8,0"
-                            Style="{DynamicResource MahApps.Styles.Button.Square}"
-                            Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                            ToolTip="Check all fields against Configuration Manager and confirm the deployment is ready"/>
-                    <Button x:Name="btnDeploy"   Content="Deploy"   MinWidth="110" Height="32" Visibility="Collapsed"
-                            Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
-                            Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                            ToolTip="Create the deployment in Configuration Manager"/>
+                    <Button x:Name="btnValidate" Content="Validate" MinWidth="110" Margin="0,0,8,0"
+                            Style="{StaticResource DialogButton}"
+                            ToolTip="Run the five checks for the deployment."/>
+                    <Button x:Name="btnDeploy"   Content="Deploy"   MinWidth="110" Visibility="Collapsed"
+                            Style="{StaticResource DialogAccentButton}"
+                            ToolTip="Create the deployment on the site."/>
                 </StackPanel>
             </Grid>
 
@@ -437,7 +473,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Object type:" Style="{StaticResource FormLabelStyle}" Margin="0,8,12,8"/>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Object Type:" Style="{StaticResource FormLabelStyle}" Margin="0,8,12,8"/>
                         <ComboBox x:Name="cboRingType" Grid.Row="0" Grid.Column="1" Width="280" HorizontalAlignment="Left"
                                   FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,8,0,8">
                             <ComboBoxItem Content="Application" Tag="Application" IsSelected="True"/>
@@ -449,29 +485,28 @@
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Object:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <TextBox x:Name="txtRingObject" Grid.Row="1" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"
                                  Controls:TextBoxHelper.Watermark="Name of the application, package, task sequence, or update group"/>
-                        <Button x:Name="btnRingBrowseObject" Grid.Row="1" Grid.Column="2" Content="Browse..." Style="{StaticResource BrowseButtonStyle}" Margin="8,0,0,8"
-                                ToolTip="Pick the object from Configuration Manager"/>
+                        <Button x:Name="btnRingBrowseObject" Grid.Row="1" Grid.Column="2" Content="Browse..." Style="{StaticResource InlineButtonStyle}" Margin="8,0,0,8"
+                                ToolTip="Pick the object from the site."/>
 
                         <TextBlock x:Name="lblRingProgram" Grid.Row="2" Grid.Column="0" Text="Program:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <ComboBox x:Name="cboRingProgram" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="28"
                                   VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed"/>
 
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Ring plan:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Ring Plan:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <ComboBox x:Name="cboRingPlan" Grid.Row="3" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"/>
                         <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,8">
-                            <Button x:Name="btnRingReloadPlans" Content="Reload" Style="{StaticResource BrowseButtonStyle}" Margin="0"
-                                    ToolTip="Read the plan files again"/>
-                            <Button x:Name="btnRingOpenFolder" Content="Open folder" Style="{StaticResource BrowseButtonStyle}"
-                                    ToolTip="Open the Rings folder that holds the plan files"/>
+                            <Button x:Name="btnRingReloadPlans" Content="Reload" Style="{StaticResource InlineButtonStyle}" Margin="0,0,8,0"
+                                    ToolTip="Read the ring plan files again."/>
+                            <Button x:Name="btnRingOpenFolder" Content="Open Folder" Style="{StaticResource InlineButtonStyle}" Margin="0"
+                                    ToolTip="Open the folder that holds the ring plan files."/>
                         </StackPanel>
 
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Plan start:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Plan Start:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
                             <Controls:DateTimePicker x:Name="dtpRingStart" Width="240" FontSize="12" Height="28"/>
-                            <Button x:Name="btnRingExpand" Content="Expand" MinWidth="90" Height="28" Margin="8,0,0,0"
-                                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                    ToolTip="Compute every ring's dates from the plan start. Discards edits in the preview."/>
+                            <Button x:Name="btnRingExpand" Content="Expand" MinWidth="90" Margin="8,0,0,0"
+                                    Style="{StaticResource InlineButtonStyle}"
+                                    ToolTip="Calculate the dates of every ring from the plan start."/>
                             <CheckBox x:Name="chkRingHold" Content="Hold later rings (create ring 1 now, promote the rest)" FontSize="12"
                                       VerticalAlignment="Center" Margin="16,0,0,0"/>
                         </StackPanel>
@@ -482,23 +517,22 @@
                     </Grid>
 
                     <DockPanel Margin="0,10,0,6" LastChildFill="False">
-                        <TextBlock DockPanel.Dock="Left" Text="EXPANSION PREVIEW (EDITS APPLY TO THIS RUN ONLY)" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"/>
+                        <TextBlock DockPanel.Dock="Left" Text="Expansion Preview" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"
+                                   ToolTip="Edits in the preview apply to this run only."/>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <Button x:Name="btnRingPickCollection" Content="Set collection..." MinWidth="120" Height="32" Margin="0,0,8,0"
-                                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                    ToolTip="Pick the device collection for the selected ring (this run only). Shift+click reloads the list."/>
-                            <Button x:Name="btnRingValidate" Content="Validate" MinWidth="110" Height="32" Margin="0,0,8,0"
-                                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                    ToolTip="Run the five checks for every ring and the plan rules"/>
-                            <Button x:Name="btnRingCreate" Content="Create deployments" MinWidth="150" Height="32" Visibility="Collapsed"
-                                    Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
-                                    Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                    ToolTip="Create the ring deployments in Configuration Manager"/>
+                            <Button x:Name="btnRingPickCollection" Content="Set Collection..." MinWidth="120" Margin="0,0,8,0"
+                                    Style="{StaticResource DialogButton}"
+                                    ToolTip="Pick the device collection for the selected ring (Shift+click reloads the list)."/>
+                            <Button x:Name="btnRingValidate" Content="Validate" MinWidth="110" Margin="0,0,8,0"
+                                    Style="{StaticResource DialogButton}"
+                                    ToolTip="Run the five checks for every ring."/>
+                            <Button x:Name="btnRingCreate" Content="Create Deployments" MinWidth="150" Visibility="Collapsed"
+                                    Style="{StaticResource DialogAccentButton}"
+                                    ToolTip="Create the ring deployments on the site."/>
                         </StackPanel>
                     </DockPanel>
                     <DataGrid x:Name="dgRingPreview" Height="140" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                              RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
                               AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                               CanUserSortColumns="False" SelectionMode="Single" SelectionUnit="FullRow"
                               GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0"
@@ -524,15 +558,15 @@
                     </DataGrid>
 
                     <DockPanel Margin="0,14,0,6" LastChildFill="False">
-                        <TextBlock x:Name="lblRingRuns" DockPanel.Dock="Left" Text="OPEN RUNS" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"/>
-                        <Button x:Name="btnRingRefreshRuns" DockPanel.Dock="Right" Content="Refresh and reconcile" MinWidth="150" Height="28"
-                                Style="{DynamicResource MahApps.Styles.Button.Square}"
-                                Controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                ToolTip="Read live counts, mark deleted deployments Removed, and close finished runs"/>
+                        <TextBlock x:Name="lblRingRuns" DockPanel.Dock="Left" Text="Open Runs" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"/>
+                        <Button x:Name="btnRingRefreshRuns" DockPanel.Dock="Right" Content="Refresh and Reconcile" MinWidth="150" Margin="0"
+                                Style="{StaticResource InlineButtonStyle}"
+                                ToolTip="Read the live counts, mark deleted deployments Removed and close finished runs."/>
                         <CheckBox x:Name="chkRingShowClosed" DockPanel.Dock="Right" Content="Show closed runs" FontSize="12"
                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
                     </DockPanel>
                     <DataGrid x:Name="dgRingRuns" Height="140" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                              RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
                               AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
                               SelectionMode="Single" SelectionUnit="FullRow"
                               GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0"
@@ -554,7 +588,7 @@
                             <DataGridTextColumn Header="Targeted" Binding="{Binding Targeted}" Width="90"/>
                             <DataGridTextColumn Header="Success" Binding="{Binding Success}" Width="82"/>
                             <DataGridTextColumn Header="Error" Binding="{Binding Errors}" Width="66"/>
-                            <DataGridTextColumn Header="In progress" Binding="{Binding InProgress}" Width="110"/>
+                            <DataGridTextColumn Header="In Progress" Binding="{Binding InProgress}" Width="110"/>
                             <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="2*" MinWidth="80">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
@@ -566,12 +600,11 @@
                             <DataGridTemplateColumn Header="" Width="90">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Content="Promote" Height="24" Margin="2" Padding="8,0,8,0"
+                                        <Button Content="Promote" Height="24" MinWidth="70" Margin="2" Padding="8,0,8,0"
                                                 IsEnabled="{Binding CanPromote}"
-                                                ToolTip="{Binding PromoteTip}" ToolTipService.ShowOnDisabled="True"
-                                                Controls:ControlsHelper.ContentCharacterCasing="Normal">
+                                                ToolTip="{Binding PromoteTip}" ToolTipService.ShowOnDisabled="True">
                                             <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource MahApps.Styles.Button.Square.Accent}">
+                                                <Style TargetType="Button" BasedOn="{StaticResource DialogAccentButton}">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding ShowPromote}" Value="True">
@@ -598,8 +631,8 @@
             <!-- Log output drawer -->
             <Border Grid.Row="3">
                 <DockPanel>
-                    <TextBlock x:Name="lblLogOutput" DockPanel.Dock="Top" Text="LOG OUTPUT"
-                               FontSize="10" FontWeight="SemiBold"
+                    <TextBlock x:Name="lblLogOutput" DockPanel.Dock="Top" Text="Log Output"
+                               FontSize="11" FontWeight="Bold"
                                Margin="8,6,0,4"/>
                     <TextBox x:Name="txtLog"
                              IsReadOnly="True"

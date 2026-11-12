@@ -1,5 +1,31 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Show white text on every blue background in the light theme: the sidebar buttons, the primary buttons, the selected rows of the grids, and the selected and highlighted items of the lists and combo boxes, in the window and in every dialog.
+- Show the Site Code and SMS Provider titles of the Options dialog in bold at 14 pt, in both themes. The value boxes keep the body style.
+- Show field labels, section headers and page titles in bold, in both themes. Use Title Case for titles, buttons and headers: Log Output, Validation, Expansion Preview, Open Runs, and the titles of the dialogs.
+- Use one short sentence for each tooltip, in Configuration Manager words.
+- Keep raw exception text out of the window. A message that the tool throws itself still shows. Any other error shows a fixed sentence and the text goes to the log file.
+- Use the title bar brushes of SuiteCommon, not a color of the start script.
+- Set one themed button style in the window and in every dialog. Hover, pressed and disabled change colors, never the opacity. The sidebar buttons take their colors from SuiteCommon. Cancel, Browse and the other secondary buttons use one gray style. The primary buttons use the accent blue with white text. The inline buttons use the secondary style at the height of a form row.
+- Set the size of the buttons of the Options dialog from the style. The dialog is wider, so that the three template buttons fit.
+- Show the badge of the DP group picker in the text color of the row, so that it stays readable on a selected row.
+
+### Added
+
+- Add Theme.Guard.Tests.ps1 and ThemeGuardHelpers.ps1. They check the white text on blue, the equal fonts in both themes, the bold titles, the shared button style, the banned words, the Title Case of the buttons, the one-sentence tooltips and the raw exception text.
+- Add Get-UserErrorText to the module, with tests.
+- Add one light theme image, of the Browse Applications dialog with a selected row. The light Ring Deployment image now shows a selected row.
+- Add the -OutDir parameter to the capture tool. The tool now uses its own lab folder and its own task name, waits for the capture lock, and never deletes C:\guide.
+
+### Changed
+
+- Refresh the vendored SuiteCommon library to release 2026.11.11.0080 from the suite main.
+- Invoke-Checks.ps1 filters every path relative to the repository root, so a worktree under .claude does not change the result.
+
 ## [2026.11.11.0020] - 2026-11-11
 
 ## 243 tests run in CI on 2 PowerShell versions

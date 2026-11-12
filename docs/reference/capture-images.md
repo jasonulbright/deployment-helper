@@ -4,7 +4,9 @@ One command regenerates every image of this guide.
 
 ## What it does
 
-`tools\guide-capture\Invoke-GuideCapture.ps1` copies the tool to a lab computer, starts it in an interactive session of a lab account, walks every view, dialog and setting with Windows UI Automation, takes the screenshots at 1440 by 900 pixels, copies the PNG files back to `docs\images` and removes its files from the lab computer. It replaces only the images that exist already.
+`tools\guide-capture\Invoke-GuideCapture.ps1` copies the tool to a lab computer, starts it in an interactive session of a lab account, walks every view, dialog and setting with Windows UI Automation, takes the screenshots at 1440 by 900 pixels, copies the PNG files back to `docs\images` and removes its files from the lab computer. It replaces only the images that exist already. It works in its own lab folder, `C:\guide\deployment-helper`, with its own scheduled task, `GuideShots-deployment-helper`, and it waits while another capture holds `C:\guide\capture.lock`. It never deletes `C:\guide`.
+
+Use `-OutDir` to also keep a copy of every captured image.
 
 ## When to use it
 
@@ -15,7 +17,7 @@ Use it after a change that alters the window, and before a release.
 - A lab computer with the Configuration Manager console, an SMS Provider that you can read, and PowerShell remoting for an account.
 - A script, outside the repository, that sets `$LabCredential` to the credential of that account.
 - A domain account that has an interactive session on the lab computer. The capture runs as a scheduled task with an interactive logon.
-- Lab data only. The capture reads the site. It validates an existing lab application against a lab collection. When **Deploy** shows, it selects **Deploy** and answers **Cancel** to `Confirm deployment`, **No** to `Check deployment schedule` and **OK** to `Deployment blocked`. It never confirms a deployment.
+- Lab data only. The capture reads the site. It validates an existing lab application against a lab collection. When **Deploy** shows, it selects **Deploy** and answers **Cancel** to `Confirm Deployment`, **No** to `Check Deployment Schedule` and **OK** to `Deployment Blocked`. It never confirms a deployment.
 
 ## Steps
 

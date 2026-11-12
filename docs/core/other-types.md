@@ -21,7 +21,7 @@ Use it to deploy a classic package and program, a task sequence or a software up
 
 1. Select **Packages** in the sidebar.
 2. Select the package, then select its program in **Program**. Select the collection, the purpose and the dates.
-3. Set **Fast network**, **Slow network** and **Rerun behavior**.
+3. Set **Fast Network**, **Slow Network** and **Rerun Behavior**.
 4. Select **Validate**, then **Deploy**.
 
 ![The Packages form](../images/packages-form.png)
@@ -51,7 +51,7 @@ The controls are those of [Application deployment](apps.md), plus:
 | Control | Type | Effect |
 |---|---|---|
 | **Program** | Package | The program to deploy. |
-| **Fast network**, **Slow network**, **Rerun behavior** | Package | How the client downloads and reruns the program. |
+| **Fast Network**, **Slow Network**, **Rerun Behavior** | Package | How the client downloads and reruns the program. |
 | **Availability** | Task sequence | The clients or media that get the task sequence. |
 | **Show task sequence progress on client** | Task sequence | Shows the progress. |
 | **Fall back to Microsoft Update if no DP has content** and the next two | Software update group | Fallback and scan options. |
@@ -59,7 +59,7 @@ The controls are those of [Application deployment](apps.md), plus:
 ## Limits
 
 - The object field and the collection field keep their text when you change the type. Clear them before you validate.
-- A software update group has no **Distribute to** line.
+- A software update group has no **Distribute To** line.
 
 ## Troubleshooting
 

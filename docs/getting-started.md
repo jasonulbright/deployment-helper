@@ -34,7 +34,7 @@ The window opens on **Apps**. At the first start the tool writes four deployment
 ### Set the connection
 
 1. Select **Options** in the sidebar.
-2. Type the **Site code**, for example `MCM`.
+2. Type the **Site Code**, for example `MCM`.
 3. Type the **SMS Provider**, for example `cm01.contoso.com`.
 4. Select **OK**. The tool connects when the site code or the provider changed.
 

@@ -21,7 +21,7 @@ None.
 Select the **Apps** button in the sidebar, then press Tab. The focus goes in this order:
 
 1. The sidebar buttons: **Packages**, **Task Sequences**, **Software Update Groups**, **Ring Deployment**, **Options**.
-2. The **Apply template** list.
+2. The **Apply Template** list.
 3. The **Application** box and its **Browse...** button.
 4. The **Collection** box and its **Browse...** button.
 5. The purpose buttons **Available** and **Required**.
