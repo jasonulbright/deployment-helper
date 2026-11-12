@@ -47,7 +47,7 @@ The paths of the audit log and of the run-state folder come from the **Logging**
 
 | Message or symptom | Cause | Fix |
 |---|---|---|
-| `Audit log write failed` | The audit path is not writable. | Set a writable path in **Options > Logging**. |
+| `Audit Log Write Failed` | The audit path is not writable. | Set a writable path in **Options > Logging**. |
 
 ## Links
 

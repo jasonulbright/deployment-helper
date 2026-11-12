@@ -4,7 +4,7 @@ The Options dialog sets the connection, the log paths, the history exports and t
 
 ## What it does
 
-The dialog has five pages: **Connection**, **Logging**, **History**, **Templates** and **About**. **OK** saves. **Cancel** closes the dialog and keeps the old values of the Connection and Logging pages. It does not undo template changes: **Save template**, **New**, **Duplicate** and **Delete** take effect at once.
+The dialog has five pages: **Connection**, **Logging**, **History**, **Templates** and **About**. **OK** saves. **Cancel** closes the dialog and keeps the old values of the Connection and Logging pages. It does not undo template changes: **Save Template**, **New**, **Duplicate** and **Delete** take effect at once.
 
 ## When to use it
 
@@ -20,9 +20,9 @@ None.
 
 | Field | Meaning |
 |---|---|
-| **Site code** | The site code, for example `MCM`. |
-| **SMS Provider** | The server with the SMS Provider role. |
-| **Reload DP groups** | Reads the distribution point groups again. |
+| **Site Code** | The site code, for example `MCM`. The title is bold at 14 pt in both themes. |
+| **SMS Provider** | The server with the SMS Provider role. The title is bold at 14 pt in both themes. |
+| **Reload DP Groups** | Reads the distribution point groups again. |
 
 **OK** disconnects the current connection when the site code or the provider changed. The next action that needs a connection connects again with the saved settings.
 
@@ -42,7 +42,7 @@ The page shows the number of records in the audit log. **Export CSV...** and **E
 
 ### Templates
 
-The list shows the deployment templates. **New**, **Duplicate** and **Delete** change the list. Select a template to edit its name, target collection, purpose, notification, time basis, deadline offset in hours and options, and select **Save template**. Each template is a JSON file in `Templates`.
+The list shows the deployment templates. **New**, **Duplicate** and **Delete** change the list. Select a template to edit its name, target collection, purpose, notification, time basis, deadline offset in hours and options, and select **Save Template**. Each template is a JSON file in `Templates`.
 
 ![The Templates page](../images/options-templates.png)
 
@@ -54,7 +54,7 @@ The page shows the version and a short description.
 
 ### Theme
 
-The **Dark Theme** switch at the bottom of the sidebar changes the theme. The tool keeps the choice.
+The **Dark Theme** switch at the bottom of the sidebar changes the theme. The tool keeps the choice. The theme changes colors only. Font size, weight and style stay the same. Every blue background has white text, and the titles of fields are bold.
 
 ![The Apps view in the light theme](../images/light-apps.png)
 
@@ -81,7 +81,7 @@ See the tables above. [Settings](../reference/settings.md) lists the file keys.
 
 | Message or symptom | Cause | Fix |
 |---|---|---|
-| The Deploy button gives `Audit log write failed`. | The tool cannot write the audit log path. | Set a writable path on the **Logging** page. |
+| The Deploy button gives `Audit Log Write Failed`. | The tool cannot write the audit log path. | Set a writable path on the **Logging** page. |
 
 ## Links
 

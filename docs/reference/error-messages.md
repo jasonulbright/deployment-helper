@@ -26,12 +26,12 @@ None.
 | `Duplicate deployment already exists.` | Log | The object is already deployed to the collection. | Select another collection, or remove the old deployment. |
 | `Duplicate check failed; deployment is blocked: <reason>` | Log | The duplicate check could not run. | Read the reason. Check the connection. |
 | `Run Validate first.` | Log | **Deploy** ran before **Validate**. | Select **Validate**. |
-| `Deployment cancelled by user.` | Log | You selected **Cancel** in `Confirm deployment`. | None. |
-| `Deployment cancelled: schedule warning not confirmed.` | Log | You selected **No** in `Check deployment schedule`. | Correct the dates. |
-| `Deployment blocked` | Dialog | The dates or the notification are not valid, or the audit log cannot be written. | Read the text of the dialog. |
-| `Audit log write failed` | Dialog | The audit log path is not writable. | Set a writable path in **Options > Logging**. |
+| `Deployment cancelled by user.` | Log | You selected **Cancel** in `Confirm Deployment`. | None. |
+| `Deployment cancelled: schedule warning not confirmed.` | Log | You selected **No** in `Check Deployment Schedule`. | Correct the dates. |
+| `Deployment Blocked` | Dialog | The dates or the notification are not valid, or the audit log cannot be written. | Read the text of the dialog. |
+| `Audit Log Write Failed` | Dialog | The audit log path is not writable. | Set a writable path in **Options > Logging**. |
 | `Package has <n> programs. Select one.` and `Select a program from the dropdown.` | Log | A package deployment needs a program. | Select the program in **Program**. |
-| `Browse load failed: <reason>` and `Load error: <reason>` | Log, dialog | The list could not load. | Read the reason. Check the connection. |
+| `Browse load failed: <reason>` and `Load error: <reason>` | Log, dialog | The list could not load. | Read the reason. Check the connection and the tool log. The log holds the full error text. |
 | `Ring plan refused:` | Log | The plan has a rule error. | Read the text after the colon. |
 | `Select a ring plan.` | Log | No plan is selected. | Select a plan. |
 

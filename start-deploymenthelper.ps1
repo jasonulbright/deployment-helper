@@ -306,14 +306,14 @@ $script:TypeMeta = @{
     'TaskSequences' = @{
         Header      = 'Task Sequences Deployment'
         Subheader   = 'Select a task sequence and a device collection.'
-        TargetLabel = 'Task sequence:'
+        TargetLabel = 'Task Sequence:'
         Watermark   = 'Task sequence name'
         Check1Text  = 'Task sequence exists in Configuration Manager'
     }
     'SUG' = @{
         Header      = 'Software Update Groups Deployment'
         Subheader   = 'Select a software update group and a device collection.'
-        TargetLabel = 'Update group:'
+        TargetLabel = 'Update Group:'
         Watermark   = 'Software update group name'
         Check1Text  = 'Software update group exists in Configuration Manager'
     }
@@ -356,7 +356,7 @@ function Show-AuditWriteFailure {
     }
     Add-LogLine -Message $message
     Set-StatusText -Text $(if ($DeploymentCreated) { 'Deployment created; audit write failed.' } else { 'Audit write failed.' })
-    [void](Show-ThemedMessage -Owner $window -Title 'Audit log write failed' -Message $message -Buttons OK -Icon Warn)
+    [void](Show-ThemedMessage -Owner $window -Title 'Audit Log Write Failed' -Message $message -Buttons OK -Icon Warn)
 }
 
 function Test-DeploymentAuditReady {
@@ -366,7 +366,7 @@ function Test-DeploymentAuditReady {
     $message = ("Deployment was blocked because the audit log is not writable at {0}: {1}" -f $script:DeploymentAuditLog, $check.Error)
     Add-LogLine -Message $message
     Set-StatusText -Text 'Deployment blocked: audit log unavailable.'
-    [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $message -Buttons OK -Icon Error)
+    [void](Show-ThemedMessage -Owner $window -Title 'Deployment Blocked' -Message $message -Buttons OK -Icon Error)
     return $false
 }
 
@@ -397,7 +397,7 @@ function Test-NoCurrentDuplicateDeployment {
 
     Add-LogLine -Message $message
     Set-StatusText -Text 'Deployment blocked by the final duplicate check.'
-    [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $message -Buttons OK -Icon Warn)
+    [void](Show-ThemedMessage -Owner $window -Title 'Deployment Blocked' -Message $message -Buttons OK -Icon Warn)
     return $false
 }
 
@@ -416,6 +416,18 @@ $xamlPath = Join-Path $PSScriptRoot 'MainWindow.xaml'
 
 $reader = New-Object System.Xml.XmlNodeReader $xaml
 $window = [System.Windows.Markup.XamlReader]::Load($reader)
+
+# The dialogs take their button, list and grid styles from MainWindow.xaml, so each style exists once.
+# The marker below sits in the Resources of each dialog XAML and is replaced by the shared styles.
+$script:SharedStyleMarker = '<!--SHARED_STYLES-->'
+function Get-SharedStyleXaml {
+    $keys = 'ThemedButtonTemplate', 'ThemedButtonStyle', 'DialogAccentButton', 'DialogButton', 'InlineButtonStyle', 'GridRowStyle', 'GridCellStyle'
+    $nodes = @($xaml.SelectNodes("//*[local-name()='ResourceDictionary']/*[local-name()='ControlTemplate' or local-name()='Style']") | Where-Object {
+            $key = $_.GetAttribute('Key', 'http://schemas.microsoft.com/winfx/2006/xaml')
+            ($key -in $keys) -or (-not $key -and $_.GetAttribute('TargetType') -in 'ComboBoxItem', 'ListBoxItem')
+        })
+    return (($nodes | ForEach-Object { $_.OuterXml }) -join [Environment]::NewLine)
+}
 
 # Installed version: the script header is the single source of truth for the
 # About panel.
@@ -545,23 +557,18 @@ Initialize-SuiteTheme -Window $window `
     -OptionsButtons $script:OptionsButtons `
     -LogLabel $lblLogOutput
 
-$script:TitleBarBlue         = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#0078D4')
-$script:TitleBarBlueInactive = [System.Windows.Media.BrushConverter]::new().ConvertFrom('#4BA3E0')
-
 $toggleTheme.Add_Toggled({
     if ($toggleTheme.IsOn) {
         [ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($window, 'Dark.Steel')
         $txtThemeLabel.Text = 'Dark Theme'
         Set-ButtonTheme -IsDark $true
-        $window.ClearValue([MahApps.Metro.Controls.MetroWindow]::WindowTitleBrushProperty)
-        $window.ClearValue([MahApps.Metro.Controls.MetroWindow]::NonActiveWindowTitleBrushProperty)
+        Update-TitleBarBrushes -IsDark $true
     }
     else {
         [ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($window, 'Light.Blue')
         $txtThemeLabel.Text = 'Light Theme'
         Set-ButtonTheme -IsDark $false
-        $window.WindowTitleBrush         = $script:TitleBarBlue
-        $window.NonActiveWindowTitleBrush = $script:TitleBarBlueInactive
+        Update-TitleBarBrushes -IsDark $false
     }
 })
 
@@ -817,6 +824,7 @@ function Show-BrowseLoadingDialog {
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <!--SHARED_STYLES-->
         </ResourceDictionary>
     </Window.Resources>
     <Grid Margin="16,12,16,12">
@@ -829,14 +837,13 @@ function Show-BrowseLoadingDialog {
                                    Foreground="{DynamicResource MahApps.Brushes.Accent}"/>
             <TextBlock x:Name="txtStep" VerticalAlignment="Center" FontSize="13" Text="Connecting..."/>
         </StackPanel>
-        <Button x:Name="btnCancel" Grid.Row="1" Content="Cancel" MinWidth="90" Height="32" HorizontalAlignment="Right" IsCancel="True"
-                Style="{DynamicResource MahApps.Styles.Button.Square}"
-                Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+        <Button x:Name="btnCancel" Grid.Row="1" Content="Cancel" HorizontalAlignment="Right" Margin="0" IsCancel="True"
+                Style="{StaticResource DialogButton}"/>
     </Grid>
 </Controls:MetroWindow>
 '@
 
-    [xml]$xml = $dlgXaml
+    [xml]$xml = $dlgXaml.Replace($script:SharedStyleMarker, (Get-SharedStyleXaml))
     $reader = New-Object System.Xml.XmlNodeReader $xml
     $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
     Install-TitleBarDragFallback -Window $dlg
@@ -852,8 +859,9 @@ function Show-BrowseLoadingDialog {
         Initialize-BgRunspace
     }
     catch {
-        Add-LogLine -Message ('Browse load failed: {0}' -f $_.Exception.Message)
-        [void](Show-ThemedMessage -Owner $Owner -Title 'Browse' -Message ('Background load could not start: {0}' -f $_.Exception.Message) -Buttons OK -Icon Error)
+        $loadText = Get-UserErrorText -ErrorRecord $_ -Fallback 'The background load could not start. See the log file.'
+        Add-LogLine -Message ('Browse load failed: {0}' -f $loadText)
+        [void](Show-ThemedMessage -Owner $Owner -Title 'Browse' -Message ('Browse load failed: {0}' -f $loadText) -Buttons OK -Icon Error)
         return $null
     }
     Stop-BgWork
@@ -915,7 +923,7 @@ function Show-BrowseLoadingDialog {
             $State.Result = [PSCustomObject]@{ Items = $items; Folders = $folders }
         }
         catch {
-            $State.ErrorMsg = $_.Exception.Message
+            $State.ErrorMsg = Get-UserErrorText -ErrorRecord $_ -Fallback 'The site read failed. See the log file.'
         }
         finally {
             $State.Done = $true
@@ -1036,6 +1044,7 @@ function Show-BrowseDialog {
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <!--SHARED_STYLES-->
         </ResourceDictionary>
     </Window.Resources>
     <Grid Margin="16,12,16,12">
@@ -1050,10 +1059,9 @@ function Show-BrowseDialog {
             <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
 
-        <TextBox x:Name="txtFilter" Grid.Row="0" Grid.Column="0" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,8,8"/>
-        <Button  x:Name="btnRefresh" Grid.Row="0" Grid.Column="1" Content="Refresh" Width="90" Height="28" Margin="0,0,0,8"
-                 Style="{DynamicResource MahApps.Styles.Button.Square}"
-                 Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+        <TextBox x:Name="txtFilter" Grid.Row="0" Grid.Column="0" FontSize="12" Height="32" VerticalContentAlignment="Center" Margin="0,0,8,8"/>
+        <Button  x:Name="btnRefresh" Grid.Row="0" Grid.Column="1" Content="Refresh" Margin="0,0,0,8"
+                 Style="{StaticResource DialogButton}"/>
 
         <DataGrid x:Name="dgResults" Grid.Row="1" Grid.ColumnSpan="2"
                   AutoGenerateColumns="False"
@@ -1067,6 +1075,7 @@ function Show-BrowseDialog {
                   RowHeaderWidth="0"
                   BorderThickness="1"
                   BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                  RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
                   ColumnHeaderHeight="28"
                   EnableRowVirtualization="True"
                   VirtualizingPanel.VirtualizationMode="Recycling"/>
@@ -1075,18 +1084,16 @@ function Show-BrowseDialog {
                    Foreground="{DynamicResource MahApps.Brushes.Gray1}" Text=""/>
 
         <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="btnOK"     Content="OK"     MinWidth="90" Height="32" Margin="0,0,8,0" IsDefault="True"
-                    Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
-                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
-            <Button x:Name="btnCancel" Content="Cancel" MinWidth="90" Height="32" IsCancel="True"
-                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+            <Button x:Name="btnOK"     Content="OK" IsDefault="True"
+                    Style="{StaticResource DialogAccentButton}"/>
+            <Button x:Name="btnCancel" Content="Cancel" Margin="0" IsCancel="True"
+                    Style="{StaticResource DialogButton}"/>
         </StackPanel>
     </Grid>
 </Controls:MetroWindow>
 '@
 
-    [xml]$xml = $dlgXaml
+    [xml]$xml = $dlgXaml.Replace($script:SharedStyleMarker, (Get-SharedStyleXaml))
     $reader = New-Object System.Xml.XmlNodeReader $xml
     $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
     Install-TitleBarDragFallback -Window $dlg
@@ -1182,14 +1189,14 @@ function Show-CollectionBrowseItem {
         [switch]$Force
     )
 
-    $loaded = Get-BrowseList -Owner $Owner -Title 'Browse device collections' -Type 'Collections' -Force:$Force
+    $loaded = Get-BrowseList -Owner $Owner -Title 'Browse Device Collections' -Type 'Collections' -Force:$Force
     if ($null -eq $loaded) { return $null }
     if (@($loaded.Items).Count -eq 0) {
         [void](Show-ThemedMessage -Owner $Owner -Title 'Browse' -Message 'No device collections were returned by the site.' -Buttons OK -Icon Info)
         return $null
     }
 
-    return Show-CollectionPickerDialog -Owner $Owner -Collections @($loaded.Items) -Folders @($loaded.Folders) -Title 'Pick device collection'
+    return Show-CollectionPickerDialog -Owner $Owner -Collections @($loaded.Items) -Folders @($loaded.Folders) -Title 'Pick Device Collection'
 }
 
 function Show-CollectionBrowse {
@@ -1438,12 +1445,12 @@ $script:InvokePackagesDeploy = {
 
     $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose -Now $(if ($timeBasis -eq 'Utc') { [datetime]::UtcNow } else { Get-Date })
     if (-not $schedule.Ok) {
-        [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Deployment Blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid schedule.'
         return
     }
     if ($schedule.Level -eq 'Warn') {
-        $proceed = Show-ThemedMessage -Owner $window -Title 'Check deployment schedule' -Message $schedule.Reason -Buttons YesNo -Icon Warn
+        $proceed = Show-ThemedMessage -Owner $window -Title 'Check Deployment Schedule' -Message $schedule.Reason -Buttons YesNo -Icon Warn
         if ($proceed -ne 'Yes') {
             Add-LogLine -Message 'Deployment cancelled: schedule warning not confirmed.'
             return
@@ -1456,7 +1463,7 @@ $script:InvokePackagesDeploy = {
         $script:ValidatedCollection.Name,
         $script:ValidatedCollection.MemberCount,
         $purpose)
-    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm deployment' -Message $confirmMsg -Buttons OKCancel -Icon Question
+    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm Deployment' -Message $confirmMsg -Buttons OKCancel -Icon Question
     if ($confirm -ne 'OK') {
         Add-LogLine -Message 'Deployment cancelled by user.'
         return
@@ -1636,12 +1643,12 @@ $script:InvokeSUGDeploy = {
 
     $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose -Now $(if ($timeBasis -eq 'Utc') { [datetime]::UtcNow } else { Get-Date })
     if (-not $schedule.Ok) {
-        [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Deployment Blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid schedule.'
         return
     }
     if ($schedule.Level -eq 'Warn') {
-        $proceed = Show-ThemedMessage -Owner $window -Title 'Check deployment schedule' -Message $schedule.Reason -Buttons YesNo -Icon Warn
+        $proceed = Show-ThemedMessage -Owner $window -Title 'Check Deployment Schedule' -Message $schedule.Reason -Buttons YesNo -Icon Warn
         if ($proceed -ne 'Yes') {
             Add-LogLine -Message 'Deployment cancelled: schedule warning not confirmed.'
             return
@@ -1650,7 +1657,7 @@ $script:InvokeSUGDeploy = {
 
     $notification = Test-DeploymentNotification -Purpose $purpose -Notification $notifTag
     if (-not $notification.Ok) {
-        [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $notification.Reason -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Deployment Blocked' -Message $notification.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid notification/purpose combo.'
         return
     }
@@ -1661,7 +1668,7 @@ $script:InvokeSUGDeploy = {
         $script:ValidatedCollection.Name,
         $script:ValidatedCollection.MemberCount,
         $purpose)
-    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm deployment' -Message $confirmMsg -Buttons OKCancel -Icon Question
+    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm Deployment' -Message $confirmMsg -Buttons OKCancel -Icon Question
     if ($confirm -ne 'OK') {
         Add-LogLine -Message 'Deployment cancelled by user.'
         return
@@ -1843,12 +1850,12 @@ $script:InvokeTaskSequencesDeploy = {
 
     $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose -Now $(if ($timeBasis -eq 'Utc') { [datetime]::UtcNow } else { Get-Date })
     if (-not $schedule.Ok) {
-        [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Deployment Blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid schedule.'
         return
     }
     if ($schedule.Level -eq 'Warn') {
-        $proceed = Show-ThemedMessage -Owner $window -Title 'Check deployment schedule' -Message $schedule.Reason -Buttons YesNo -Icon Warn
+        $proceed = Show-ThemedMessage -Owner $window -Title 'Check Deployment Schedule' -Message $schedule.Reason -Buttons YesNo -Icon Warn
         if ($proceed -ne 'Yes') {
             Add-LogLine -Message 'Deployment cancelled: schedule warning not confirmed.'
             return
@@ -1861,7 +1868,7 @@ $script:InvokeTaskSequencesDeploy = {
         $script:ValidatedCollection.MemberCount,
         $purpose,
         $avail)
-    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm deployment' -Message $confirmMsg -Buttons OKCancel -Icon Question
+    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm Deployment' -Message $confirmMsg -Buttons OKCancel -Icon Question
     if ($confirm -ne 'OK') {
         Add-LogLine -Message 'Deployment cancelled by user.'
         return
@@ -1950,12 +1957,12 @@ $script:InvokeAppsDeploy = {
     # client" moments before the ConfigMgr cmdlet accepts them.
     $schedule = Test-DeploymentSchedule -Available $available -Deadline $deadline -Purpose $purpose -Now $(if ($timeBasis -eq 'Utc') { [datetime]::UtcNow } else { Get-Date })
     if (-not $schedule.Ok) {
-        [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Deployment Blocked' -Message $schedule.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid schedule.'
         return
     }
     if ($schedule.Level -eq 'Warn') {
-        $proceed = Show-ThemedMessage -Owner $window -Title 'Check deployment schedule' -Message $schedule.Reason -Buttons YesNo -Icon Warn
+        $proceed = Show-ThemedMessage -Owner $window -Title 'Check Deployment Schedule' -Message $schedule.Reason -Buttons YesNo -Icon Warn
         if ($proceed -ne 'Yes') {
             Add-LogLine -Message 'Deployment cancelled: schedule warning not confirmed.'
             return
@@ -1964,7 +1971,7 @@ $script:InvokeAppsDeploy = {
 
     $notification = Test-DeploymentNotification -Purpose $purpose -Notification $notifTag
     if (-not $notification.Ok) {
-        [void](Show-ThemedMessage -Owner $window -Title 'Deployment blocked' -Message $notification.Reason -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Deployment Blocked' -Message $notification.Reason -Buttons OK -Icon Error)
         Set-StatusText -Text 'Deployment blocked: invalid notification/purpose combo.'
         return
     }
@@ -1975,7 +1982,7 @@ $script:InvokeAppsDeploy = {
         $script:ValidatedCollection.Name,
         $script:ValidatedCollection.MemberCount,
         $purpose)
-    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm deployment' -Message $confirmMsg -Buttons OKCancel -Icon Question
+    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm Deployment' -Message $confirmMsg -Buttons OKCancel -Icon Question
     if ($confirm -ne 'OK') {
         Add-LogLine -Message 'Deployment cancelled by user.'
         return
@@ -2051,7 +2058,7 @@ function Update-DPPickerButtonLabel {
     $sel = @($global:SelectedDPGroups)
     $all = @($global:DPGroupsCache)
     if ($sel.Count -eq 0) {
-        $btnDPPicker.Content = 'Select DP groups...'
+        $btnDPPicker.Content = 'Select DP Groups...'
     }
     elseif ($all.Count -gt 0 -and $sel.Count -eq $all.Count) {
         $btnDPPicker.Content = ('All {0} DP groups selected' -f $all.Count)
@@ -2098,7 +2105,7 @@ function Show-DPGroupPickerDialog {
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
-    Title="Select DP groups"
+    Title="Select DP Groups"
     Width="520" Height="480"
     WindowStartupLocation="CenterOwner"
     TitleCharacterCasing="Normal"
@@ -2112,6 +2119,7 @@ function Show-DPGroupPickerDialog {
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <!--SHARED_STYLES-->
         </ResourceDictionary>
     </Window.Resources>
     <Grid Margin="16,12,16,12">
@@ -2125,12 +2133,10 @@ function Show-DPGroupPickerDialog {
         <TextBlock Grid.Row="0" Text="Check the distribution point groups to distribute content to. Groups that already have this content are pre-checked." FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-            <Button x:Name="btnSelectAll"  Content="Select all"  MinWidth="100" Height="28" Margin="0,0,8,0"
-                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
-            <Button x:Name="btnSelectNone" Content="Select none" MinWidth="100" Height="28"
-                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+            <Button x:Name="btnSelectAll"  Content="Select All"
+                    Style="{StaticResource DialogButton}"/>
+            <Button x:Name="btnSelectNone" Content="Select None"
+                    Style="{StaticResource DialogButton}"/>
         </StackPanel>
 
         <ListBox x:Name="lstGroups" Grid.Row="2" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}">
@@ -2139,26 +2145,23 @@ function Show-DPGroupPickerDialog {
                     <StackPanel Orientation="Horizontal">
                         <CheckBox IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding Name}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding Badge}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource MahApps.Brushes.Gray1}"/>
+                        <TextBlock Text="{Binding Badge}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center" Opacity="0.8"/>
                     </StackPanel>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="btnOK"     Content="OK"     MinWidth="90" Height="32" Margin="0,0,8,0" IsDefault="True"
-                    Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
-                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
-            <Button x:Name="btnCancel" Content="Cancel" MinWidth="90" Height="32" IsCancel="True"
-                    Style="{DynamicResource MahApps.Styles.Button.Square}"
-                    Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+            <Button x:Name="btnOK"     Content="OK" IsDefault="True"
+                    Style="{StaticResource DialogAccentButton}"/>
+            <Button x:Name="btnCancel" Content="Cancel" Margin="0" IsCancel="True"
+                    Style="{StaticResource DialogButton}"/>
         </StackPanel>
     </Grid>
 </Controls:MetroWindow>
 '@
 
-    [xml]$xml = $dlgXaml
+    [xml]$xml = $dlgXaml.Replace($script:SharedStyleMarker, (Get-SharedStyleXaml))
     $reader = New-Object System.Xml.XmlNodeReader $xml
     $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
     Install-TitleBarDragFallback -Window $dlg
@@ -2231,7 +2234,7 @@ function New-ConnectionPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'Configuration Manager Connection'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'SemiBold'
+    $hdr.FontWeight = 'Bold'
     $hdr.Margin = '0,0,0,12'
     [void]$grid.Children.Add($hdr)
 
@@ -2247,8 +2250,9 @@ function New-ConnectionPanel {
     [void]$g.ColumnDefinitions.Add($c2)
 
     $lblSite = New-Object System.Windows.Controls.TextBlock
-    $lblSite.Text = 'Site code:'
-    $lblSite.FontSize = 12
+    $lblSite.Text = 'Site Code:'
+    $lblSite.FontSize = 14
+    $lblSite.FontWeight = 'Bold'
     $lblSite.VerticalAlignment = 'Center'
     $lblSite.Margin = '0,4,8,4'
     [System.Windows.Controls.Grid]::SetRow($lblSite, 0)
@@ -2256,10 +2260,10 @@ function New-ConnectionPanel {
     [void]$g.Children.Add($lblSite)
 
     $txtSite = New-Object System.Windows.Controls.TextBox
-    $txtSite.Name = 'txtSite'
+    $txtSite.Name = 'txtSiteCode'
     $txtSite.Text = [string]$global:Prefs['SiteCode']
     $txtSite.FontSize = 12
-    $txtSite.Height = 28
+    $txtSite.Height = 32
     $txtSite.VerticalContentAlignment = 'Center'
     $txtSite.MaxLength = 3
     $txtSite.Margin = '0,4,0,4'
@@ -2271,7 +2275,8 @@ function New-ConnectionPanel {
 
     $lblProv = New-Object System.Windows.Controls.TextBlock
     $lblProv.Text = 'SMS Provider:'
-    $lblProv.FontSize = 12
+    $lblProv.FontSize = 14
+    $lblProv.FontWeight = 'Bold'
     $lblProv.VerticalAlignment = 'Center'
     $lblProv.Margin = '0,4,8,4'
     [System.Windows.Controls.Grid]::SetRow($lblProv, 1)
@@ -2279,10 +2284,10 @@ function New-ConnectionPanel {
     [void]$g.Children.Add($lblProv)
 
     $txtProv = New-Object System.Windows.Controls.TextBox
-    $txtProv.Name = 'txtProv'
+    $txtProv.Name = 'txtSmsProvider'
     $txtProv.Text = [string]$global:Prefs['SMSProvider']
     $txtProv.FontSize = 12
-    $txtProv.Height = 28
+    $txtProv.Height = 32
     $txtProv.VerticalContentAlignment = 'Center'
     $txtProv.Margin = '0,4,0,4'
     [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtProv, 'server.fqdn')
@@ -2301,9 +2306,9 @@ function New-ConnectionPanel {
     [void]$grid.Children.Add($note)
 
     $dpHdr = New-Object System.Windows.Controls.TextBlock
-    $dpHdr.Text = 'Distribution point groups'
+    $dpHdr.Text = 'Distribution Point Groups'
     $dpHdr.FontSize = 13
-    $dpHdr.FontWeight = 'SemiBold'
+    $dpHdr.FontWeight = 'Bold'
     $dpHdr.Margin = '0,6,0,6'
     [void]$grid.Children.Add($dpHdr)
 
@@ -2317,12 +2322,11 @@ function New-ConnectionPanel {
 
     $dpBtn = New-Object System.Windows.Controls.Button
     $dpBtn.Name = 'btnReloadDPGroups'
-    $dpBtn.Content = 'Reload DP groups'
+    $dpBtn.Content = 'Reload DP Groups'
     $dpBtn.MinWidth = 160
-    $dpBtn.Height = 28
     $dpBtn.HorizontalAlignment = 'Left'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($dpBtn, [System.Windows.Controls.CharacterCasing]::Normal)
-    $dpBtn.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    $dpBtn.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogButton')
     [void]$grid.Children.Add($dpBtn)
 
     # Helper-indirection pattern (see New-TemplatesPanel for the mechanics).
@@ -2399,13 +2403,14 @@ function New-LoggingPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'Logging'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'SemiBold'
+    $hdr.FontWeight = 'Bold'
     $hdr.Margin = '0,0,0,12'
     [void]$grid.Children.Add($hdr)
 
     $lblTool = New-Object System.Windows.Controls.TextBlock
-    $lblTool.Text = 'Current tool log:'
+    $lblTool.Text = 'Current Tool Log:'
     $lblTool.FontSize = 12
+    $lblTool.FontWeight = 'Bold'
     $lblTool.Margin = '0,0,0,4'
     [void]$grid.Children.Add($lblTool)
 
@@ -2415,14 +2420,15 @@ function New-LoggingPanel {
     $toolTxt.IsReadOnly = $true
     $toolTxt.FontSize = 11
     $toolTxt.FontFamily = 'Cascadia Code, Consolas, Courier New'
-    $toolTxt.Height = 28
+    $toolTxt.Height = 32
     $toolTxt.VerticalContentAlignment = 'Center'
     $toolTxt.Margin = '0,0,0,14'
     [void]$grid.Children.Add($toolTxt)
 
     $lblAudit = New-Object System.Windows.Controls.TextBlock
-    $lblAudit.Text = 'Deployment audit log (JSONL):'
+    $lblAudit.Text = 'Deployment Audit Log (JSONL):'
     $lblAudit.FontSize = 12
+    $lblAudit.FontWeight = 'Bold'
     $lblAudit.Margin = '0,0,0,4'
     [void]$grid.Children.Add($lblAudit)
 
@@ -2431,11 +2437,9 @@ function New-LoggingPanel {
     $auditBtn = New-Object System.Windows.Controls.Button
     $auditBtn.Name = 'btnBrowseAuditLog'
     $auditBtn.Content = 'Browse...'
-    $auditBtn.Width = 90
-    $auditBtn.Height = 28
     $auditBtn.Margin = '8,0,0,0'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($auditBtn, [System.Windows.Controls.CharacterCasing]::Normal)
-    $auditBtn.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    $auditBtn.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogButton')
     [System.Windows.Controls.DockPanel]::SetDock($auditBtn, 'Right')
     [void]$row.Children.Add($auditBtn)
     $auditTxt = New-Object System.Windows.Controls.TextBox
@@ -2443,14 +2447,14 @@ function New-LoggingPanel {
     $auditTxt.Text = [string]$global:Prefs['DeploymentAuditLogPath']
     $auditTxt.FontSize = 11
     $auditTxt.FontFamily = 'Cascadia Code, Consolas, Courier New'
-    $auditTxt.Height = 28
+    $auditTxt.Height = 32
     $auditTxt.VerticalContentAlignment = 'Center'
     [void]$row.Children.Add($auditTxt)
     [void]$grid.Children.Add($row)
 
     $auditBtn.Add_Click({
         $dlg = New-Object System.Windows.Forms.SaveFileDialog
-        $dlg.Title = 'Deployment audit log location'
+        $dlg.Title = 'Deployment Audit Log Location'
         $dlg.Filter = 'JSONL files (*.jsonl)|*.jsonl|All files (*.*)|*.*'
         $dlg.FileName = Split-Path -Path $auditTxt.Text -Leaf
         $dir = Split-Path -Path $auditTxt.Text -Parent
@@ -2461,8 +2465,9 @@ function New-LoggingPanel {
     }.GetNewClosure())
 
     $lblRuns = New-Object System.Windows.Controls.TextBlock
-    $lblRuns.Text = 'Ring run-state folder (local path or UNC share for a team):'
+    $lblRuns.Text = 'Ring Run-State Folder:'
     $lblRuns.FontSize = 12
+    $lblRuns.FontWeight = 'Bold'
     $lblRuns.Margin = '0,14,0,4'
     [void]$grid.Children.Add($lblRuns)
 
@@ -2471,19 +2476,18 @@ function New-LoggingPanel {
     $runsBtn = New-Object System.Windows.Controls.Button
     $runsBtn.Name = 'btnBrowseRingRuns'
     $runsBtn.Content = 'Browse...'
-    $runsBtn.Width = 90
-    $runsBtn.Height = 28
     $runsBtn.Margin = '8,0,0,0'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($runsBtn, [System.Windows.Controls.CharacterCasing]::Normal)
-    $runsBtn.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    $runsBtn.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogButton')
     [System.Windows.Controls.DockPanel]::SetDock($runsBtn, 'Right')
     [void]$runsRow.Children.Add($runsBtn)
     $runsTxt = New-Object System.Windows.Controls.TextBox
     $runsTxt.Name = 'txtRingRuns'
+    $runsTxt.ToolTip = 'Use a local path or a UNC share for a team.'
     $runsTxt.Text = [string]$global:Prefs['RingRunStatePath']
     $runsTxt.FontSize = 11
     $runsTxt.FontFamily = 'Cascadia Code, Consolas, Courier New'
-    $runsTxt.Height = 28
+    $runsTxt.Height = 32
     $runsTxt.VerticalContentAlignment = 'Center'
     [void]$runsRow.Children.Add($runsTxt)
     [void]$grid.Children.Add($runsRow)
@@ -2535,7 +2539,7 @@ function New-HistoryPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'Deployment History'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'SemiBold'
+    $hdr.FontWeight = 'Bold'
     $hdr.Margin = '0,0,0,12'
     [void]$grid.Children.Add($hdr)
 
@@ -2560,19 +2564,17 @@ function New-HistoryPanel {
     $btnCsv.Name = 'btnExportCsv'
     $btnCsv.Content = 'Export CSV...'
     $btnCsv.MinWidth = 120
-    $btnCsv.Height = 28
     $btnCsv.Margin = '0,0,8,0'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnCsv, [System.Windows.Controls.CharacterCasing]::Normal)
-    $btnCsv.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    $btnCsv.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogButton')
     [void]$btnRow.Children.Add($btnCsv)
 
     $btnHtml = New-Object System.Windows.Controls.Button
     $btnHtml.Name = 'btnExportHtml'
     $btnHtml.Content = 'Export HTML...'
     $btnHtml.MinWidth = 120
-    $btnHtml.Height = 28
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnHtml, [System.Windows.Controls.CharacterCasing]::Normal)
-    $btnHtml.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    $btnHtml.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogButton')
     [void]$btnRow.Children.Add($btnHtml)
 
     [void]$grid.Children.Add($btnRow)
@@ -2590,7 +2592,7 @@ function New-HistoryPanel {
             return
         }
         $dlg = New-Object System.Windows.Forms.SaveFileDialog
-        $dlg.Title = 'Export audit log as CSV'
+        $dlg.Title = 'Export Audit Log as CSV'
         $dlg.Filter = 'CSV files (*.csv)|*.csv'
         $dlg.FileName = ('deployment-history-{0}.csv' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
         if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
@@ -2606,7 +2608,7 @@ function New-HistoryPanel {
             return
         }
         $dlg = New-Object System.Windows.Forms.SaveFileDialog
-        $dlg.Title = 'Export audit log as HTML'
+        $dlg.Title = 'Export Audit Log as HTML'
         $dlg.Filter = 'HTML files (*.html)|*.html'
         $dlg.FileName = ('deployment-history-{0}.html' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
         if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
@@ -2634,7 +2636,7 @@ function New-TemplatesPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'Deployment Templates'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'SemiBold'
+    $hdr.FontWeight = 'Bold'
     $hdr.Margin = '0,0,0,12'
     [void]$root.Children.Add($hdr)
 
@@ -2665,23 +2667,23 @@ function New-TemplatesPanel {
 
     $btnNew = New-Object System.Windows.Controls.Button
     $btnNew.Name = 'btnNew'
-    $btnNew.Content = 'New'; $btnNew.MinWidth = 68; $btnNew.Height = 28; $btnNew.FontSize = 12; $btnNew.Margin = '0,0,4,0'
+    $btnNew.Content = 'New'; $btnNew.Margin = '0,0,4,0'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnNew, [System.Windows.Controls.CharacterCasing]::Normal)
-    $btnNew.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    $btnNew.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogButton')
     [void]$tb.Children.Add($btnNew)
 
     $btnDup = New-Object System.Windows.Controls.Button
     $btnDup.Name = 'btnDup'
-    $btnDup.Content = 'Duplicate'; $btnDup.MinWidth = 68; $btnDup.Height = 28; $btnDup.FontSize = 12; $btnDup.Margin = '0,0,4,0'
+    $btnDup.Content = 'Duplicate'; $btnDup.Margin = '0,0,4,0'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnDup, [System.Windows.Controls.CharacterCasing]::Normal)
-    $btnDup.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    $btnDup.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogButton')
     [void]$tb.Children.Add($btnDup)
 
     $btnDel = New-Object System.Windows.Controls.Button
     $btnDel.Name = 'btnDelete'
-    $btnDel.Content = 'Delete'; $btnDel.MinWidth = 68; $btnDel.Height = 28; $btnDel.FontSize = 12
+    $btnDel.Content = 'Delete'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnDel, [System.Windows.Controls.CharacterCasing]::Normal)
-    $btnDel.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    $btnDel.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogButton')
     [void]$tb.Children.Add($btnDel)
 
     [void]$left.Children.Add($tb)
@@ -2713,38 +2715,38 @@ function New-TemplatesPanel {
 
     # Row 0: Name
     $lblName = New-Object System.Windows.Controls.TextBlock
-    $lblName.Text = 'Name:'; $lblName.FontSize = 12; $lblName.VerticalAlignment = 'Center'; $lblName.Margin = '0,4,8,4'
+    $lblName.Text = 'Name:'; $lblName.FontWeight = 'Bold'; $lblName.FontSize = 12; $lblName.VerticalAlignment = 'Center'; $lblName.Margin = '0,4,8,4'
     [System.Windows.Controls.Grid]::SetRow($lblName, 0); [System.Windows.Controls.Grid]::SetColumn($lblName, 0)
     [void]$form.Children.Add($lblName)
     $txtName = New-Object System.Windows.Controls.TextBox
     $txtName.Name = 'txtName'
-    $txtName.FontSize = 12; $txtName.Height = 28; $txtName.VerticalContentAlignment = 'Center'; $txtName.Margin = '0,4,0,4'
+    $txtName.FontSize = 12; $txtName.Height = 32; $txtName.VerticalContentAlignment = 'Center'; $txtName.Margin = '0,4,0,4'
     [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtName, 'e.g. Workstations - Pilot (Available)')
     [System.Windows.Controls.Grid]::SetRow($txtName, 0); [System.Windows.Controls.Grid]::SetColumn($txtName, 1); [System.Windows.Controls.Grid]::SetColumnSpan($txtName, 2)
     [void]$form.Children.Add($txtName)
 
     # Row 1: Target collection
     $lblColl = New-Object System.Windows.Controls.TextBlock
-    $lblColl.Text = 'Target collection:'; $lblColl.FontSize = 12; $lblColl.VerticalAlignment = 'Center'; $lblColl.Margin = '0,4,8,4'
+    $lblColl.Text = 'Target Collection:'; $lblColl.FontWeight = 'Bold'; $lblColl.FontSize = 12; $lblColl.VerticalAlignment = 'Center'; $lblColl.Margin = '0,4,8,4'
     [System.Windows.Controls.Grid]::SetRow($lblColl, 1); [System.Windows.Controls.Grid]::SetColumn($lblColl, 0)
     [void]$form.Children.Add($lblColl)
     $txtColl = New-Object System.Windows.Controls.TextBox
     $txtColl.Name = 'txtColl'
-    $txtColl.FontSize = 12; $txtColl.Height = 28; $txtColl.VerticalContentAlignment = 'Center'; $txtColl.Margin = '0,4,0,4'
+    $txtColl.FontSize = 12; $txtColl.Height = 32; $txtColl.VerticalContentAlignment = 'Center'; $txtColl.Margin = '0,4,0,4'
     [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtColl, 'Device collection name')
     [System.Windows.Controls.Grid]::SetRow($txtColl, 1); [System.Windows.Controls.Grid]::SetColumn($txtColl, 1)
     [void]$form.Children.Add($txtColl)
     $btnBrowseColl = New-Object System.Windows.Controls.Button
     $btnBrowseColl.Name = 'btnBrowseColl'
-    $btnBrowseColl.Content = 'Browse...'; $btnBrowseColl.Width = 90; $btnBrowseColl.Height = 28; $btnBrowseColl.Margin = '8,4,0,4'
+    $btnBrowseColl.Content = 'Browse...'; $btnBrowseColl.Margin = '8,4,0,4'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnBrowseColl, [System.Windows.Controls.CharacterCasing]::Normal)
-    $btnBrowseColl.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square')
+    $btnBrowseColl.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogButton')
     [System.Windows.Controls.Grid]::SetRow($btnBrowseColl, 1); [System.Windows.Controls.Grid]::SetColumn($btnBrowseColl, 2)
     [void]$form.Children.Add($btnBrowseColl)
 
     # Row 2: Purpose
     $lblPurp = New-Object System.Windows.Controls.TextBlock
-    $lblPurp.Text = 'Purpose:'; $lblPurp.FontSize = 12; $lblPurp.VerticalAlignment = 'Center'; $lblPurp.Margin = '0,4,8,4'
+    $lblPurp.Text = 'Purpose:'; $lblPurp.FontWeight = 'Bold'; $lblPurp.FontSize = 12; $lblPurp.VerticalAlignment = 'Center'; $lblPurp.Margin = '0,4,8,4'
     [System.Windows.Controls.Grid]::SetRow($lblPurp, 2); [System.Windows.Controls.Grid]::SetColumn($lblPurp, 0)
     [void]$form.Children.Add($lblPurp)
     $pnlPurp = New-Object System.Windows.Controls.StackPanel
@@ -2764,12 +2766,12 @@ function New-TemplatesPanel {
 
     # Row 3: Notification
     $lblNot = New-Object System.Windows.Controls.TextBlock
-    $lblNot.Text = 'Notification:'; $lblNot.FontSize = 12; $lblNot.VerticalAlignment = 'Center'; $lblNot.Margin = '0,4,8,4'
+    $lblNot.Text = 'Notification:'; $lblNot.FontWeight = 'Bold'; $lblNot.FontSize = 12; $lblNot.VerticalAlignment = 'Center'; $lblNot.Margin = '0,4,8,4'
     [System.Windows.Controls.Grid]::SetRow($lblNot, 3); [System.Windows.Controls.Grid]::SetColumn($lblNot, 0)
     [void]$form.Children.Add($lblNot)
     $cboNot = New-Object System.Windows.Controls.ComboBox
     $cboNot.Name = 'cboNot'
-    $cboNot.FontSize = 12; $cboNot.Height = 28; $cboNot.VerticalContentAlignment = 'Center'; $cboNot.Margin = '0,4,0,4'
+    $cboNot.FontSize = 12; $cboNot.Height = 32; $cboNot.VerticalContentAlignment = 'Center'; $cboNot.Margin = '0,4,0,4'
     foreach ($n in @(
         @{C='Display All'; T='DisplayAll'},
         @{C='Display in Software Center Only'; T='DisplaySoftwareCenterOnly'},
@@ -2785,7 +2787,7 @@ function New-TemplatesPanel {
 
     # Row 4: Time basis
     $lblTime = New-Object System.Windows.Controls.TextBlock
-    $lblTime.Text = 'Time basis:'; $lblTime.FontSize = 12; $lblTime.VerticalAlignment = 'Center'; $lblTime.Margin = '0,4,8,4'
+    $lblTime.Text = 'Time Basis:'; $lblTime.FontWeight = 'Bold'; $lblTime.FontSize = 12; $lblTime.VerticalAlignment = 'Center'; $lblTime.Margin = '0,4,8,4'
     [System.Windows.Controls.Grid]::SetRow($lblTime, 4); [System.Windows.Controls.Grid]::SetColumn($lblTime, 0)
     [void]$form.Children.Add($lblTime)
     $pnlTime = New-Object System.Windows.Controls.StackPanel
@@ -2805,12 +2807,12 @@ function New-TemplatesPanel {
 
     # Row 5: Deadline offset hours
     $lblDead = New-Object System.Windows.Controls.TextBlock
-    $lblDead.Text = 'Deadline offset (h):'; $lblDead.FontSize = 12; $lblDead.VerticalAlignment = 'Center'; $lblDead.Margin = '0,4,8,4'
+    $lblDead.Text = 'Deadline Offset (h):'; $lblDead.FontWeight = 'Bold'; $lblDead.FontSize = 12; $lblDead.VerticalAlignment = 'Center'; $lblDead.Margin = '0,4,8,4'
     [System.Windows.Controls.Grid]::SetRow($lblDead, 5); [System.Windows.Controls.Grid]::SetColumn($lblDead, 0)
     [void]$form.Children.Add($lblDead)
     $txtDead = New-Object System.Windows.Controls.TextBox
     $txtDead.Name = 'txtDead'
-    $txtDead.FontSize = 12; $txtDead.Height = 28; $txtDead.VerticalContentAlignment = 'Center'; $txtDead.Margin = '0,4,0,4'
+    $txtDead.FontSize = 12; $txtDead.Height = 32; $txtDead.VerticalContentAlignment = 'Center'; $txtDead.Margin = '0,4,0,4'
     $txtDead.Width = 80; $txtDead.HorizontalAlignment = 'Left'; $txtDead.Text = '0'
     [System.Windows.Controls.Grid]::SetRow($txtDead, 5); [System.Windows.Controls.Grid]::SetColumn($txtDead, 1)
     [void]$form.Children.Add($txtDead)
@@ -2830,10 +2832,10 @@ function New-TemplatesPanel {
     # Row 7: Save button
     $btnSave = New-Object System.Windows.Controls.Button
     $btnSave.Name = 'btnSave'
-    $btnSave.Content = 'Save template'; $btnSave.MinWidth = 130; $btnSave.Height = 28
+    $btnSave.Content = 'Save Template'; $btnSave.MinWidth = 130
     $btnSave.HorizontalAlignment = 'Left'; $btnSave.Margin = '0,12,0,0'
     [MahApps.Metro.Controls.ControlsHelper]::SetContentCharacterCasing($btnSave, [System.Windows.Controls.CharacterCasing]::Normal)
-    $btnSave.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'MahApps.Styles.Button.Square.Accent')
+    $btnSave.SetResourceReference([System.Windows.Controls.Control]::StyleProperty, 'DialogAccentButton')
     [System.Windows.Controls.Grid]::SetRow($btnSave, 7); [System.Windows.Controls.Grid]::SetColumn($btnSave, 0); [System.Windows.Controls.Grid]::SetColumnSpan($btnSave, 3)
     [void]$form.Children.Add($btnSave)
 
@@ -3005,7 +3007,7 @@ function New-TemplatesPanel {
         & $loadEditor $defaults
         $txtName.Focus() | Out-Null
         $txtName.SelectAll()
-        $lblStatus.Text = 'New template -- edit fields then click Save.'
+        $lblStatus.Text = 'New template. Edit the fields, then select Save Template.'
     }.GetNewClosure())
 
     $btnDup.Add_Click({
@@ -3021,14 +3023,14 @@ function New-TemplatesPanel {
         $list.SelectedIndex = -1
         & $loadEditor $copy
         $txtName.Focus() | Out-Null
-        $lblStatus.Text = 'Duplicate -- rename and click Save.'
+        $lblStatus.Text = 'Duplicate template. Rename it, then select Save Template.'
     }.GetNewClosure())
 
     $btnDel.Add_Click({
         if ($list.SelectedIndex -lt 0) { return }
         $t = $state.Items[$list.SelectedIndex]
         if (-not $t) { return }
-        $ans = & $showThemed -Owner $ownerWindow -Title 'Delete template' `
+        $ans = & $showThemed -Owner $ownerWindow -Title 'Delete Template' `
             -Message ("Delete template '{0}'?" -f $t.Name) -Buttons YesNo -Icon Question
         if ($ans -ne 'Yes') { return }
         try {
@@ -3037,14 +3039,14 @@ function New-TemplatesPanel {
             & $refreshList
             & $refreshMainCombo
         } catch {
-            [void](& $showThemed -Owner $ownerWindow -Title 'Delete failed' -Message ($_.ToString()) -Buttons OK -Icon Error)
+            [void](& $showThemed -Owner $ownerWindow -Title 'Delete Failed' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The template could not be deleted. See the log file.') -Buttons OK -Icon Error)
         }
     }.GetNewClosure())
 
     $btnSave.Add_Click({
         $name = $txtName.Text.Trim()
         if ([string]::IsNullOrWhiteSpace($name)) {
-            [void](& $showThemed -Owner $ownerWindow -Title 'Save template' -Message 'Template name cannot be empty.' -Buttons OK -Icon Warn)
+            [void](& $showThemed -Owner $ownerWindow -Title 'Save Template' -Message 'Template name cannot be empty.' -Buttons OK -Icon Warn)
             return
         }
         $config   = & $harvestConfig
@@ -3070,7 +3072,7 @@ function New-TemplatesPanel {
             }
             & $refreshMainCombo
         } catch {
-            [void](& $showThemed -Owner $ownerWindow -Title 'Save failed' -Message ($_.ToString()) -Buttons OK -Icon Error)
+            [void](& $showThemed -Owner $ownerWindow -Title 'Save Failed' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The template could not be saved. See the log file.') -Buttons OK -Icon Error)
         }
     }.GetNewClosure())
 
@@ -3089,7 +3091,7 @@ function New-AboutPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'About'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'SemiBold'
+    $hdr.FontWeight = 'Bold'
     $hdr.Margin = '0,0,0,12'
     [void]$grid.Children.Add($hdr)
 
@@ -3140,8 +3142,8 @@ function Show-OptionsDialog {
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
     Title="Options"
-    Width="860" Height="580"
-    MinWidth="760" MinHeight="480"
+    Width="1000" Height="620"
+    MinWidth="900" MinHeight="520"
     WindowStartupLocation="CenterOwner"
     TitleCharacterCasing="Normal"
     ShowIconOnTitleBar="False"
@@ -3154,6 +3156,7 @@ function Show-OptionsDialog {
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <!--SHARED_STYLES-->
         </ResourceDictionary>
     </Window.Resources>
     <Grid>
@@ -3169,7 +3172,7 @@ function Show-OptionsDialog {
 
         <ListBox Grid.Column="0" Grid.Row="0" x:Name="lstNav" BorderThickness="0" Padding="0,8,0,0">
             <ListBox.ItemContainerStyle>
-                <Style TargetType="ListBoxItem">
+                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                     <Setter Property="Padding" Value="16,10,16,10"/>
                     <Setter Property="FontSize" Value="13"/>
                 </Style>
@@ -3185,19 +3188,17 @@ function Show-OptionsDialog {
         <Border Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="1"
                 BorderBrush="{DynamicResource MahApps.Brushes.Gray8}" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,12,20,12">
-                <Button x:Name="btnOK"     Content="OK"     MinWidth="90" Height="32" Margin="0,0,8,0" IsDefault="True"
-                        Style="{DynamicResource MahApps.Styles.Button.Square.Accent}"
-                        Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
-                <Button x:Name="btnCancel" Content="Cancel" MinWidth="90" Height="32" IsCancel="True"
-                        Style="{DynamicResource MahApps.Styles.Button.Square}"
-                        Controls:ControlsHelper.ContentCharacterCasing="Normal"/>
+                <Button x:Name="btnOK"     Content="OK" IsDefault="True"
+                        Style="{StaticResource DialogAccentButton}"/>
+                <Button x:Name="btnCancel" Content="Cancel" Margin="0" IsCancel="True"
+                        Style="{StaticResource DialogButton}"/>
             </StackPanel>
         </Border>
     </Grid>
 </Controls:MetroWindow>
 '@
 
-    [xml]$xml = $dlgXaml
+    [xml]$xml = $dlgXaml.Replace($script:SharedStyleMarker, (Get-SharedStyleXaml))
     $reader = New-Object System.Xml.XmlNodeReader $xml
     $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
     Install-TitleBarDragFallback -Window $dlg
@@ -3248,7 +3249,7 @@ function Show-OptionsDialog {
             $script:OptionsDlgResult = $true
             $dlg.Close()
         } catch {
-            [void](Show-ThemedMessage -Owner $dlg -Title 'Save failed' -Message ('Save failed: {0}' -f $_.Exception.Message) -Buttons OK -Icon Error)
+            [void](Show-ThemedMessage -Owner $dlg -Title 'Save Failed' -Message ('The options could not be saved: {0}' -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Error)
         }
     })
 
@@ -3352,7 +3353,7 @@ $script:SetCurrentType = {
 # One object, one ring plan, N ordinary deployments. The preview grid holds
 # the expanded rings for this run only; plan files are never written here.
 # Create-all makes every ring now with future dates. Hold later rings writes
-# a run file, creates ring 1, and leaves the rest to Promote in Open runs.
+# a run file, creates ring 1, and leaves the rest to Promote in Open Runs.
 # =============================================================================
 $script:RingPlans           = @()
 $script:RingPlanErrors      = @()
@@ -3363,10 +3364,10 @@ $script:RingViewInitialized = $false
 $dgRingPreview.ItemsSource  = $script:RingPreviewRows
 
 $script:RingTypeBrowse = @{
-    'Application'  = @{ Browse = 'Apps';          NameProperty = 'LocalizedDisplayName'; Title = 'Browse applications';           Watermark = 'Filter by name, version, or CI ID' }
-    'Package'      = @{ Browse = 'Packages';      NameProperty = 'Name';                 Title = 'Browse packages';               Watermark = 'Filter by name, package ID, manufacturer, or version' }
-    'TaskSequence' = @{ Browse = 'TaskSequences'; NameProperty = 'Name';                 Title = 'Browse task sequences';         Watermark = 'Filter by name, package ID, or description' }
-    'SUG'          = @{ Browse = 'SUG';           NameProperty = 'LocalizedDisplayName'; Title = 'Browse software update groups'; Watermark = 'Filter by name' }
+    'Application'  = @{ Browse = 'Apps';          NameProperty = 'LocalizedDisplayName'; Title = 'Browse Applications';           Watermark = 'Filter by name, version, or CI ID' }
+    'Package'      = @{ Browse = 'Packages';      NameProperty = 'Name';                 Title = 'Browse Packages';               Watermark = 'Filter by name, package ID, manufacturer, or version' }
+    'TaskSequence' = @{ Browse = 'TaskSequences'; NameProperty = 'Name';                 Title = 'Browse Task Sequences';         Watermark = 'Filter by name, package ID, or description' }
+    'SUG'          = @{ Browse = 'SUG';           NameProperty = 'LocalizedDisplayName'; Title = 'Browse Software Update Groups'; Watermark = 'Filter by name' }
 }
 
 function Get-RingSelectedType {
@@ -3495,10 +3496,10 @@ function Get-RingPreviewSubmission {
         $label = Get-RingLabel -Ring $row
         $row.CollectionID = ([string]$row.CollectionID).Trim().ToUpperInvariant()
         try { $row.AvailableDateTime = ConvertFrom-RingDateText $row.AvailableText }
-        catch { $errors.Add(('{0} available: {1}' -f $label, $_.Exception.Message)) }
+        catch { $errors.Add(('{0} available: {1}' -f $label, (Get-UserErrorText -ErrorRecord $_ -Fallback 'The date is not valid.'))) }
         if ($row.Purpose -eq 'Required') {
             try { $row.DeadlineDateTime = ConvertFrom-RingDateText $row.DeadlineText }
-            catch { $errors.Add(('{0} deadline: {1}' -f $label, $_.Exception.Message)) }
+            catch { $errors.Add(('{0} deadline: {1}' -f $label, (Get-UserErrorText -ErrorRecord $_ -Fallback 'The date is not valid.'))) }
         }
         else {
             $row.DeadlineDateTime = $null
@@ -3533,7 +3534,7 @@ function Invoke-RingValidate {
 
     $sub = Get-RingPreviewSubmission
     if (@($sub.Errors).Count -gt 0) {
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring preview' -Message ("Fix the preview dates (yyyy-MM-dd HH:mm):`n" + (Format-RingMessageList $sub.Errors)) -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Preview' -Message ("Fix the preview dates (yyyy-MM-dd HH:mm):`n" + (Format-RingMessageList $sub.Errors)) -Buttons OK -Icon Error)
         return
     }
     foreach ($row in $sub.Rows) { $row.Checks = '' }
@@ -3542,7 +3543,7 @@ function Invoke-RingValidate {
     if (@($exp.Errors).Count -gt 0) {
         foreach ($e in $exp.Errors) { Add-LogLine -Message ('Ring rule: ' + $e) }
         Update-RingPreviewGrid
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring run blocked' -Message ("The rings break these rules:`n" + (Format-RingMessageList $exp.Errors)) -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Run Blocked' -Message ("The rings break these rules:`n" + (Format-RingMessageList $exp.Errors)) -Buttons OK -Icon Error)
         Set-StatusText -Text 'Ring run blocked by plan rules.'
         return
     }
@@ -3711,7 +3712,7 @@ function Invoke-RingCreate {
     if (@($v.Warnings).Count -gt 0) { $msg += ("`n`nWarnings:`n" + (Format-RingMessageList $v.Warnings)) }
     $msg += "`n`nContinue?"
     $icon = if (@($v.Warnings).Count -gt 0) { 'Warn' } else { 'Question' }
-    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm ring deployment' -Message $msg -Buttons OKCancel -Icon $icon
+    $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm Ring Deployment' -Message $msg -Buttons OKCancel -Icon $icon
     if ($confirm -ne 'OK') { Add-LogLine -Message 'Ring deployment cancelled by user.'; return }
 
     $runId = New-RingRunId
@@ -3754,7 +3755,7 @@ function Invoke-RingCreateAll {
     }
     if (-not $failure) {
         Set-StatusText -Text ('Created {0} ring deployment(s).' -f $created.Count)
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring deployment' -Message ("Created {0} of {0} deployment(s). Run ID {1}. Configuration Manager enforces each ring's dates." -f $created.Count, $RunId) -Buttons OK -Icon Info)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Deployment' -Message ("Created {0} of {0} deployment(s). Run ID {1}. Configuration Manager enforces each ring's dates." -f $created.Count, $RunId) -Buttons OK -Icon Info)
         return
     }
     $notCreated = @($rows | Where-Object { $created -notcontains $_ } | ForEach-Object { Get-RingLabel -Ring $_ })
@@ -3764,14 +3765,14 @@ function Invoke-RingCreateAll {
             (Get-RingLabel -Ring $failure.Ring), $failure.Error,
             (($created | ForEach-Object { Get-RingLabel -Ring $_ }) -join ', '),
             ($notCreated -join ', '))
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring run stopped: audit failure' -Message $text -Buttons OK -Icon Warn)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Run Stopped: Audit Failure' -Message $text -Buttons OK -Icon Warn)
     }
     else {
         $text = ("{0} failed: {1}`n`nCreated: {2}`nNot created: {3}`n`nThe created deployments stay in Configuration Manager." -f
             (Get-RingLabel -Ring $failure.Ring), $failure.Error,
             $(if ($created.Count) { ($created | ForEach-Object { Get-RingLabel -Ring $_ }) -join ', ' } else { 'none' }),
             ($notCreated -join ', '))
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring run stopped' -Message $text -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Run Stopped' -Message $text -Buttons OK -Icon Error)
     }
 }
 
@@ -3785,7 +3786,7 @@ function Invoke-RingCreateHeld {
     # still leaves a run that Promote can find.
     try { $path = New-RingRunFile -Run $run -Folder $script:RingRunStatePath -FileName $fileName }
     catch {
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring run not started' -Message ("The run file could not be written: {0}`n`nNothing was created." -f $_.Exception.Message) -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Run Not Started' -Message ("The run file could not be written: {0}`n`nNothing was created." -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Error)
         return
     }
     Add-LogLine -Message ('Run file written: {0}' -f $path)
@@ -3798,32 +3799,32 @@ function Invoke-RingCreateHeld {
         [void](Set-RingRunRingStatus -Run $run -RingIndex 1 -Status Creating)
         try { Save-RingRun -Run $run -Path $path }
         catch {
-            [void](Show-ThemedMessage -Owner $window -Title 'Ring run not started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f $_.Exception.Message) -Buttons OK -Icon Error)
+            [void](Show-ThemedMessage -Owner $window -Title 'Ring Run Not Started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Error)
             return
         }
         $res = Invoke-RingOneDeployment -Validated $Validated -Ring $ring1 -Collection $Validated.Collections[1] -RunId $RunId
         if (-not $res.Success) {
             [void](Set-RingRunRingStatus -Run $run -RingIndex 1 -Status Held)
             try { Save-RingRun -Run $run -Path $path }
-            catch { Add-LogLine -Message ("Ring 1 remains Creating until live reconciliation can confirm no deployment exists: {0}" -f $_.Exception.Message) }
+            catch { Add-LogLine -Message ("Ring 1 remains Creating until live reconciliation can confirm no deployment exists: {0}" -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) }
             $row1.Checks = ('Failed: {0}' -f $res.Error)
-            [void](Show-ThemedMessage -Owner $window -Title 'Ring 1 failed' -Message ("{0}`n`nThe run stays open. If the run file could not be updated, refresh Open runs after the create recovery wait." -f $res.Error) -Buttons OK -Icon Error)
+            [void](Show-ThemedMessage -Owner $window -Title 'Ring 1 Failed' -Message ("{0}`n`nThe run stays open. If the run file could not be updated, refresh Open Runs after the create recovery wait." -f $res.Error) -Buttons OK -Icon Error)
             return
         }
         $row1.Checks = ('Created: {0}' -f $res.DeploymentID)
         [void](Set-RingRunRingStatus -Run $run -RingIndex 1 -Status Created -DeploymentID (Get-RingRecordedId -Result $res) -AssignmentID $res.DeploymentID)
         try { Save-RingRun -Run $run -Path $path }
         catch {
-            [void](Show-ThemedMessage -Owner $window -Title 'Run file not updated' -Message ("Ring 1 was created (DeploymentID {0}), but the run file could not be updated: {1}`n`nThe saved run marks ring 1 Creating. Refresh Open runs to reconcile and adopt the deployment; do not retry it manually." -f $res.DeploymentID, $_.Exception.Message) -Buttons OK -Icon Warn)
+            [void](Show-ThemedMessage -Owner $window -Title 'Run File Not Updated' -Message ("Ring 1 was created (DeploymentID {0}), but the run file could not be updated: {1}`n`nThe saved run marks ring 1 Creating. Refresh Open Runs to reconcile and adopt the deployment; do not retry it manually." -f $res.DeploymentID, (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Warn)
             return
         }
         Set-StatusText -Text 'Ring 1 created; later rings held.'
-        $message = ("Ring 1 created (DeploymentID {0}). {1} later ring(s) are held.`n`nUse Promote in Open runs after you check ring 1." -f $res.DeploymentID, (@($Validated.Rows).Count - 1))
+        $message = ("Ring 1 created (DeploymentID {0}). {1} later ring(s) are held.`n`nUse Promote in Open Runs after you check ring 1." -f $res.DeploymentID, (@($Validated.Rows).Count - 1))
         if (-not $res.AuditLogged) { $message += ("`n`nThe deployment exists, but its audit record failed: {0}" -f $res.AuditError) }
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring deployment' -Message $message -Buttons OK -Icon $(if ($res.AuditLogged) { 'Info' } else { 'Warn' }))
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Deployment' -Message $message -Buttons OK -Icon $(if ($res.AuditLogged) { 'Info' } else { 'Warn' }))
     }
     catch {
-        [void](Show-ThemedMessage -Owner $window -Title 'Ring deployment' -Message $_.Exception.Message -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Ring Deployment' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The ring deployment failed. See the log file.') -Buttons OK -Icon Error)
     }
     finally {
         Exit-RingRunLock -LockPath $lock
@@ -3840,7 +3841,7 @@ function Update-RingRunsGrid {
     param([switch]$Live)
 
     $showClosed = [bool]$chkRingShowClosed.IsChecked
-    $lblRingRuns.Text = if ($showClosed) { 'CLOSED RUNS' } else { 'OPEN RUNS' }
+    $lblRingRuns.Text = if ($showClosed) { 'Closed Runs' } else { 'Open Runs' }
     $live = $Live -and -not $showClosed
     $gridRows = New-Object System.Collections.ObjectModel.ObservableCollection[PSObject]
 
@@ -3895,7 +3896,7 @@ function Update-RingRunsGrid {
                 }
             }
             catch {
-                $runNote = $_.Exception.Message
+                $runNote = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The run state could not be saved. See the log file.')
                 if ($rec) {
                     foreach ($i in $rec.Recovered) {
                         $recoveryNotes[[int]$i] = ("A matching deployment was found, but the recovered run state could not be saved: {0}" -f $runNote)
@@ -3911,7 +3912,7 @@ function Update-RingRunsGrid {
             }
         }
         else {
-            try { $run = Read-RingRun -Path $f.FullName } catch { $runNote = $_.Exception.Message }
+            try { $run = Read-RingRun -Path $f.FullName } catch { $runNote = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The run file could not be read. See the log file.') }
         }
 
         if (-not $run) {
@@ -3936,7 +3937,7 @@ function Update-RingRunsGrid {
             elseif ([int]$r.ShiftedMinutes -gt 0) { $note = ('Dates moved {0} minutes later at promote.' -f $r.ShiftedMinutes) }
             elseif ($r.Status -eq 'Created' -and -not $live -and -not $showClosed) { $note = 'Refresh to read live counts.' }
             if ($r.Status -eq 'Creating') {
-                $note = if ($recoveryNotes.ContainsKey($idx)) { [string]$recoveryNotes[$idx] } else { 'Create outcome unresolved. Refresh and reconcile before retrying.' }
+                $note = if ($recoveryNotes.ContainsKey($idx)) { [string]$recoveryNotes[$idx] } else { 'Create outcome unresolved. Refresh and Reconcile before retrying.' }
             }
 
             $row = [PSCustomObject]@{
@@ -3971,7 +3972,7 @@ function Update-RingRunsGrid {
                         $row.PromoteTip = ('Create ring {0}. Ring {1} has no success threshold.' -f $idx, ($idx - 1))
                     }
                     elseif (-not $live) {
-                        $row.PromoteTip = 'Click Refresh and reconcile to read ring counts first.'
+                        $row.PromoteTip = 'Select Refresh and Reconcile to read ring counts first.'
                     }
                     else {
                         $t = Test-RingThreshold -Summary $summaries[$idx - 1] -ThresholdPercent $prev.SuccessThresholdPercent
@@ -3994,7 +3995,7 @@ function Invoke-RingPromote {
     $lock = $null
     try { $lock = Enter-RingRunLock -Path $RunPath }
     catch {
-        [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message $_.Exception.Message -Buttons OK -Icon Warn)
+        [void](Show-ThemedMessage -Owner $window -Title 'Promote Refused' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The run file could not be locked. See the log file.') -Buttons OK -Icon Warn)
         return
     }
 
@@ -4005,7 +4006,7 @@ function Invoke-RingPromote {
         $run = Read-RingRun -Path $RunPath
         $check = Test-RingRunPromotable -Run $run -RingIndex $RingIndex
         if (-not $check.Ok) {
-            [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message $check.Reason -Buttons OK -Icon Warn)
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote Refused' -Message $check.Reason -Buttons OK -Icon Warn)
             return
         }
         $ring = Get-RingRunRing -Run $run -RingIndex $RingIndex
@@ -4015,7 +4016,7 @@ function Invoke-RingPromote {
             $prevSummary = Get-RingLiveSummary -Ring $prev -ObjectType $run.Object.Type
             $t = Test-RingThreshold -Summary $prevSummary -ThresholdPercent $prev.SuccessThresholdPercent
             if (-not $t.Met) {
-                [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message ('{0}: {1}' -f (Get-RingLabel -Ring $prev), $t.Reason) -Buttons OK -Icon Warn)
+                [void](Show-ThemedMessage -Owner $window -Title 'Promote Refused' -Message ('{0}: {1}' -f (Get-RingLabel -Ring $prev), $t.Reason) -Buttons OK -Icon Warn)
                 return
             }
         }
@@ -4024,7 +4025,7 @@ function Invoke-RingPromote {
             -Rings @($ring) -ExpectedObjectId $run.Object.ID
         if (-not $pre.Ok) {
             $why = if ($pre.ObjectMessage) { $pre.ObjectMessage } else { $pre.Rings[0].Message }
-            [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message ('{0}: {1}' -f (Get-RingLabel -Ring $ring), $why) -Buttons OK -Icon Error)
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote Refused' -Message ('{0}: {1}' -f (Get-RingLabel -Ring $ring), $why) -Buttons OK -Icon Error)
             return
         }
         $collection = $pre.Rings[0].Collection
@@ -4034,7 +4035,7 @@ function Invoke-RingPromote {
         if ($shift -gt 0) { [void](Move-RingRunSchedule -Run $run -FromIndex $RingIndex -Minutes $shift) }
         $exp = Test-RingExpansion -Rings @($ring) -Now $now
         if (@($exp.Errors).Count -gt 0) {
-            [void](Show-ThemedMessage -Owner $window -Title 'Promote refused' -Message (Format-RingMessageList $exp.Errors) -Buttons OK -Icon Error)
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote Refused' -Message (Format-RingMessageList $exp.Errors) -Buttons OK -Icon Error)
             return
         }
 
@@ -4046,7 +4047,7 @@ function Invoke-RingPromote {
         }
         if (@($exp.Warnings).Count -gt 0) { $msg += ("`n`nWarnings:`n" + (Format-RingMessageList $exp.Warnings)) }
         $msg += "`n`nContinue?"
-        $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm promote' -Message $msg -Buttons OKCancel -Icon Question
+        $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm Promote' -Message $msg -Buttons OKCancel -Icon Question
         if ($confirm -ne 'OK') { Add-LogLine -Message 'Promote cancelled by user.'; return }
 
         $validated = @{
@@ -4059,21 +4060,21 @@ function Invoke-RingPromote {
         [void](Set-RingRunRingStatus -Run $run -RingIndex $RingIndex -Status Creating)
         try { Save-RingRun -Run $run -Path $RunPath }
         catch {
-            [void](Show-ThemedMessage -Owner $window -Title 'Promote not started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f $_.Exception.Message) -Buttons OK -Icon Error)
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote Not Started' -Message ("The run could not record its create intent: {0}`n`nNothing was created." -f (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Error)
             return
         }
         $res = Invoke-RingOneDeployment -Validated $validated -Ring $ring -Collection $collection -RunId ([string]$run.RunId)
         if (-not $res.Success) {
             [void](Set-RingRunRingStatus -Run $run -RingIndex $RingIndex -Status Held)
             try { Save-RingRun -Run $run -Path $RunPath }
-            catch { Add-LogLine -Message ("Ring {0} remains Creating until live reconciliation can confirm no deployment exists: {1}" -f $RingIndex, $_.Exception.Message) }
-            [void](Show-ThemedMessage -Owner $window -Title 'Promote failed' -Message ("{0}`n`nIf the run file could not be updated, refresh Open runs after the create recovery wait." -f $res.Error) -Buttons OK -Icon Error)
+            catch { Add-LogLine -Message ("Ring {0} remains Creating until live reconciliation can confirm no deployment exists: {1}" -f $RingIndex, (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) }
+            [void](Show-ThemedMessage -Owner $window -Title 'Promote Failed' -Message ("{0}`n`nIf the run file could not be updated, refresh Open Runs after the create recovery wait." -f $res.Error) -Buttons OK -Icon Error)
             return
         }
         [void](Set-RingRunRingStatus -Run $run -RingIndex $RingIndex -Status Created -DeploymentID (Get-RingRecordedId -Result $res) -AssignmentID $res.DeploymentID)
         try { Save-RingRun -Run $run -Path $RunPath }
         catch {
-            [void](Show-ThemedMessage -Owner $window -Title 'Run file not updated' -Message ("Ring {0} was created (DeploymentID {1}), but the run file could not be updated: {2}`n`nThe saved run marks this ring Creating. Refresh Open runs to reconcile and adopt the deployment; do not retry it manually." -f $RingIndex, $res.DeploymentID, $_.Exception.Message) -Buttons OK -Icon Warn)
+            [void](Show-ThemedMessage -Owner $window -Title 'Run File Not Updated' -Message ("Ring {0} was created (DeploymentID {1}), but the run file could not be updated: {2}`n`nThe saved run marks this ring Creating. Refresh Open Runs to reconcile and adopt the deployment; do not retry it manually." -f $RingIndex, $res.DeploymentID, (Get-UserErrorText -ErrorRecord $_ -Fallback 'See the log file.')) -Buttons OK -Icon Warn)
             return
         }
         Set-StatusText -Text ('Ring {0} created.' -f $RingIndex)
@@ -4082,11 +4083,11 @@ function Invoke-RingPromote {
             $auditMessage = ("Ring {0} exists, but its audit record failed: {1}" -f $RingIndex, $res.AuditError)
             Add-LogLine -Message $auditMessage
             Set-StatusText -Text 'Ring created; audit write failed.'
-            [void](Show-ThemedMessage -Owner $window -Title 'Audit log write failed' -Message $auditMessage -Buttons OK -Icon Warn)
+            [void](Show-ThemedMessage -Owner $window -Title 'Audit Log Write Failed' -Message $auditMessage -Buttons OK -Icon Warn)
         }
     }
     catch {
-        [void](Show-ThemedMessage -Owner $window -Title 'Promote' -Message $_.Exception.Message -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Promote' -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The promote failed. See the log file.') -Buttons OK -Icon Error)
     }
     finally {
         $window.Cursor = $null
@@ -4163,7 +4164,7 @@ $btnRingPickCollection.Add_Click({
     $picked = Show-CollectionBrowseItem -Owner $window -Force:$reload
     if (-not $picked) { return }
     if (Test-CollectionIdBuiltIn -CollectionId ([string]$picked.CollectionID)) {
-        [void](Show-ThemedMessage -Owner $window -Title 'Collection blocked' -Message ('{0} ({1}) is a built-in collection. Rings never target built-in collections.' -f $picked.Name, $picked.CollectionID) -Buttons OK -Icon Error)
+        [void](Show-ThemedMessage -Owner $window -Title 'Collection Blocked' -Message ('{0} ({1}) is a built-in collection. Rings never target built-in collections.' -f $picked.Name, $picked.CollectionID) -Buttons OK -Icon Error)
         return
     }
     $row.CollectionID   = [string]$picked.CollectionID
@@ -4231,7 +4232,7 @@ $btnBrowseTarget.Add_Click({
     if (-not (Connect-IfNeeded)) { return }
     switch ($script:CurrentType) {
         'Apps' {
-            $picked = Show-BrowseDialog -Owner $window -Title 'Browse applications' `
+            $picked = Show-BrowseDialog -Owner $window -Title 'Browse Applications' `
                 -Watermark 'Filter by name, version, or CI ID' `
                 -Type 'Apps' -NameProperty 'LocalizedDisplayName'
             if ($picked) {
@@ -4240,7 +4241,7 @@ $btnBrowseTarget.Add_Click({
             }
         }
         'Packages' {
-            $picked = Show-BrowseDialog -Owner $window -Title 'Browse packages' `
+            $picked = Show-BrowseDialog -Owner $window -Title 'Browse Packages' `
                 -Watermark 'Filter by name, package ID, manufacturer, or version' `
                 -Type 'Packages' -NameProperty 'Name'
             if ($picked) {
@@ -4251,7 +4252,7 @@ $btnBrowseTarget.Add_Click({
             }
         }
         'TaskSequences' {
-            $picked = Show-BrowseDialog -Owner $window -Title 'Browse task sequences' `
+            $picked = Show-BrowseDialog -Owner $window -Title 'Browse Task Sequences' `
                 -Watermark 'Filter by name, package ID, or description' `
                 -Type 'TaskSequences' -NameProperty 'Name'
             if ($picked) {
@@ -4260,7 +4261,7 @@ $btnBrowseTarget.Add_Click({
             }
         }
         'SUG' {
-            $picked = Show-BrowseDialog -Owner $window -Title 'Browse software update groups' `
+            $picked = Show-BrowseDialog -Owner $window -Title 'Browse Software Update Groups' `
                 -Watermark 'Filter by name' `
                 -Type 'SUG' -NameProperty 'LocalizedDisplayName'
             if ($picked) {
@@ -4383,9 +4384,9 @@ $btnDeploy.Add_Click({
 # =============================================================================
 $logContextMenu = New-Object System.Windows.Controls.ContextMenu
 $miClearLog = New-Object System.Windows.Controls.MenuItem
-$miClearLog.Header = 'Clear log'
+$miClearLog.Header = 'Clear Log'
 $miCopyLog  = New-Object System.Windows.Controls.MenuItem
-$miCopyLog.Header  = 'Copy log to clipboard'
+$miCopyLog.Header  = 'Copy Log to Clipboard'
 [void]$logContextMenu.Items.Add($miClearLog)
 [void]$logContextMenu.Items.Add($miCopyLog)
 $txtLog.ContextMenu = $logContextMenu

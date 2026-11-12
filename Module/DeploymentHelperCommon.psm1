@@ -35,6 +35,33 @@ if (-not (Get-Module SuiteCommon)) {
 }
 
 # ---------------------------------------------------------------------------
+# User-facing error text
+# ---------------------------------------------------------------------------
+
+function Get-UserErrorText {
+    <#
+    .SYNOPSIS
+        Returns the text of an error that the window may show.
+
+    .DESCRIPTION
+        A message that this tool throws itself (throw 'text') is written for the user and passes
+        through. Any other error (a Configuration Manager, WMI, file or .NET exception) is raw
+        exception text. It goes to the log file and the caller gets the fallback sentence.
+        Every catch block that feeds the window, a dialog or a result property uses this function.
+    #>
+    param(
+        [Parameter(Mandatory)]$ErrorRecord,
+        [Parameter(Mandatory)][string]$Fallback
+    )
+    $ex = $ErrorRecord.Exception
+    if ($null -ne $ex -and $ex.GetType().FullName -eq 'System.Management.Automation.RuntimeException' -and $null -eq $ex.InnerException) {
+        return [string]$ex.Message
+    }
+    if ($null -ne $ex) { Write-Log ('Error detail kept out of the window: {0}' -f $ex.Message) -Level ERROR }
+    return $Fallback
+}
+
+# ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
 
@@ -262,7 +289,7 @@ function Test-ContentDistributed {
     }
     catch {
         Write-Log "Error checking distribution status: $_" -Level ERROR
-        return @{ Targeted = 0; NumberSuccess = 0; NumberInProgress = 0; NumberErrors = 0; IsFullyDistributed = $false; Error = $_.ToString() }
+        return @{ Targeted = 0; NumberSuccess = 0; NumberInProgress = 0; NumberErrors = 0; IsFullyDistributed = $false; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The distribution status could not be read. See the log file.') }
     }
 }
 
@@ -298,7 +325,7 @@ function Start-ContentDistributionToGroups {
                 $results += @{ Group = $groupName; Success = $true; AlreadyTargeted = $true }
             } else {
                 Write-Log "Error distributing to DP group '$groupName': $_" -Level ERROR
-                $results += @{ Group = $groupName; Success = $false; Error = $_.ToString() }
+                $results += @{ Group = $groupName; Success = $false; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The content could not be distributed. See the log file.') }
             }
         }
     }
@@ -335,17 +362,16 @@ function Invoke-ContentDistributionToGroups {
             $results += @{ Group = $groupName; Success = $true }
         }
         catch {
-            $msg = $_.Exception.Message
             # Different CM builds phrase "already distributed" differently; accept a
             # broad match rather than brittle exact wording.
-            if ($msg -match 'already been targeted' -or
-                $msg -match 'already been distributed' -or
-                $msg -match 'No content destination.*already been distributed') {
+            if ($_.Exception.Message -match 'already been targeted' -or
+                $_.Exception.Message -match 'already been distributed' -or
+                $_.Exception.Message -match 'No content destination.*already been distributed') {
                 Write-Log "DP group '$groupName' already has this content"
                 $results += @{ Group = $groupName; Success = $true; AlreadyTargeted = $true }
             } else {
                 Write-Log "Error distributing to DP group '$groupName': $_" -Level ERROR
-                $results += @{ Group = $groupName; Success = $false; Error = $_.ToString() }
+                $results += @{ Group = $groupName; Success = $false; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The content could not be distributed. See the log file.') }
             }
         }
     }
@@ -523,7 +549,7 @@ function Test-DuplicateDeployment {
     }
     catch {
         Write-Log "Error checking for duplicate deployment: $_" -Level ERROR
-        return [PSCustomObject]@{ DuplicateCheckFailed = $true; Error = $_.Exception.Message }
+        return [PSCustomObject]@{ DuplicateCheckFailed = $true; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The duplicate check failed. See the log file.') }
     }
 }
 
@@ -641,7 +667,7 @@ function Invoke-ApplicationDeployment {
             Success            = $false
             DeploymentID       = $null
             DeploymentUniqueID = $null
-            Error              = $_.ToString()
+            Error              = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be created. See the log file.')
         }
     }
 }
@@ -718,7 +744,7 @@ function Invoke-SUGDeployment {
             Success            = $false
             DeploymentID       = $null
             DeploymentUniqueID = $null
-            Error              = $_.ToString()
+            Error              = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be created. See the log file.')
         }
     }
 }
@@ -796,7 +822,7 @@ function Test-DeploymentLogWritable {
         return @{ Success = $true; Error = $null }
     }
     catch {
-        return @{ Success = $false; Error = $_.Exception.Message }
+        return @{ Success = $false; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The audit log file cannot be written. See the log file.') }
     }
     finally {
         if ($null -ne $stream) { try { $stream.Dispose() } catch { $null = $_ } }
@@ -843,9 +869,8 @@ function Write-DeploymentLog {
         return @{ Success = $true; Error = $null }
     }
     catch {
-        $errorMessage = $_.Exception.Message
-        Write-Log ("Audit log write failed ({0}): {1}" -f $LogPath, $errorMessage) -Level WARN
-        return @{ Success = $false; Error = $errorMessage }
+        Write-Log ("Audit log write failed ({0}): {1}" -f $LogPath, $_.Exception.Message) -Level WARN
+        return @{ Success = $false; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The audit log file cannot be written. See the log file.') }
     }
 }
 
@@ -1062,7 +1087,7 @@ function Test-DuplicatePackageDeployment {
     }
     catch {
         Write-Log "Error checking duplicate package deployment: $_" -Level ERROR
-        return [PSCustomObject]@{ DuplicateCheckFailed = $true; Error = $_.Exception.Message }
+        return [PSCustomObject]@{ DuplicateCheckFailed = $true; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The duplicate check failed. See the log file.') }
     }
 }
 
@@ -1103,7 +1128,7 @@ function Test-DuplicateSUGDeployment {
     }
     catch {
         Write-Log "Error checking duplicate SUG deployment: $_" -Level ERROR
-        return [PSCustomObject]@{ DuplicateCheckFailed = $true; Error = $_.Exception.Message }
+        return [PSCustomObject]@{ DuplicateCheckFailed = $true; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The duplicate check failed. See the log file.') }
     }
 }
 
@@ -1162,7 +1187,7 @@ function Test-DuplicateTaskSequenceDeployment {
     }
     catch {
         Write-Log "Error checking duplicate TS deployment: $_" -Level ERROR
-        return [PSCustomObject]@{ DuplicateCheckFailed = $true; Error = $_.Exception.Message }
+        return [PSCustomObject]@{ DuplicateCheckFailed = $true; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The duplicate check failed. See the log file.') }
     }
 }
 
@@ -1247,7 +1272,7 @@ function Invoke-TaskSequenceDeployment {
             Success            = $false
             DeploymentID       = $null
             DeploymentUniqueID = $null
-            Error              = $_.ToString()
+            Error              = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be created. See the log file.')
         }
     }
 }
@@ -1363,7 +1388,7 @@ function Invoke-PackageDeployment {
             Success            = $false
             DeploymentID       = $null
             DeploymentUniqueID = $null
-            Error              = $_.ToString()
+            Error              = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be created. See the log file.')
         }
     }
 }
@@ -1704,7 +1729,7 @@ function Import-RingPlan {
         $obj = ConvertTo-RingJsonText -InputObject ($raw | ConvertFrom-Json -ErrorAction Stop)
     }
     catch {
-        throw ("Plan {0} failed to load: {1}" -f $leaf, $_.Exception.Message)
+        throw ("Plan {0} failed to load: {1}" -f $leaf, (Get-UserErrorText -ErrorRecord $_ -Fallback 'The file cannot be read or is not valid JSON.'))
     }
     $result = ConvertTo-RingPlan -InputObject $obj
     if (@($result.Errors).Count -gt 0) {
@@ -1728,8 +1753,8 @@ function Get-RingPlanList {
     foreach ($f in @(Get-ChildItem -LiteralPath $Path -Filter '*.json' -File -ErrorAction SilentlyContinue | Sort-Object Name)) {
         try { $plans += Import-RingPlan -Path $f.FullName }
         catch {
-            $errors += $_.Exception.Message
-            Write-Log $_.Exception.Message -Level WARN
+            $errors += (Get-UserErrorText -ErrorRecord $_ -Fallback ('Plan {0} could not be loaded.' -f $f.Name))
+            Write-Log ('Ring plan {0} refused: {1}' -f $f.Name, $_.Exception.Message) -Level WARN
         }
     }
     Write-Log ("Ring plans: {0} loaded, {1} refused" -f $plans.Count, $errors.Count)
@@ -2173,7 +2198,7 @@ function Test-RingRunPromotable {
     $ring = Get-RingRunRing -Run $Run -RingIndex $RingIndex
     if ($null -eq $ring) { return @{ Ok = $false; Reason = "Ring $RingIndex is not in this run." } }
     if ([string]$ring.Status -eq 'Creating') {
-        return @{ Ok = $false; Reason = ("Ring {0} has an unresolved create attempt. Refresh and reconcile before trying again." -f $RingIndex) }
+        return @{ Ok = $false; Reason = ("Ring {0} has an unresolved create attempt. Refresh and Reconcile before trying again." -f $RingIndex) }
     }
     if ([string]$ring.Status -ne 'Held') {
         return @{ Ok = $false; Reason = ("Ring {0} is {1}, not Held. The run file changed after it was loaded." -f $RingIndex, $ring.Status) }
@@ -2282,7 +2307,7 @@ function Get-RingDeploymentSummary {
         $d = @(Get-CMDeployment -DeploymentId $DeploymentId -ErrorAction Stop)
     }
     catch {
-        $empty.Error = $_.Exception.Message
+        $empty.Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment status could not be read. See the log file.')
         Write-Log ("Deployment summary read failed for {0}: {1}" -f $DeploymentId, $_.Exception.Message) -Level WARN
         return [PSCustomObject]$empty
     }
@@ -2332,7 +2357,7 @@ function Test-RingDeploymentExist {
         }
     }
     catch {
-        return @{ Exists = $null; Error = $_.Exception.Message }
+        return @{ Exists = $null; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployment could not be read from the site. See the log file.') }
     }
     return @{ Exists = (@($found | Where-Object { $null -ne $_ }).Count -gt 0); Error = $null }
 }
@@ -2392,7 +2417,7 @@ function Get-RingLiveSummary {
         }
         catch {
             $s.Found = $null
-            $s.Error = $_.Exception.Message
+            $s.Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The deployments of the collection could not be read. See the log file.')
             return $s
         }
         $recordedAssignment = [string]$Ring.AssignmentID
@@ -2470,7 +2495,7 @@ function Update-RingRunReconcile {
                 $recoveryNotes[$idx] = ('Recovered the existing deployment {0} into the run.' -f $reference.DeploymentID)
             }
             catch {
-                $recoveryNotes[$idx] = $_.Exception.Message
+                $recoveryNotes[$idx] = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The existing deployment could not be recovered into the run. See the log file.')
             }
             continue
         }

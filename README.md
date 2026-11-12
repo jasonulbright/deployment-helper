@@ -67,7 +67,7 @@ To run a plan:
 3. Select the plan and the plan start. Click **Expand** to compute each ring's dates.
 4. Set each ring's collection in the preview, or set `CollectionID` in the plan file. Edits in the preview apply to this run only.
 5. Click **Validate**. Each ring must pass the five checks and the plan rules.
-6. Click **Create deployments**. The confirmation lists every deployment that the run creates.
+6. Click **Create Deployments**. The confirmation lists every deployment that the run creates.
 
 Plan rules:
 
@@ -86,13 +86,13 @@ This is the default. The tool creates every ring now with future available times
 
 Set `"HoldLaterRings": true` in the plan, or select **Hold later rings** before Validate. The tool writes a run file, records ring 1 as creating, then creates it. The other rings stay held.
 
-**Open runs** shows each ring of each open run with live counts from the site: targeted, success, error, and in progress. **Promote** on the next held ring creates it after the five checks run again. Promote reads the run file again first and refuses when the ring is no longer held or another session holds the run lock. If the app stops after starting a create, refresh and reconcile before retrying; the pending ring is adopted when one matching deployment exists, or returned to Held after five minutes with no match. Multiple matches remain blocked until extras are removed.
+**Open Runs** shows each ring of each open run with live counts from the site: targeted, success, error, and in progress. **Promote** on the next held ring creates it after the five checks run again. Promote reads the run file again first and refuses when the ring is no longer held or another session holds the run lock. If the app stops after starting a create, refresh and reconcile before retrying; the pending ring is adopted when one matching deployment exists, or returned to Held after five minutes with no match. Multiple matches remain blocked until extras are removed.
 
 `SuccessThresholdPercent` on a ring is the success rate that ring must reach before Promote is available for the next ring. Promote never runs by itself.
 
 If the deadline of a held ring has passed when you promote it, Promote moves that ring and every later held ring later by the same amount. The confirmation shows the change.
 
-**Refresh and reconcile** reads live counts. The site summarizes a new deployment on its own schedule; until then the ring shows no counts, and a threshold on it keeps Promote disabled. Reconcile marks a ring **Removed** only when the deployment itself is gone from the site, for example deleted in the console. It moves a finished run to the `closed` subfolder. A read error never marks a ring Removed.
+**Refresh and Reconcile** reads live counts. The site summarizes a new deployment on its own schedule; until then the ring shows no counts, and a threshold on it keeps Promote disabled. Reconcile marks a ring **Removed** only when the deployment itself is gone from the site, for example deleted in the console. It moves a finished run to the `closed` subfolder. A read error never marks a ring Removed.
 
 The run-state folder is set in **Options > Logging**. The default is `Rings\runs`. A UNC path lets a team share runs.
 
@@ -162,6 +162,8 @@ Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser
 ```
 
 `Invoke-Checks.ps1` fails on a lint finding of severity Error or Warning, on a failed test, and on a run that finds no test. The `Checks` workflow runs it on each pull request and each push to `main`, in two jobs: Windows PowerShell 5.1 and PowerShell 7.
+
+`Tests\Theme.Guard.Tests.ps1` guards the theme rules. It parses the XAML and the scripts and checks that every blue background has white text, that fonts do not depend on the theme, that titles are bold, that every button takes the shared style, that no banned word is in the text, and that raw exception text stays out of the window.
 
 ## License
 

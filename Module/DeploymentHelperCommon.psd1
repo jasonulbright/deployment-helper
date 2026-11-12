@@ -10,6 +10,9 @@
         # Logging and CM connection come from the vendored SuiteCommon
         # module (Lib\SuiteCommon), imported globally by the root module.
 
+        # Error text for the window
+        'Get-UserErrorText'
+
         # Search
         'Search-CMApplicationByName'
         'Search-CMCollectionByName'

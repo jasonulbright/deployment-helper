@@ -1169,3 +1169,41 @@ Describe 'Write-DeploymentLog result' {
         finally { $holder.Dispose() }
     }
 }
+
+Describe 'Get-UserErrorText' {
+    It 'passes the message of an own throw to the window' {
+        try { throw 'The run file is locked by someone.' } catch { $e = $_ }
+        Get-UserErrorText -ErrorRecord $e -Fallback 'Fixed sentence.' | Should -Be 'The run file is locked by someone.'
+    }
+
+    It 'returns the fixed sentence for a .NET exception and keeps its text out of the result' {
+        try { [System.IO.File]::ReadAllText((Join-Path $TestDrive 'does-not-exist.txt')) } catch { $e = $_ }
+        $text = Get-UserErrorText -ErrorRecord $e -Fallback 'Fixed sentence.'
+        $text | Should -Be 'Fixed sentence.'
+        $text | Should -Not -Match 'does-not-exist'
+    }
+
+    It 'returns the fixed sentence for a cmdlet error with -ErrorAction Stop' {
+        try { Get-Content -LiteralPath (Join-Path $TestDrive 'missing.txt') -ErrorAction Stop } catch { $e = $_ }
+        Get-UserErrorText -ErrorRecord $e -Fallback 'Fixed sentence.' | Should -Be 'Fixed sentence.'
+    }
+
+    It 'returns the fixed sentence for a thrown exception object' {
+        try { throw [System.InvalidOperationException]::new('raw detail') } catch { $e = $_ }
+        Get-UserErrorText -ErrorRecord $e -Fallback 'Fixed sentence.' | Should -Be 'Fixed sentence.'
+    }
+
+    It 'is exported by the module' {
+        (Get-Command Get-UserErrorText).Source | Should -Be 'DeploymentHelperCommon'
+    }
+}
+
+Describe 'Result errors keep raw exception text out of the window' {
+    It 'Test-DuplicateDeployment returns the fixed sentence for a .NET exception' {
+        Mock Get-CMApplicationDeployment -ModuleName DeploymentHelperCommon { throw [System.TimeoutException]::new('raw provider detail') }
+        $r = Test-DuplicateDeployment -ApplicationName 'App1' -CollectionName 'Col1'
+        $r.DuplicateCheckFailed | Should -BeTrue
+        $r.Error | Should -Be 'The duplicate check failed. See the log file.'
+        $r.Error | Should -Not -Match 'raw provider detail'
+    }
+}

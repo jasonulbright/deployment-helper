@@ -31,7 +31,7 @@ Select **Ring Deployment** in the sidebar.
 ![The object type list](../images/rings-type-list.png)
 
 2. Type the object name in **Object**, or select **Browse...**. For a package, select the program.
-3. Open the **Ring plan** list and select a plan. **Reload** reads the plan files again. **Open folder** opens the `Rings` folder.
+3. Open the **Ring plan** list and select a plan. **Reload** reads the plan files again. **Open Folder** opens the `Rings` folder.
 
 ![The ring plan list](../images/rings-plan-list.png)
 
@@ -43,11 +43,11 @@ Select **Ring Deployment** in the sidebar.
 
 ![The expansion preview](../images/rings-expanded.png)
 
-2. Select a ring and select **Set collection...** to set its collection for this run. Edits in the preview apply to this run only. Or set `CollectionID` in the plan file.
+2. Select a ring and select **Set Collection...** to set its collection for this run. Edits in the preview apply to this run only. Or set `CollectionID` in the plan file.
 3. Select **Validate**. Each ring must pass the five checks of [Application deployment](apps.md) and the plan rules.
-4. Select **Create deployments**. The confirmation lists every deployment that the run creates.
+4. Select **Create Deployments**. The confirmation lists every deployment that the run creates.
 
-This guide expanded a plan. It did not validate a plan with collections and did not create deployments. The behavior of **Validate**, **Create deployments** and Promote was read from the README and the code only.
+This guide expanded a plan. It did not validate a plan with collections and did not create deployments. The behavior of **Validate**, **Create Deployments** and Promote was read from the README and the code only.
 
 ### Plan rules
 
@@ -66,15 +66,15 @@ This is the default. The tool creates every ring now, with future available time
 
 With **Hold later rings**, or `"HoldLaterRings": true` in the plan, the tool writes a run file, records ring 1 as creating and creates it. The other rings stay held.
 
-**Open runs** shows each ring of each open run with live counts from the site: targeted, success, error and in progress. **Promote** on the next held ring creates it after the five checks run again. Promote reads the run file again first. It refuses when the ring is no longer held or when another session holds the run lock. `SuccessThresholdPercent` of a ring is the success rate that the ring must reach before Promote is available for the next ring. Promote never runs by itself.
+**Open Runs** shows each ring of each open run with live counts from the site: targeted, success, error and in progress. **Promote** on the next held ring creates it after the five checks run again. Promote reads the run file again first. It refuses when the ring is no longer held or when another session holds the run lock. `SuccessThresholdPercent` of a ring is the success rate that the ring must reach before Promote is available for the next ring. Promote never runs by itself.
 
 If the deadline of a held ring has passed when you promote it, Promote moves that ring and every later held ring later by the same amount. The confirmation shows the change.
 
-### Refresh and reconcile
+### Refresh and Reconcile
 
-Select **Refresh and reconcile** to read the live counts. The site summarizes a new deployment on its own schedule. Until then the ring shows no counts, and a threshold on it keeps Promote disabled. Reconcile marks a ring **Removed** only when the deployment is gone from the site. It moves a finished run to the `closed` subfolder. Select **Show closed runs** to see finished runs.
+Select **Refresh and Reconcile** to read the live counts. The site summarizes a new deployment on its own schedule. Until then the ring shows no counts, and a threshold on it keeps Promote disabled. Reconcile marks a ring **Removed** only when the deployment is gone from the site. It moves a finished run to the `closed` subfolder. Select **Show closed runs** to see finished runs.
 
-![The Open runs list](../images/rings-runs.png)
+![The Open Runs list](../images/rings-runs.png)
 
 ### The plan file
 
@@ -100,11 +100,11 @@ Every ring deployment writes one audit record with `PlanName`, `RingIndex`, `Rin
 | Control | Effect |
 |---|---|
 | **Object type**, **Object**, **Browse...** | Pick the object. |
-| **Ring plan**, **Reload**, **Open folder** | Pick, reload and find the plans. |
+| **Ring plan**, **Reload**, **Open Folder** | Pick, reload and find the plans. |
 | **Plan start**, **Expand** | Compute the dates of each ring. |
 | **Hold later rings** | Create ring 1 now and promote the others later. |
-| **Set collection...**, **Validate**, **Create deployments** | Set the collections, check and create. |
-| **Refresh and reconcile**, **Show closed runs** | Read the live counts and show finished runs. |
+| **Set Collection...**, **Validate**, **Create Deployments** | Set the collections, check and create. |
+| **Refresh and Reconcile**, **Show closed runs** | Read the live counts and show finished runs. |
 
 The run-state folder is set in [Options dialog](options.md). The default is `Rings\runs`.
 
@@ -118,8 +118,8 @@ The run-state folder is set in [Options dialog](options.md). The default is `Rin
 
 | Message or symptom | Cause | Fix |
 |---|---|---|
-| The preview shows no collection. | The seed plan names no collection. | Select **Set collection...** or set `CollectionID` in the plan file. |
-| Promote is disabled. | The ring before it has not reached its threshold, or the site has no counts yet. | Select **Refresh and reconcile** later. |
+| The preview shows no collection. | The seed plan names no collection. | Select **Set Collection...** or set `CollectionID` in the plan file. |
+| Promote is disabled. | The ring before it has not reached its threshold, or the site has no counts yet. | Select **Refresh and Reconcile** later. |
 | The log names a ring and the plan does not load. | The plan names a built-in collection. | Name a custom collection. |
 
 ## Links

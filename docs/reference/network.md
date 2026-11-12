@@ -14,7 +14,7 @@ Use it to open the firewall for the tool, or to check the traffic.
 
 | Call | Target | When | Content |
 |---|---|---|---|
-| ConfigurationManager module | The SMS Provider in **Options > Connection**, through the site drive that the console module opens. The ports are those of the console. | Browse, Validate, **Distribute content**, **Deploy** and the ring actions. | `Get-CM*` reads and the deployment commands. |
+| ConfigurationManager module | The SMS Provider in **Options > Connection**, through the site drive that the console module opens. The ports are those of the console. | Browse, Validate, **Distribute Content**, **Deploy** and the ring actions. | `Get-CM*` reads and the deployment commands. |
 | UNC share | The run-state folder, if you set a UNC path. | Ring runs. | The run files. |
 | `https://api.github.com/repos/<repository>/releases/latest` | HTTPS to GitHub. | At the start of the window, once a day, only when the tool is installed by the suite installer. | The check for a newer suite version. |
 
