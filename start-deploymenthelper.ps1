@@ -2234,7 +2234,7 @@ function New-ConnectionPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'Configuration Manager Connection'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'Bold'
+    $hdr.FontWeight = 'SemiBold'
     $hdr.Margin = '0,0,0,12'
     [void]$grid.Children.Add($hdr)
 
@@ -2308,7 +2308,7 @@ function New-ConnectionPanel {
     $dpHdr = New-Object System.Windows.Controls.TextBlock
     $dpHdr.Text = 'Distribution Point Groups'
     $dpHdr.FontSize = 13
-    $dpHdr.FontWeight = 'Bold'
+    $dpHdr.FontWeight = 'SemiBold'
     $dpHdr.Margin = '0,6,0,6'
     [void]$grid.Children.Add($dpHdr)
 
@@ -2403,7 +2403,7 @@ function New-LoggingPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'Logging'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'Bold'
+    $hdr.FontWeight = 'SemiBold'
     $hdr.Margin = '0,0,0,12'
     [void]$grid.Children.Add($hdr)
 
@@ -2539,7 +2539,7 @@ function New-HistoryPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'Deployment History'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'Bold'
+    $hdr.FontWeight = 'SemiBold'
     $hdr.Margin = '0,0,0,12'
     [void]$grid.Children.Add($hdr)
 
@@ -2636,7 +2636,7 @@ function New-TemplatesPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'Deployment Templates'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'Bold'
+    $hdr.FontWeight = 'SemiBold'
     $hdr.Margin = '0,0,0,12'
     [void]$root.Children.Add($hdr)
 
@@ -3091,7 +3091,7 @@ function New-AboutPanel {
     $hdr = New-Object System.Windows.Controls.TextBlock
     $hdr.Text = 'About'
     $hdr.FontSize = 18
-    $hdr.FontWeight = 'Bold'
+    $hdr.FontWeight = 'SemiBold'
     $hdr.Margin = '0,0,0,12'
     [void]$grid.Children.Add($hdr)
 
