@@ -407,40 +407,47 @@ Describe 'Theme helpers of SuiteCommon behave and are used (a, b, d)' {
         $text | Should -Not -Match '\$box\.FontWeight'
     }
 
-    It 'bolds every title and field label of the Options pages' {
+    It 'bolds every field label of the Options pages and keeps the page headers SemiBold' {
         $count = 0
+        $headers = 0
         $bad = foreach ($fnName in 'New-ConnectionPanel', 'New-LoggingPanel', 'New-HistoryPanel', 'New-TemplatesPanel', 'New-AboutPanel') {
             $fn = Get-ScriptFunction -Path $script:ShellPath -Name $fnName
             $fn | Should -Not -BeNullOrEmpty -Because $fnName
             foreach ($tb in @(Get-CodeControl -Path $script:ShellPath -TypeName 'TextBlock' | Where-Object { $_.FunctionName -eq $fnName })) {
-                $isTitle = ($tb.Variable -match '^(lbl|hdr|dpHdr|title)' -and $tb.Variable -notmatch '^(lblStatus|lblDPStatus|lblHistoryInfo)$')
+                $assigned = Get-MemberAssignment -Node $fn -Variable $tb.Variable
+                if ($tb.Variable -match '^(hdr|dpHdr|title)$') {
+                    $headers++
+                    if ($assigned['FontWeight'] -notmatch 'SemiBold') { '{0}: ${1} is not SemiBold' -f $fnName, $tb.Variable }
+                    continue
+                }
+                $isTitle = ($tb.Variable -match '^lbl' -and $tb.Variable -notmatch '^(lblStatus|lblDPStatus|lblHistoryInfo)$')
                 if (-not $isTitle) { continue }
                 $count++
-                $assigned = Get-MemberAssignment -Node $fn -Variable $tb.Variable
                 if ($assigned['FontWeight'] -notmatch 'Bold') { '{0}: ${1} is not bold' -f $fnName, $tb.Variable }
             }
         }
-        $count | Should -BeGreaterOrEqual 15
+        $count | Should -BeGreaterOrEqual 10
+        $headers | Should -BeGreaterOrEqual 6
         @($bad) | Should -BeNullOrEmpty
     }
 
-    It 'bolds the titles and the field labels of the main window' {
+    It 'bolds the field labels and the app title of the main window and keeps the headers SemiBold' {
         $doc = @($script:XamlDocs | Where-Object { $_.Source -eq 'MainWindow.xaml' })[0]
         [xml]$x = $doc.Text
-        foreach ($key in 'FormLabelStyle', 'SectionHeaderStyle') {
-            $st = $x.SelectSingleNode(("//*[local-name()='Style'][@*[local-name()='Key']='{0}']" -f $key))
-            $st | Should -Not -BeNullOrEmpty -Because $key
+        foreach ($pair in @(@{ Key = 'FormLabelStyle'; Weight = 'Bold' }, @{ Key = 'SectionHeaderStyle'; Weight = 'SemiBold' })) {
+            $st = $x.SelectSingleNode(("//*[local-name()='Style'][@*[local-name()='Key']='{0}']" -f $pair.Key))
+            $st | Should -Not -BeNullOrEmpty -Because $pair.Key
             $w = @($st.SelectNodes("*[local-name()='Setter'][@Property='FontWeight']"))
-            $w.Count | Should -Be 1 -Because $key
-            $w[0].GetAttribute('Value') | Should -Be 'Bold' -Because $key
+            $w.Count | Should -Be 1 -Because $pair.Key
+            $w[0].GetAttribute('Value') | Should -Be $pair.Weight -Because $pair.Key
         }
         $labels = @($x.SelectNodes("//*[local-name()='TextBlock'][@Text][substring(@Text, string-length(@Text)) = ':']"))
         $labels.Count | Should -BeGreaterOrEqual 12
         $bad = foreach ($t in $labels) { if ($t.GetAttribute('Style') -notmatch 'FormLabelStyle') { 'Label {0} does not use FormLabelStyle' -f $t.GetAttribute('Text') } }
         @($bad) | Should -BeNullOrEmpty
-        foreach ($name in 'txtAppTitle', 'txtModuleHeader', 'lblLogOutput') {
-            $t = $x.SelectSingleNode(("//*[@*[local-name()='Name']='{0}']" -f $name))
-            $t.GetAttribute('FontWeight') | Should -Be 'Bold' -Because $name
+        foreach ($pair in @(@{ Name = 'txtAppTitle'; Weight = 'Bold' }, @{ Name = 'txtModuleHeader'; Weight = 'SemiBold' }, @{ Name = 'lblLogOutput'; Weight = 'SemiBold' })) {
+            $t = $x.SelectSingleNode(("//*[@*[local-name()='Name']='{0}']" -f $pair.Name))
+            $t.GetAttribute('FontWeight') | Should -Be $pair.Weight -Because $pair.Name
         }
     }
 

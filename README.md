@@ -163,7 +163,7 @@ Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser
 
 `Invoke-Checks.ps1` fails on a lint finding of severity Error or Warning, on a failed test, and on a run that finds no test. The `Checks` workflow runs it on each pull request and each push to `main`, in two jobs: Windows PowerShell 5.1 and PowerShell 7.
 
-`Tests\Theme.Guard.Tests.ps1` guards the theme rules. It parses the XAML and the scripts and checks that every blue background has white text, that fonts do not depend on the theme, that titles are bold, that every button takes the shared style, that no banned word is in the text, and that raw exception text stays out of the window.
+`Tests\FontWeight.Guard.Tests.ps1` fails when a header or a status text is bold. `Tests\Theme.Guard.Tests.ps1` guards the theme rules. It parses the XAML and the scripts and checks that every blue background has white text, that fonts do not depend on the theme, that only field titles and the app title are bold, that every button takes the shared style, that no banned word is in the text, and that raw exception text stays out of the window.
 
 ## License
 
