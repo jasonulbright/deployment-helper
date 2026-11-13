@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [2026.11.13.0022] - 2026-11-13
+
+## 1 footer that shows the site and the SMS Provider
 
 ### Fixed
 
