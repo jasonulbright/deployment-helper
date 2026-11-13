@@ -32,7 +32,7 @@ $script:FwConfig = @{
     StaticName      = @('txtModuleHeader', 'txtModuleSubheader', 'lblLogOutput', 'txtStatus', 'lblRingRuns')
     AllowedText     = @()
     ExemptType      = @('Button', 'ToggleButton', 'RepeatButton')
-    CodeAllowed     = @('New-AboutPanel:title', 'Set-ConnectionTextTheme:title')
+    CodeAllowed     = @('Set-ConnectionTextTheme:title')
 }
 # ------------------------------------------------------------------------------------------------------------------
 
@@ -111,11 +111,12 @@ function Test-FwStyleBold {
     return $false
 }
 
-# True when the element has a bold weight of its own or through its style.
+# True when the element has a bold weight of its own or through its style. A weight set on the element wins.
 function Test-FwElementBold {
     param($Doc, $Element)
     foreach ($a in @($Element.Attributes)) {
-        if ($a.Name -match '(^|\.)FontWeight$' -and (Test-FwBoldValue $a.Value)) { return $true }
+        # A weight on the element wins over the weight of its style.
+        if ($a.Name -match '(^|\.)FontWeight$') { return (Test-FwBoldValue $a.Value) }
     }
     $style = $Element.GetAttribute('Style')
     if ($style -match '(?:Static|Dynamic)Resource\s+([^\}\s]+)') { return (Test-FwStyleBold -Doc $Doc -Key $Matches[1]) }
@@ -202,6 +203,9 @@ function Get-FwXamlViolation {
         }
         if (-not (Test-FwElementBold -Doc $x -Element $el)) { continue }
         if (Test-FwExemptType $el.LocalName) { continue }
+        $ownWeight = $false
+        foreach ($a in @($el.Attributes)) { if ($a.Name -match '(^|\.)FontWeight$' -and (Test-FwBoldValue $a.Value)) { $ownWeight = $true } }
+        if (-not $ownWeight -and $el.GetAttribute('Style') -match '(?:Static|Dynamic)Resource\s+([^\}\s]+)' -and $script:FwConfig.KeptBoldStyle -contains $Matches[1]) { continue }
         $name = Get-FwElementName $el
         $label = if ($name) { $name } else { Get-FwLabelText $el }
         if ($name -and ($script:FwConfig.AppTitleName -contains $name -or $script:FwConfig.KeptBoldName -contains $name)) { continue }

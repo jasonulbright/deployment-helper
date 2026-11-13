@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Restore the weight of the page headers, the section headers and the log header to SemiBold. The light theme change had made them bold. Only field titles and the app title are bold.
+- Restore the weight of the page headers, the section headers, the log header and the About title to SemiBold. The light theme change had made them bold. Only field titles and the app title are bold.
 
 ### Added
 

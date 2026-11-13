@@ -415,7 +415,7 @@ Describe 'Theme helpers of SuiteCommon behave and are used (a, b, d)' {
             $fn | Should -Not -BeNullOrEmpty -Because $fnName
             foreach ($tb in @(Get-CodeControl -Path $script:ShellPath -TypeName 'TextBlock' | Where-Object { $_.FunctionName -eq $fnName })) {
                 $assigned = Get-MemberAssignment -Node $fn -Variable $tb.Variable
-                if ($tb.Variable -match '^(hdr|dpHdr)$') {
+                if ($tb.Variable -match '^(hdr|dpHdr|title)$') {
                     $headers++
                     if ($assigned['FontWeight'] -notmatch 'SemiBold') { '{0}: ${1} is not SemiBold' -f $fnName, $tb.Variable }
                     continue

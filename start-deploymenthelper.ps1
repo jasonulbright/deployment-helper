@@ -3098,7 +3098,7 @@ function New-AboutPanel {
     $title = New-Object System.Windows.Controls.TextBlock
     $title.Text = 'Deployment Helper'
     $title.FontSize = 20
-    $title.FontWeight = 'Bold'
+    $title.FontWeight = 'SemiBold'
     $title.Margin = '0,0,0,4'
     [void]$grid.Children.Add($title)
 
