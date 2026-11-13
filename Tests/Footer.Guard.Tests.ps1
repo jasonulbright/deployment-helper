@@ -21,6 +21,7 @@ BeforeAll {
 
     # ---- Settings of this repository ----------------------------------------------------------------------------
     # StartScript     : the script that builds the window and calls the footer helpers.
+    # ExtraScript     : more script files that hold a refresh place (the Options dialog may live in its own file).
     # StatusName      : x:Name of the footer status element.
     # FooterDocument  : the XAML document of the main window, as a pattern for its source name: a XAML file name, or
     #                   'file here-string N' for a here-string. A dialog may have its own status line. The footer rules do not apply to it.
@@ -34,9 +35,11 @@ BeforeAll {
     # OptionsFunction : the functions that may hold an editable site code box or site server box (the Options dialog
     #                   and a first-run dialog).
     # SiteNamePattern : the names of the site code boxes and the site server boxes.
-    # ReadOnlyName    : names that match the pattern and are read-only text.
+    # ReadOnlyName    : names that match the pattern and are read-only text. A string constant with such a name is not a site
+    #                   box in code. XAML relies on the element type and on IsReadOnly.
     $script:FtConfig = @{
         StartScript     = 'start-deploymenthelper.ps1'
+        ExtraScript     = @()
         StatusName      = 'txtStatus'
         FooterDocument  = '^MainWindow[.]xaml$'
         StatusVariable  = @('txtStatus')
@@ -157,7 +160,6 @@ BeforeAll {
             $name = $el.GetAttribute('Name', $script:FtKeyNamespace)
             if (-not $name) { $name = $el.GetAttribute('Name') }
             if (-not $name -or $name -notmatch $script:FtConfig.SiteNamePattern) { continue }
-            if ($script:FtConfig.ReadOnlyName -contains $name) { continue }
             if ($el.GetAttribute('IsReadOnly') -eq 'True') { continue }
             [void]$found.Add(('{0}: the editable <{1}> {2} sits outside the Options dialog' -f $Source, $el.LocalName, $name))
         }
@@ -294,7 +296,13 @@ Describe 'Footer guard' {
         It 'calls Initialize-SuiteFooter after the load and refreshes the footer after the load, after the Options dialog and after a connect' {
             $path = Join-Path $script:FtRepoRoot $script:FtConfig.StartScript
             Test-Path -LiteralPath $path | Should -BeTrue
-            $v = @(Get-FtWiringProblem -Text (Get-Content -LiteralPath $path -Raw) -Source $script:FtConfig.StartScript)
+            $text = Get-Content -LiteralPath $path -Raw
+            foreach ($extra in $script:FtConfig.ExtraScript) {
+                $extraPath = Join-Path $script:FtRepoRoot $extra
+                Test-Path -LiteralPath $extraPath | Should -BeTrue
+                $text += [Environment]::NewLine + (Get-Content -LiteralPath $extraPath -Raw)
+            }
+            $v = @(Get-FtWiringProblem -Text $text -Source $script:FtConfig.StartScript)
             ($v -join [Environment]::NewLine) | Should -BeNullOrEmpty
         }
 
@@ -347,10 +355,10 @@ Describe 'Footer guard' {
         }
 
         It 'fails a site box name in code outside the Options functions and passes one inside' {
-            $outside = 'function Show-Other { $t = New-Object System.Windows.Controls.TextBox; $t.Name = ''txtSiteCode'' }'
+            $outside = 'function Show-Other { $t = New-Object System.Windows.Controls.TextBox; $t.Name = ''txtWizSiteCode'' }'
             @(Get-FtCodeProblem -Text $outside -Source 'sample').Count | Should -Be 1
             if ($script:FtConfig.OptionsFunction.Count -gt 0) {
-                $inside = 'function ' + $script:FtConfig.OptionsFunction[0] + ' { $t = New-Object System.Windows.Controls.TextBox; $t.Name = ''txtSiteCode'' }'
+                $inside = 'function ' + $script:FtConfig.OptionsFunction[0] + ' { $t = New-Object System.Windows.Controls.TextBox; $t.Name = ''txtWizSiteCode'' }'
                 @(Get-FtCodeProblem -Text $inside -Source 'sample') | Should -BeNullOrEmpty
             }
         }
