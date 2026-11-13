@@ -9,6 +9,15 @@
 ### Added
 
 - Add FontWeight.Guard.Tests.ps1 and FontWeightGuardHelpers.ps1. They fail when a bold weight is set on a label that is not a field title or an app title, in XAML, in the XAML of the scripts and in code that sets a weight at run time.
+- Show the site code and the SMS Provider in the footer, at the right end: `Site MCM · cm01.contoso.com`. The footer shows `Site not set` before you set them. The text is read-only. Select it to open Options. The footer refreshes after the window loads, after the Options dialog closes and after a connect.
+- Add Footer.Guard.Tests.ps1. It checks the footer status element, the shared footer font, the footer calls and the rule that the site code and the SMS Provider are editable only in the Options dialog. It has bad-sample tests.
+- Add a bad-sample test to FontWeight.Guard.Tests.ps1: a bold label before a panel that holds an input is not a field title.
+
+### Changed
+
+- Refresh the vendored SuiteCommon library to release 2026.11.13.0082. The footer font comes from SuiteCommon in both themes. The status text has no font setting of its own.
+- Tighten the field title rule of FontWeightGuardHelpers.ps1. A label counts as a field title only when an input follows or precedes it directly, or shares its grid row. The labels Purpose, Time Basis and Plan Start are named in the settings of the guard.
+- Update the README text, the user guide text and the images. The README images main-dark.png and rings-dark.png come from the capture tool, in the current UI with the footer. Retake the images of the user guide.
 
 ## [2026.11.12.0021] - 2026-11-12
 

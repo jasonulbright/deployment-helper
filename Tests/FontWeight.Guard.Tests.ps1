@@ -113,6 +113,16 @@ Describe 'The font weight check itself' {
         @(Get-FwXamlViolation -Text $text -Source 'sample').Count | Should -Be 1
     }
 
+    It 'fails a bold header before a panel that holds an input, and passes a label directly before an input (bad sample)' {
+        $ns = 'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"'
+        $bad = '<StackPanel ' + $ns + '><TextBlock Text="Library" FontWeight="Bold"/><StackPanel><TextBox/></StackPanel></StackPanel>'
+        $good = '<StackPanel ' + $ns + '><TextBlock Text="Name" FontWeight="Bold"/><TextBox/></StackPanel>'
+        @(Get-FwXamlViolation -Text $bad -Source 'sample').Count | Should -Be 1
+        @(Get-FwXamlViolation -Text $good -Source 'sample') | Should -BeNullOrEmpty
+        $count = Get-FwLabelCount -Text $good
+        $count.Titles | Should -Be 1
+    }
+
     It 'passes a bold field title next to an input and a SemiBold header' {
         @(Get-FwXamlViolation -Text $script:GoodSample -Source 'sample') | Should -BeNullOrEmpty
     }

@@ -163,6 +163,13 @@ try {
     foreach ($png in $captured) {
         if ($AddNew -or (Test-Path (Join-Path $images $png.Name))) { Copy-Item $png.FullName (Join-Path $images $png.Name) -Force }
     }
+    # The README shows two of the guide images. Each README file takes the captured image of the same view.
+    $readmeImages = @{ 'main-dark.png' = 'apps-empty.png'; 'rings-dark.png' = 'rings-expanded.png' }
+    foreach ($key in $readmeImages.Keys) {
+        $source = $captured | Where-Object { $_.Name -eq $readmeImages[$key] } | Select-Object -First 1
+        $target = Join-Path (Join-Path $repo 'screenshots') $key
+        if ($source -and (Test-Path $target)) { Copy-Item $source.FullName $target -Force }
+    }
 }
 finally {
     # Each cleanup runs on its own, so that a failed cleanup cannot replace the original error.

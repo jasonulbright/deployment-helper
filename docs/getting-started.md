@@ -38,6 +38,8 @@ The window opens on **Apps**. At the first start the tool writes four deployment
 3. Type the **SMS Provider**, for example `cm01.contoso.com`.
 4. Select **OK**. The tool connects when the site code or the provider changed.
 
+The footer of the window shows the saved values at the right end, for example `Site MCM · cm01.contoso.com`. Before you set them, it shows `Site not set`. The footer is read-only text. Select it to open **Options**. You change the site code and the SMS Provider only in **Options**.
+
 ![The Options dialog at the first start](images/options-empty.png)
 
 ![The Connection page with values](images/options-connection.png)

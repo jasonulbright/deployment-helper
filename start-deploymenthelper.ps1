@@ -342,6 +342,11 @@ function Set-StatusText {
     $txtStatus.Text = $Text
 }
 
+# Shows the site code and the site server of the saved settings at the right end of the footer. The footer is read-only text.
+function Update-FooterSite {
+    Update-SuiteFooter -Window $window -SiteCode ([string]$global:Prefs['SiteCode']) -SiteServer ([string]$global:Prefs['SMSProvider'])
+}
+
 function Show-AuditWriteFailure {
     param(
         [Parameter(Mandatory)][hashtable]$AuditResult,
@@ -666,6 +671,7 @@ function Connect-IfNeeded {
     finally {
         $window.Cursor = $null
     }
+    Update-FooterSite
     if ($ok) {
         $script:ConnectedToCM = $true
         Add-LogLine -Message 'Connected.'
@@ -4208,6 +4214,7 @@ $btnRings.Add_Click({         & $script:ShowRingView })
 
 $btnOptions.Add_Click({
     Show-OptionsDialog -Owner $window -InitialSection 'Connection'
+    Update-FooterSite
 })
 
 $radRequired.Add_Checked({
@@ -4540,6 +4547,11 @@ $window.Add_SourceInitialized({
 })
 
 $window.Add_Loaded({
+    Initialize-SuiteFooter -Window $window -StatusName 'txtStatus' -OnOpenOptions {
+        Show-OptionsDialog -Owner $window -InitialSection 'Connection'
+        Update-FooterSite
+    } | Out-Null
+    Update-FooterSite
     if ($script:SavedType -eq 'Rings') {
         & $script:SetCurrentType 'Apps'
         & $script:ShowRingView
