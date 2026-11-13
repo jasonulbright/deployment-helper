@@ -11,7 +11,6 @@ $script:FwKeyNamespace = 'http://schemas.microsoft.com/winfx/2006/xaml'
 $script:FwExcluded = '^(\.claude|\.git|Tests|tools|Logs)([\\/]|$)'
 $script:FwBoldWord = '(?i)\b(Bold|ExtraBold|UltraBold|Black|Heavy|ExtraBlack|UltraBlack)\b'
 $script:FwInputType = @('TextBox', 'ComboBox', 'CheckBox', 'RadioButton', 'PasswordBox', 'DatePicker', 'DateTimePicker', 'TimePicker', 'ListBox', 'ListView', 'Slider', 'NumericUpDown')
-$script:FwHolderType = @('Border', 'StackPanel', 'Grid', 'DockPanel', 'WrapPanel')
 
 # ---- Settings of this repository ---------------------------------------------------------------------------------
 # FieldTitleStyle : style keys that make a field title bold. A style key listed here may set FontWeight Bold.
@@ -28,7 +27,7 @@ $script:FwConfig = @{
     AppTitleName    = @('txtAppTitle')
     KeptBoldName    = @()
     KeptBoldStyle   = @()
-    FieldTitleName  = @('lblDistribute')
+    FieldTitleName  = @('lblDistribute', 'lblPurpose', 'lblTimeBasis', 'lblRingStart')
     StaticName      = @('txtModuleHeader', 'txtModuleSubheader', 'lblLogOutput', 'txtStatus', 'lblRingRuns')
     AllowedText     = @()
     ExemptType      = @('Button', 'ToggleButton', 'RepeatButton')
@@ -138,23 +137,17 @@ function Get-FwLabelText {
     return $t
 }
 
-# True when the element is the text label of an input control: it sits in the same grid row next to an input
-# (or in the row above it), or it is the sibling before or after an input in a panel. A key label next to a
-# TextBlock value is not a field title.
+# True when the element is the text label of an input control: its own next or previous sibling is directly an input,
+# or it sits in the same grid row as an input (or one row above it, same column). A label before a container is not a field title.
+# A key label next to a TextBlock value is not a field title.
 function Test-FwFieldTitle {
     param($Element)
     if ($Element.LocalName -notin 'TextBlock', 'Label') { return $false }
     $parent = $Element.ParentNode
     if ($null -eq $parent -or $parent.NodeType -ne 'Element') { return $false }
     $siblings = @($parent.ChildNodes | Where-Object { $_.NodeType -eq 'Element' -and $_.LocalName -notmatch '\.' })
-    $hasInput = {
-        param($n)
-        if ($script:FwInputType -contains $n.LocalName) { return $true }
-        if ($script:FwHolderType -contains $n.LocalName) {
-            foreach ($c in @($n.ChildNodes | Where-Object { $_.NodeType -eq 'Element' })) { if ($script:FwInputType -contains $c.LocalName) { return $true } }
-        }
-        return $false
-    }
+    # Only an input control counts. A panel, a border or a grid that holds an input does not.
+    $hasInput = { param($n) return ($script:FwInputType -contains $n.LocalName) }
     if ($parent.LocalName -eq 'Grid') {
         $row = 0; $col = 0
         [void][int]::TryParse($Element.GetAttribute('Grid.Row'), [ref]$row)

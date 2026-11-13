@@ -25,6 +25,7 @@ Safe Configuration Manager deployment for Applications, Packages, Task Sequences
 - Fail-closed creates: a deployment is blocked when the duplicate check cannot run or the audit log cannot be written
 - CSV + HTML history export
 - Dark and light themes with runtime toggle
+- Footer with the status text on the left and the site code and the SMS Provider on the right, for example `Site MCM · cm01.contoso.com`
 
 ## User guide
 
@@ -39,7 +40,7 @@ The [user guide](docs/index.md) walks every view, dialog and setting with images
 
 ## Install
 
-On first launch, open **Options > Connection** and set the site code + SMS Provider FQDN, then use the sidebar to pick a deployment type. Four default deployment templates are written to the `Templates\` folder and two ring plans to the `Rings\` folder automatically.
+On first launch, open **Options > Connection** and set the site code + SMS Provider FQDN, then use the sidebar to pick a deployment type. The footer shows the saved values at the right end. It is read-only text: select it to open **Options**, and change the values only there. Four default deployment templates are written to the `Templates\` folder and two ring plans to the `Rings\` folder automatically.
 
 ## Templates
 

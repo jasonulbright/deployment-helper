@@ -318,7 +318,7 @@
                                 ToolTip="Pick a device collection from the site."/>
 
                         <!-- Purpose -->
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Purpose:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
+                        <TextBlock x:Name="lblPurpose" Grid.Row="3" Grid.Column="0" Text="Purpose:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
                             <RadioButton x:Name="radAvailable" Content="Available" GroupName="Purpose" IsChecked="True" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0"/>
                             <RadioButton x:Name="radRequired"  Content="Required"  GroupName="Purpose" FontSize="12" VerticalAlignment="Center"/>
@@ -344,7 +344,7 @@
                         </ComboBox>
 
                         <!-- Time basis -->
-                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Time Basis:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
+                        <TextBlock x:Name="lblTimeBasis" Grid.Row="7" Grid.Column="0" Text="Time Basis:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <StackPanel Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
                             <RadioButton x:Name="radLocalTime" Content="Local time" GroupName="TimeBasis" IsChecked="True" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0"/>
                             <RadioButton x:Name="radUtc"       Content="UTC"        GroupName="TimeBasis" FontSize="12" VerticalAlignment="Center"/>
@@ -501,7 +501,7 @@
                                     ToolTip="Open the folder that holds the ring plan files."/>
                         </StackPanel>
 
-                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Plan Start:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
+                        <TextBlock x:Name="lblRingStart" Grid.Row="4" Grid.Column="0" Text="Plan Start:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
                             <Controls:DateTimePicker x:Name="dtpRingStart" Width="240" FontSize="12" Height="28"/>
                             <Button x:Name="btnRingExpand" Content="Expand" MinWidth="90" Margin="8,0,0,0"
@@ -649,7 +649,7 @@
             <!-- Status bar -->
             <Border Grid.Row="4" Padding="8,4,8,4"
                     Background="{DynamicResource MahApps.Brushes.Gray10}">
-                <TextBlock x:Name="txtStatus" Text="Ready." FontSize="11"/>
+                <TextBlock x:Name="txtStatus" Text="Ready."/>
             </Border>
         </Grid>
     </Grid>

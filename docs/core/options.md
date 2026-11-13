@@ -24,7 +24,7 @@ None.
 | **SMS Provider** | The server with the SMS Provider role. The title is bold at 14 pt in both themes. |
 | **Reload DP Groups** | Reads the distribution point groups again. |
 
-**OK** disconnects the current connection when the site code or the provider changed. The next action that needs a connection connects again with the saved settings.
+The footer of the window shows the saved site code and SMS Provider. **Options** is the only place where you change them. **OK** disconnects the current connection when the site code or the provider changed. The next action that needs a connection connects again with the saved settings.
 
 ![The Connection page](../images/options-connection.png)
 
