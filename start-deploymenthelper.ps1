@@ -344,7 +344,8 @@ function Set-StatusText {
 
 # Shows the site code and the site server of the saved settings at the right end of the footer. The footer is read-only text.
 function Update-FooterSite {
-    Update-SuiteFooter -Window $window -SiteCode ([string]$global:Prefs['SiteCode']) -SiteServer ([string]$global:Prefs['SMSProvider'])
+    try { Update-SuiteFooter -Window $window -SiteCode ([string]$global:Prefs['SiteCode']) -SiteServer ([string]$global:Prefs['SMSProvider']) }
+    catch { Add-LogLine -Message 'The footer was not updated.' }
 }
 
 function Show-AuditWriteFailure {
@@ -4547,10 +4548,13 @@ $window.Add_SourceInitialized({
 })
 
 $window.Add_Loaded({
-    Initialize-SuiteFooter -Window $window -StatusName 'txtStatus' -OnOpenOptions {
-        Show-OptionsDialog -Owner $window -InitialSection 'Connection'
-        Update-FooterSite
-    } | Out-Null
+    try {
+        Initialize-SuiteFooter -Window $window -StatusName 'txtStatus' -OnOpenOptions {
+            Show-OptionsDialog -Owner $window -InitialSection 'Connection'
+            Update-FooterSite
+        } | Out-Null
+    }
+    catch { Add-LogLine -Message 'The footer was not set up.' }
     Update-FooterSite
     if ($script:SavedType -eq 'Rings') {
         & $script:SetCurrentType 'Apps'
