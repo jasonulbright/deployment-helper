@@ -25,7 +25,7 @@ Safe Configuration Manager deployment for Applications, Packages, Task Sequences
 - Fail-closed creates: a deployment is blocked when the duplicate check cannot run or the audit log cannot be written
 - CSV + HTML history export
 - Dark and light themes with runtime toggle
-- Footer with the status text on the left and the site code and the SMS Provider on the right, for example `Site MCM · cm01.contoso.com`
+- Footer with the status text on the left and the site code and the SMS Provider on the right, for example `Site MCM`, a middle dot, and `cm01.contoso.com`
 
 ## User guide
 
