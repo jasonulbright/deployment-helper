@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Make the PowerShell sources and the files they read plain ASCII, and add the encoding guard.
+
 ## [2026.11.14.0023] - 2026-11-14
 
 ## 2 fixes for contrast and shared styles
@@ -22,7 +26,7 @@
 ### Added
 
 - Add FontWeight.Guard.Tests.ps1 and FontWeightGuardHelpers.ps1. They fail when a bold weight is set on a label that is not a field title or an app title, in XAML, in the XAML of the scripts and in code that sets a weight at run time.
-- Show the site code and the SMS Provider in the footer, at the right end: `Site MCM · cm01.contoso.com`. The footer shows `Site not set` before you set them. The text is read-only. Select it to open Options. The footer refreshes after the window loads, after the Options dialog closes and after a connect.
+- Show the site code and the SMS Provider in the footer, at the right end: `Site MCM`, a middle dot, and `cm01.contoso.com`. The footer shows `Site not set` before you set them. The text is read-only. Select it to open Options. The footer refreshes after the window loads, after the Options dialog closes and after a connect.
 - Add Footer.Guard.Tests.ps1. It checks the footer status element, the shared footer font, the footer calls and the rule that the site code and the SMS Provider are editable only in the Options dialog. It has bad-sample tests.
 - Add a bad-sample test to FontWeight.Guard.Tests.ps1: a bold label before a panel that holds an input is not a field title.
 
@@ -315,31 +319,31 @@ logging. Extract the zip and run `start-deploymenthelper.ps1`.
 - **Sidebar navigation** across the four target types (Apps,
   Packages, Task Sequences, Software Update Groups) plus an Options
   modal. Theme toggle bottom-docked on the sidebar.
-- **Search dialogs** for target object and target collection — filtered
+- **Search dialogs** for target object and target collection - filtered
   DataGrid results, pick-and-paste into the workflow form.
-- **DP Group Picker** modal — pick one or more DP groups for content
+- **DP Group Picker** modal - pick one or more DP groups for content
   distribution, no need to remember exact group names.
-- **Pre-flight validation** — confirms the target exists in MECM, the
+- **Pre-flight validation** - confirms the target exists in MECM, the
   collection is a device collection (not user, not `SMS000*`), no
   duplicate deployment exists, and content has been distributed to at
   least one DP. Validation runs before any `New-CM*Deployment` call.
 - **Available + Deadline date pickers** with Local-time / UTC toggle.
 - **Notification mode picker** (Display All / Hide notifications and
   restarts / etc.).
-- **Distribute content** action — runs `Start-CMContentDistribution`
+- **Distribute content** action - runs `Start-CMContentDistribution`
   against the selected DP groups in one click.
-- **Deploy templates** — save the current form state as a named
+- **Deploy templates** - save the current form state as a named
   template (target type, collection, purpose, dates, notification);
   reload by clicking Apply Template. Templates persist across
   sessions.
 - **MahApps Dark.Steel / Light.Blue themes** with live swap.
-- **Title-bar drag fallback** — native `WM_NCHITTEST` hook + managed
+- **Title-bar drag fallback** - native `WM_NCHITTEST` hook + managed
   `DragMove` for the main window and every modal dialog so the title
   bar drags reliably under any host.
-- **Immutable audit log** — every deployment writes a JSON record
+- **Immutable audit log** - every deployment writes a JSON record
   (target, collection, purpose, deployer, timestamp) to a per-day
   log file under `Logs/`.
-- **Window state persistence** — size, position, last-active target
+- **Window state persistence** - size, position, last-active target
   type restored across launches.
 
 ### Stack
