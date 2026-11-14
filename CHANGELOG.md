@@ -2,10 +2,14 @@
 
 ## [Unreleased]
 
+## [2026.11.14.0023] - 2026-11-14
+
+## 2 fixes for contrast and shared styles
+
 ### Fixed
 
-- Show the title bar of an inactive window with white text at 4.5:1 contrast or more in both themes.
-- Show text boxes, combo boxes and grid headers with the shared border and disabled-text styles in both themes.
+- Show the inactive title bar with white text at 4.5:1 contrast in both themes.
+- Show text boxes, combo boxes and grid headers with the shared styles in both themes.
 
 ## [2026.11.13.0022] - 2026-11-13
 
