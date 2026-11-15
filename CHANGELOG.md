@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep primary and secondary buttons blue or gray when hovered or pressed, never black.
+- Show the inactive light title bar in blue with dark caption text.
+
+### Added
+
+- Close stray test windows, and check dialog bodies, inputs and title bars against the theme.
+
 ## [2026.11.15.0025] - 2026-11-15
 
 ## 25 retaken guide images and 20 window tests
