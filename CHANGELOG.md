@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add window tests for the button states and the dialog chrome, with a shared window test harness.
+- Check the window titles, headers and Options panel names for Title Case.
+
 ## [2026.11.14.0024] - 2026-11-14
 
 ## 3 fixes for button borders, guards and plain ASCII sources
