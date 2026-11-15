@@ -10,6 +10,7 @@
 ### Added
 
 - Close stray test windows, and check dialog bodies, inputs and title bars against the theme.
+- Map the README images to the capture, copy them with Sync-ReadmeImages.ps1 and guard them.
 
 ## [2026.11.15.0025] - 2026-11-15
 

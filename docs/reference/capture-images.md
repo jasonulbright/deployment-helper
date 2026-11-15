@@ -8,6 +8,8 @@ One command regenerates every image of this guide.
 
 Use `-OutDir` to also keep a copy of every captured image.
 
+The README shows two images that are copies of guide images. `tools\guide-captureeadme-images.json` maps each README image to its guide image, and `tools\guide-capture\Sync-ReadmeImages.ps1` copies the guide images over them. The capture runs the script at its end. Run it by hand after you retake a guide image without the capture: `.	ools\guide-capture\Sync-ReadmeImages.ps1`. A guard test checks that every README image is a guide image or is in the map, and that each mapped copy is byte-identical to its source.
+
 ## When to use it
 
 Use it after a change that alters the window, and before a release.
