@@ -287,11 +287,43 @@ Describe 'No banned word in the UI text and the documents (c)' {
         @($bad) | Should -BeNullOrEmpty
     }
 
+    It 'uses Title Case for the window titles, the headers and the Options panel names' {
+        $bad = @()
+        $count = 0
+        foreach ($d in $script:XamlDocs) {
+            [xml]$x = $d.Text
+            foreach ($n in @($x.SelectNodes('//*[@Title or @Header]'))) {
+                foreach ($attr in 'Title', 'Header') {
+                    $v = $n.GetAttribute($attr)
+                    if ([string]::IsNullOrWhiteSpace($v) -or $v -match '[{$]' -or $v -notmatch '[A-Za-z]') { continue }
+                    $count++
+                    if (-not (Test-TitleCase $v)) { $bad += ('{0}: {1}' -f $d.Source, $v) }
+                }
+            }
+        }
+        $shell = Get-Content -LiteralPath $script:ShellPath -Raw
+        $patterns = @(
+            '-Title\s+''([^''$]+)'''                      # the title of a message box
+            '(?m)^\s*Name\s*=\s*''([^''$]+)''\s*$'        # the name of an Options panel
+            '\$(?:hdr|title)\.Text\s*=\s*''([^''$]+)'''   # the header of an Options panel
+        )
+        foreach ($pattern in $patterns) {
+            foreach ($m in [regex]::Matches($shell, $pattern)) {
+                $count++
+                if (-not (Test-TitleCase $m.Groups[1].Value)) { $bad += ('{0}: {1}' -f $script:ShellName, $m.Groups[1].Value) }
+            }
+        }
+        $count | Should -BeGreaterThan 30
+        @($bad) | Should -BeNullOrEmpty
+    }
+
     It 'checks Title Case (the check itself)' {
         Test-TitleCase 'Refresh and Reconcile' | Should -BeTrue
         Test-TitleCase 'Select DP Groups...' | Should -BeTrue
         Test-TitleCase 'Select DP groups...' | Should -BeFalse
         Test-TitleCase 'Save template' | Should -BeFalse
+        Test-TitleCase 'Ring Run Stopped: Audit Failure' | Should -BeTrue
+        Test-TitleCase 'Ring run stopped' | Should -BeFalse
     }
 }
 

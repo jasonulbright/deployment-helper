@@ -11,8 +11,8 @@
          fails too.
     The summary lists the test count as run and the coverage of the module file.
     The coverage is informational. No floor applies until the owner sets one.
-    The repository has no window test. Lab and capture scripts live in tools\ and
-    never run here.
+    The window tests (Tests\*.Window.Tests.ps1) run only when SUITE_ALLOW_WINDOW_TESTS is 1,
+    in the visible lab session. Lab and capture scripts live in tools\ and never run here.
 
 .PARAMETER SkipLint
     Leave out PSScriptAnalyzer.
