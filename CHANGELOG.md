@@ -9,7 +9,7 @@
 
 ### Changed
 
-- Retake the 32 guide images and 2 README images with the 1 px bordered dialog buttons.
+- Retake 25 guide and README images with 1 px bordered dialog buttons.
 
 ## [2026.11.14.0024] - 2026-11-14
 
