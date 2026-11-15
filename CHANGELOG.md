@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
+## [2026.11.15.0025] - 2026-11-15
+
+## 25 retaken guide images and 20 window tests
+
 ### Added
 
-- Add window tests for the button states and the dialog chrome, with a shared window test harness.
+- Add window tests for button states and dialog chrome, with a shared harness.
 - Check the window titles, headers and Options panel names for Title Case.
 
 ### Changed
