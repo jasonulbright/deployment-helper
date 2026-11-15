@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [2026.11.15.0026] - 2026-11-15
+
+## 42 window tests and 33 retaken images
+
 ### Fixed
 
 - Keep primary and secondary buttons blue or gray when hovered or pressed, never black.
