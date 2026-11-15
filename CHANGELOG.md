@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2026.11.15.0027] - 2026-11-15
+
+## 7 disabled controls now dim
+
+### Fixed
+
+- Dim text boxes and combo boxes when disabled, with gray text.
+
 ### Added
 
 - Treat disabled controls as exempt from 4.5:1 text contrast and require them to look dimmed.
