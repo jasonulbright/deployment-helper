@@ -23,8 +23,9 @@
             <!-- One template and one set of button styles for the window and for every dialog. The dialogs
                  take the styles from this file (Get-SharedStyleXaml in the start script), so each style exists
                  once. The colors come from SuiteCommon (Set-ButtonTheme) and from MahApps resources, never from
-                 a literal here. Hover shows the theme foreground as border color. Pressed swaps the theme foreground
-                 and the theme background. No state changes the opacity, because an opacity below 1 washes the text out.
+                 a literal here. Hover and pressed show the theme foreground as border color; the fill stays, so a blue button
+                 stays blue and a dark one never turns black or white. The dialog buttons use SuiteAccentButtonTemplate and
+                 SuiteNeutralButtonTemplate (SuiteCommon), which step the fill one shade in hover and pressed. The sidebar template changes no opacity, because an opacity below 1 washes the text out.
                  A disabled button shows MahApps.Brushes.Gray.MouseOver text and a Gray2 border (4.5:1 or more in both themes). -->
             <ControlTemplate x:Key="ThemedButtonTemplate" TargetType="Button">
                 <Border x:Name="Bd"
@@ -47,8 +48,7 @@
                         <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
                     </Trigger>
                     <Trigger Property="IsPressed" Value="True">
-                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
-                        <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource MahApps.Brushes.ThemeBackground}"/>
+                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
                     </Trigger>
                 </ControlTemplate.Triggers>
             </ControlTemplate>
@@ -81,7 +81,8 @@
 
             <!-- The primary button: the accent blue with white text. Deploy, Create Deployments, Promote, OK and Save Template use it. -->
             <Style x:Key="DialogAccentButton" TargetType="Button" BasedOn="{StaticResource ThemedButtonStyle}">
-                <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Accent}"/>
+                <Setter Property="Template" Value="{DynamicResource SuiteAccentButtonTemplate}"/>
+                <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.AccentBase}"/>
                 <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.IdealForeground}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.AccentBase}"/>
                 <Setter Property="MinWidth" Value="90"/><Setter Property="Height" Value="32"/>
@@ -98,6 +99,7 @@
             <!-- The one secondary style, for Cancel, Browse and every other button that is not primary: a gray fill,
                  the theme text color and a visible border. It has the size of the primary style. -->
             <Style x:Key="DialogButton" TargetType="Button" BasedOn="{StaticResource ThemedButtonStyle}">
+                <Setter Property="Template" Value="{DynamicResource SuiteNeutralButtonTemplate}"/>
                 <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Gray10}"/>
                 <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.ThemeForeground}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Gray2}"/>

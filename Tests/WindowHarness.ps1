@@ -163,5 +163,13 @@ function Invoke-WpfSta {
     }
     finally {
         $ps.Dispose()
+        # Close every window the call left open (a failed test must not leave a window on the desktop).
+        $closer = [powershell]::Create()
+        try {
+            $closer.Runspace = $rs
+            [void]$closer.AddScript('if (Get-Command Close-SuiteOpenWindow -ErrorAction SilentlyContinue) { [void](Close-SuiteOpenWindow) }', $false)
+            try { [void]$closer.Invoke() } catch { $null = $_ }
+        }
+        finally { $closer.Dispose() }
     }
 }

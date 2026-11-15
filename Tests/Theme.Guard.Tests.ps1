@@ -634,7 +634,7 @@ Describe 'Every button takes the shared themed style (e)' {
         @(Get-OpacityInStateTrigger -Text $ok).Count | Should -Be 0
     }
 
-    It 'shows hover as a border, pressed as swapped theme colors, and disabled as gray text in the button template and styles' {
+    It 'shows hover and pressed as a border, never a swapped fill, and disabled as gray text in the button template and styles' {
         $doc = @($script:XamlDocs | Where-Object { $_.Source -eq 'MainWindow.xaml' })[0]
         [xml]$x = $doc.Text
         $tpl = $x.SelectSingleNode("//*[local-name()='ControlTemplate'][@*[local-name()='Key']='ThemedButtonTemplate']")
@@ -644,7 +644,7 @@ Describe 'Every button takes the shared themed style (e)' {
         $hover.GetAttribute('Value') | Should -Match 'ThemeForeground'
         $pressed = @($tpl.SelectNodes(".//*[local-name()='Trigger'][@Property='IsPressed']/*[local-name()='Setter']") | ForEach-Object { $_.GetAttribute('Value') }) -join ' '
         $pressed | Should -Match 'ThemeForeground'
-        $pressed | Should -Match 'ThemeBackground'
+        @($tpl.SelectNodes(".//*[local-name()='Trigger'][@Property='IsPressed']/*[local-name()='Setter'][@Property='Background']")).Count | Should -Be 0 -Because 'a pressed sidebar button never swaps its fill to the theme text color (black in the light theme)'
         foreach ($key in 'ThemedButtonStyle', 'DialogAccentButton') {
             $st = $x.SelectSingleNode(("//*[local-name()='Style'][@*[local-name()='Key']='{0}']" -f $key))
             $dis = @($st.SelectNodes(".//*[local-name()='Trigger'][@Property='IsEnabled']/*[local-name()='Setter'][@Property='Foreground']"))

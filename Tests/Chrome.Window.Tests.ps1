@@ -63,11 +63,14 @@ BeforeAll {
         $key = if ($dark) { 'dark' } else { 'light' }
         $script:Measured[$key] = Invoke-WpfSta -Arguments @{ Dark = $dark; Config = $script:AppConfig; Dialogs = $dialogXaml; Shared = $script:SharedDialogFunction; PanelStyle = $panelStyle } -Script {
             $cfg = $Arguments.Config
+            $main = $null
+            try {
             $main = Open-TestWindow -XamlPath (Join-Path $Root $cfg.Xaml) -Dark $Arguments.Dark
             Initialize-ShellTheme -Window $main -Dark $Arguments.Dark -WorkflowButtonNames $cfg.WorkflowButtons -OptionsButtonNames $cfg.OptionsButtons -LogLabelName $cfg.LogLabel
             $main.FindName($cfg.FormPane).Visibility = 'Visible'; $main.FindName($cfg.RingPane).Visibility = 'Collapsed'
             Wait-Layout $main
             $mainChrome = Get-SuiteWindowChrome -Window $main -Label 'main'
+            $mainBody = Get-SuiteWindowBody -Window $main -Label 'main'
             $main.FindName($cfg.FormPane).Visibility = 'Collapsed'; $main.FindName($cfg.RingPane).Visibility = 'Visible'
             Wait-Layout $main
             $ringChrome = Get-SuiteWindowChrome -Window $main -Label 'main rings'
@@ -75,8 +78,8 @@ BeforeAll {
             Wait-Layout $main
             $out = [pscustomobject]@{
                 ThemeText = $mainChrome.ThemeText
-                MainTitle = $mainChrome.Active; MainTitleInactive = $mainChrome.Inactive
-                Main = @($mainChrome.Buttons) + @($ringChrome.Buttons); Dialogs = @(); Unmeasured = @()
+                MainChrome = $mainChrome; MainTitle = $mainChrome.Active; MainTitleInactive = $mainChrome.Inactive
+                Main = @($mainChrome.Buttons) + @($ringChrome.Buttons); MainBody = $mainBody; Dialogs = @(); Unmeasured = @()
             }
             $left = if ($env:SUITE_VISIBLE_WINDOWS -eq '1') { 120 } else { -32000 }
             $i = 0
@@ -84,6 +87,7 @@ BeforeAll {
                 $i++
                 [xml]$x = $xaml
                 $d = [System.Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $x))
+                try {
                 $d.WindowStartupLocation = 'Manual'
                 $d.Left = $left; $d.Top = $left
                 $d.ShowInTaskbar = $false
@@ -101,10 +105,14 @@ BeforeAll {
                     }
                     $content.Content = $sample
                 }
-                $d.Show(); Wait-Layout $d
+                $d.Show(); Wait-Layout $d; Start-Sleep -Milliseconds 400; Wait-Layout $d
+                # The main window behind the first dialog is inactive: its title bar shows the inactive state.
+                if ($i -eq 1) { $out | Add-Member -NotePropertyName MainInactive -NotePropertyValue (Get-SuiteWindowChrome -Window $main -Label 'main behind a dialog') }
                 $c = Get-SuiteWindowChrome -Window $d -Label ([string]$d.Title)
-                $out.Dialogs += [pscustomobject]@{ Title = $c.Title; Index = $i; Source = 'script'; Variant = ''; Active = $c.Active; Inactive = $c.Inactive; TitleRatio = $c.TitleRatio; Buttons = @($c.Buttons) }
-                $d.Close()
+                $body = Get-SuiteWindowBody -Window $d -Label ([string]$d.Title)
+                $out.Dialogs += [pscustomobject]@{ Body = $body; Title = $c.Title; Index = $i; Source = 'script'; Variant = ''; Active = $c.Active; Inactive = $c.Inactive; TitleRatio = $c.TitleRatio; Buttons = @($c.Buttons) }
+                }
+                finally { $d.Close() }
             }
 
             # SuiteCommon dialogs: the real function opens the dialog modal; a timer measures and closes it.
@@ -120,7 +128,7 @@ BeforeAll {
             }
             foreach ($recipe in $recipes) {
                 $name = $recipe.Name; $variant = $recipe.Variant
-                $holder = @{ Chrome = $null; Error = $null }
+                $holder = @{ Chrome = $null; Body = $null; Error = $null }
                 $timer = New-Object System.Windows.Threading.DispatcherTimer
                 $timer.Interval = [TimeSpan]::FromMilliseconds(700)
                 $mainWindow = $main
@@ -130,6 +138,7 @@ BeforeAll {
                             $d = @($mainWindow.OwnedWindows) | Where-Object { $_ -is [MahApps.Metro.Controls.MetroWindow] } | Select-Object -First 1
                             Wait-Layout $d
                             $holder.Chrome = Get-SuiteWindowChrome -Window $d -Label ([string]$d.Title)
+                            $holder.Body = Get-SuiteWindowBody -Window $d -Label ([string]$d.Title)
                             $d.Close()
                         }
                         catch { $holder.Error = $_.ToString(); foreach ($o in @($mainWindow.OwnedWindows)) { $o.Close() } }
@@ -149,12 +158,13 @@ BeforeAll {
                 finally { $timer.Stop(); $watchdog.Stop() }
                 if ($holder.Chrome) {
                     $c = $holder.Chrome
-                    $out.Dialogs += [pscustomobject]@{ Title = $c.Title; Index = 0; Source = $name; Variant = $variant; Active = $c.Active; Inactive = $c.Inactive; TitleRatio = $c.TitleRatio; Buttons = @($c.Buttons) }
+                    $out.Dialogs += [pscustomobject]@{ Body = $holder.Body; Title = $c.Title; Index = 0; Source = $name; Variant = $variant; Active = $c.Active; Inactive = $c.Inactive; TitleRatio = $c.TitleRatio; Buttons = @($c.Buttons) }
                 }
                 else { $out.Unmeasured += ('{0} {1}: {2}' -f $name, $variant, $holder.Error) }
             }
-            $main.Close()
             $out
+            }
+            finally { if ($main) { $main.Close() } }
         }
     }
 }
@@ -191,25 +201,82 @@ Describe 'Chrome <Theme>' -ForEach $script:ThemeCases -Skip:(-not $script:Window
     It 'gives every dialog the title bar brush of the main window' {
         $bad = @($script:M.Dialogs | Where-Object { $_.Active -ne $script:M.MainTitle -or $_.Inactive -ne $script:M.MainTitleInactive } |
                 ForEach-Object { '{0}: active {1} inactive {2}, main {3} {4}' -f $_.Title, $_.Active, $_.Inactive, $script:M.MainTitle, $script:M.MainTitleInactive })
-        $bad | Should -BeNullOrEmpty
+        $bad | Should -BeNullOrEmpty -Because ($bad -join '; ')
     }
 
     It 'keeps the title text of every dialog readable at 4.5:1' {
         $bad = @($script:M.Dialogs | Where-Object { $_.TitleRatio -lt 4.5 } | ForEach-Object { '{0}: {1}' -f $_.Title, $_.TitleRatio })
-        $bad | Should -BeNullOrEmpty
+        $bad | Should -BeNullOrEmpty -Because ($bad -join '; ')
     }
 
     It 'shows bold text on every button of the main window and of every dialog' {
         $all = @($script:M.Main) + @($script:M.Dialogs | ForEach-Object { $_.Buttons })
         $all.Count | Should -BeGreaterThan 5
         $bad = @($all | Where-Object { $_.Weight -lt 600 } | ForEach-Object { '{0} "{1}" weight {2}' -f $_.Window, $_.Text, $_.Weight })
-        $bad | Should -BeNullOrEmpty
+        $bad | Should -BeNullOrEmpty -Because ($bad -join '; ')
     }
 
     It 'gives no button a border thicker than 1 px or in the text color of the theme' {
         $all = @($script:M.Main) + @($script:M.Dialogs | ForEach-Object { $_.Buttons })
         $bad = @($all | Where-Object { $_.BorderThickness -gt 1 -or ($_.BorderThickness -gt 0 -and $_.BorderColor -eq $script:M.ThemeText) } |
                 ForEach-Object { '{0} "{1}" border {2}px {3}' -f $_.Window, $_.Text, $_.BorderThickness, $_.BorderColor })
-        $bad | Should -BeNullOrEmpty
+        $bad | Should -BeNullOrEmpty -Because ($bad -join '; ')
+    }
+
+    It 'lists the body colors of the main window and of every dialog' {
+        Write-Host ('{0} main: surface {1} text {2}' -f $Theme, $script:M.MainBody.BackLuminance, $script:M.MainBody.TextRatio)
+        foreach ($d in $script:M.Dialogs) {
+            Write-Host ('{0} {1}: surface {2} text {3}; inputs: {4}' -f $Theme, $d.Title, $d.Body.BackLuminance, $d.Body.TextRatio, ((@($d.Body.Inputs) | ForEach-Object { '{0} {1} lum {2} text {3} border {4}' -f $_.Kind, $_.Name, $_.BackLuminance, $_.TextRatio, $_.BorderRatio }) -join ' | '))
+        }
+        @($script:M.Dialogs).Count | Should -BeGreaterThan 0
+    }
+
+    It 'gives the body of every dialog the surface of the theme (light in light, dark in dark)' {
+        $light = ($Theme -eq 'light')
+        $bad = @($script:M.Dialogs | Where-Object { $null -ne $_.Body.BackLuminance -and ((($light -and $_.Body.BackLuminance -lt 0.5) -or (-not $light -and $_.Body.BackLuminance -gt 0.25))) } |
+                ForEach-Object { '{0}: surface luminance {1} in the {2} theme' -f $_.Title, $_.Body.BackLuminance, $Theme })
+        $bad | Should -BeNullOrEmpty -Because ($bad -join '; ')
+    }
+
+    It 'gives the body of every dialog the same surface as the main window' {
+        $bad = @($script:M.Dialogs | Where-Object { $null -ne $_.Body.BackLuminance -and $null -ne $script:M.MainBody.BackLuminance -and [math]::Abs($_.Body.BackLuminance - $script:M.MainBody.BackLuminance) -gt 0.1 } |
+                ForEach-Object { '{0}: surface {1}, main {2}' -f $_.Title, $_.Body.BackLuminance, $script:M.MainBody.BackLuminance })
+        $bad | Should -BeNullOrEmpty -Because ($bad -join '; ')
+    }
+
+    It 'keeps 4.5:1 for the text of every dialog body and every input' {
+        $bad = @()
+        foreach ($d in $script:M.Dialogs) {
+            if ($null -ne $d.Body.TextRatio -and $d.Body.TextRatio -lt 4.5) { $bad += ('{0}: window text {1}' -f $d.Title, $d.Body.TextRatio) }
+            foreach ($i in @($d.Body.Inputs)) { if ($null -ne $i.TextRatio -and $i.TextRatio -lt 4.5) { $bad += ('{0}: {1} {2} text {3}' -f $d.Title, $i.Kind, $i.Name, $i.TextRatio) } }
+        }
+        $bad | Should -BeNullOrEmpty -Because ($bad -join '; ')
+    }
+
+    It 'gives every input of every dialog the surface side of the theme' {
+        $light = ($Theme -eq 'light')
+        $bad = @()
+        foreach ($d in $script:M.Dialogs) { foreach ($i in @($d.Body.Inputs)) { if ($null -ne $i.BackLuminance -and ((($light -and $i.BackLuminance -lt 0.4) -or (-not $light -and $i.BackLuminance -gt 0.3)))) { $bad += ('{0}: {1} {2} luminance {3}' -f $d.Title, $i.Kind, $i.Name, $i.BackLuminance) } } }
+        $bad | Should -BeNullOrEmpty -Because ($bad -join '; ')
+    }
+
+    It 'shows the caption of the main window readable (4.5:1) on the bar of its state, active and behind a dialog' {
+        $script:M.MainChrome.TitleRatio | Should -BeGreaterOrEqual 4.5
+        $script:M.MainInactive.IsActive | Should -BeFalse -Because 'the dialog took the focus'
+        $script:M.MainInactive.TitleRatio | Should -BeGreaterOrEqual 4.5
+    }
+
+    It 'gives the inactive light title bar blue with dark caption text, and the dark one white text' {
+        if ($Theme -eq 'light') {
+            $script:M.MainInactive.TitleBrushNow | Should -Be '#FF4BA3E0'
+            $script:M.MainInactive.TitleText | Should -Be '#FF333333'
+        }
+        else { $script:M.MainInactive.TitleText | Should -Not -Be '#FF333333' }
+        $script:M.MainChrome.TitleText | Should -Not -Be '#FF333333' -Because 'the active caption is white'
+    }
+
+    It 'gives every dialog the caption text of its state (4.5:1)' {
+        $bad = @($script:M.Dialogs | Where-Object { $_.TitleRatio -lt 4.5 } | ForEach-Object { '{0}: {1}' -f $_.Title, $_.TitleRatio })
+        $bad | Should -BeNullOrEmpty -Because ($bad -join '; ')
     }
 }
