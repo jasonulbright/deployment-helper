@@ -113,6 +113,25 @@
                 <Setter Property="FontSize" Value="12"/>
             </Style>
 
+            <!-- Text boxes and combo boxes: the Gray2 border of every theme, and gray text when disabled so that a disabled
+                 field looks dimmed. WCAG 1.4.3 exempts disabled controls from the 4.5:1 text rule. -->
+            <Style TargetType="TextBox" BasedOn="{StaticResource MahApps.Styles.TextBox}">
+                <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Gray2}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.Gray.MouseOver}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style TargetType="ComboBox" BasedOn="{StaticResource MahApps.Styles.ComboBox}">
+                <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Gray2}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.Gray.MouseOver}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
             <!-- Selected and highlighted items: white text on the accent blue, in both themes. -->
             <Style TargetType="ComboBoxItem" BasedOn="{StaticResource MahApps.Styles.ComboBoxItem}">
                 <Style.Triggers>

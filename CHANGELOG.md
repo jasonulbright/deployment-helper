@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Treat disabled controls as exempt from 4.5:1 text contrast and require them to look dimmed.
+
 ## [2026.11.15.0026] - 2026-11-15
 
 ## 42 window tests and 33 retaken images
