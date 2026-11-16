@@ -3,7 +3,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
     Title="Deployment Helper"
-    Width="1320" Height="860"
+    Width="1920" Height="1032"
     MinWidth="960" MinHeight="600"
     WindowStartupLocation="CenterScreen"
     TitleCharacterCasing="Normal"
@@ -69,8 +69,8 @@
             </Style>
 
             <Style x:Key="WorkflowButtonStyle" TargetType="Button" BasedOn="{StaticResource ThemedButtonStyle}">
-                <Setter Property="Height" Value="42"/>
-                <Setter Property="Margin" Value="8,3,8,3"/>
+                <Setter Property="Height" Value="36"/>
+                <Setter Property="Margin" Value="8,2,8,2"/>
                 <Setter Property="Padding" Value="12,0,12,0"/>
                 <Setter Property="HorizontalContentAlignment" Value="Left"/>
                 <Setter Property="FontSize" Value="13"/>
@@ -109,7 +109,7 @@
 
             <!-- The secondary style at the height of a form row (28). Same colors, same template. -->
             <Style x:Key="InlineButtonStyle" TargetType="Button" BasedOn="{StaticResource DialogButton}">
-                <Setter Property="Height" Value="28"/>
+                <Setter Property="Height" Value="26"/>
                 <Setter Property="FontSize" Value="12"/>
             </Style>
 
@@ -152,6 +152,11 @@
                         <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.IdealForeground}"/>
                     </Trigger>
                 </Style.Triggers>
+            </Style>
+            <!-- The one DataGrid style of the main window: compact rows (24 px) and a 26 px column header at 1080p. -->
+            <Style x:Key="ViewDataGrid" TargetType="DataGrid" BasedOn="{StaticResource MahApps.Styles.DataGrid}">
+                <Setter Property="ColumnHeaderHeight" Value="26"/>
+                <Setter Property="RowHeight" Value="24"/>
             </Style>
             <Style x:Key="GridRowStyle" TargetType="DataGridRow" BasedOn="{StaticResource MahApps.Styles.DataGridRow}">
                 <Style.Triggers>
@@ -249,7 +254,7 @@
                                 ToolTip="Deploy one object to several device collections in rings."/>
 
                         <Button x:Name="btnOptions"         Content="Options"                Style="{StaticResource OptionsButtonStyle}"
-                                Margin="8,16,8,3"
+                                Margin="8,16,8,2"
                                 ToolTip="Set the connection, the logs, the history and the templates."/>
 
                     </StackPanel>
@@ -263,12 +268,14 @@
         <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
         <!-- MAIN CONTENT AREA                       -->
         <!-- &#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550; -->
-        <Grid Grid.Column="2">
+        <Grid x:Name="contentGrid" Grid.Column="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <!-- The view takes its own height (Auto) and the log pane takes the rest of the free height. The start script
+                     sets MaxHeight of this row from the window height, so that a small window scrolls the view instead of clipping. -->
+                <RowDefinition x:Name="rowView" Height="Auto" MinHeight="280"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="140"/>
+                <RowDefinition Height="*" MinHeight="140"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
@@ -276,7 +283,7 @@
             <DockPanel Grid.Row="0" Margin="16,14,16,6" LastChildFill="True">
                 <StackPanel x:Name="pnlApplyTemplate" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                     <TextBlock Text="Apply Template:" Style="{StaticResource FormLabelStyle}" Margin="0,0,8,0"/>
-                    <ComboBox x:Name="cboApplyTemplate" Width="220" Height="28" FontSize="12" VerticalContentAlignment="Center"/>
+                    <ComboBox x:Name="cboApplyTemplate" Width="220" Height="26" FontSize="12" VerticalContentAlignment="Center"/>
                 </StackPanel>
                 <StackPanel>
                     <TextBlock x:Name="txtModuleHeader" Text="Apps Deployment" FontSize="18" FontWeight="SemiBold"/>
@@ -322,7 +329,7 @@
 
                         <!-- Target name (label changes per type) -->
                         <TextBlock x:Name="lblTargetName" Grid.Row="0" Grid.Column="0" Text="Application:" Style="{StaticResource FormLabelStyle}" Margin="0,8,12,8"/>
-                        <TextBox x:Name="txtTargetName" Grid.Row="0" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,8,0,8"
+                        <TextBox x:Name="txtTargetName" Grid.Row="0" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,8,0,8"
                                  Controls:TextBoxHelper.Watermark="e.g. 7-Zip 26.00"/>
                         <Button x:Name="btnBrowseTarget" Grid.Row="0" Grid.Column="2" Content="Browse..." Style="{StaticResource InlineButtonStyle}" Margin="8,8,0,8"
                                 ToolTip="Pick the object from the site."/>
@@ -330,12 +337,12 @@
                         <!-- Program (Packages type only) -->
                         <TextBlock x:Name="lblProgram" Grid.Row="1" Grid.Column="0" Text="Program:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <ComboBox  x:Name="cboProgram" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
-                                   FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"
+                                   FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8"
                                    Visibility="Collapsed"/>
 
                         <!-- Collection -->
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Collection:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
-                        <TextBox x:Name="txtCollection" Grid.Row="2" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"
+                        <TextBox x:Name="txtCollection" Grid.Row="2" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8"
                                  Controls:TextBoxHelper.Watermark="Device collection name (e.g. Workstations - Pilot)"/>
                         <Button x:Name="btnBrowseCollection" Grid.Row="2" Grid.Column="2" Content="Browse..." Style="{StaticResource InlineButtonStyle}" Margin="8,0,0,8"
                                 ToolTip="Pick a device collection from the site."/>
@@ -350,17 +357,17 @@
                         <!-- Available datetime -->
                         <TextBlock Grid.Row="4" Grid.Column="0" Text="Available:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <Controls:DateTimePicker x:Name="dtpAvailable" Grid.Row="4" Grid.Column="1" Width="240" HorizontalAlignment="Left"
-                                                 FontSize="12" Height="28" Margin="0,0,0,8"/>
+                                                 FontSize="12" Height="26" Margin="0,0,0,8"/>
 
                         <!-- Deadline datetime (only when Required) -->
                         <TextBlock x:Name="lblDeadline" Grid.Row="5" Grid.Column="0" Text="Deadline:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <Controls:DateTimePicker x:Name="dtpDeadline" Grid.Row="5" Grid.Column="1" Width="240" HorizontalAlignment="Left"
-                                                 FontSize="12" Height="28" Visibility="Collapsed" Margin="0,0,0,8"/>
+                                                 FontSize="12" Height="26" Visibility="Collapsed" Margin="0,0,0,8"/>
 
                         <!-- Notification (Apps type only; packages don't use UserNotification) -->
                         <TextBlock x:Name="lblNotification" Grid.Row="6" Grid.Column="0" Text="Notification:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <ComboBox x:Name="cboNotification" Grid.Row="6" Grid.Column="1" Width="280" HorizontalAlignment="Left"
-                                  FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8">
+                                  FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8">
                             <ComboBoxItem Content="Display All" IsSelected="True" Tag="DisplayAll"/>
                             <ComboBoxItem Content="Display in Software Center Only" Tag="DisplaySoftwareCenterOnly"/>
                             <ComboBoxItem Content="Hide All" Tag="HideAll"/>
@@ -399,18 +406,18 @@
                         </StackPanel>
 
                         <TextBlock x:Name="lblPkgFastNetwork" Grid.Row="10" Grid.Column="0" Text="Fast Network:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
-                        <ComboBox  x:Name="cboPkgFastNetwork" Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
+                        <ComboBox  x:Name="cboPkgFastNetwork" Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
                             <ComboBoxItem Tag="DownloadContentFromDistributionPointAndRunLocally" Content="Download content from DP and run locally" IsSelected="True"/>
                             <ComboBoxItem Tag="RunProgramFromDistributionPoint"                    Content="Run program from DP"/>
                         </ComboBox>
                         <TextBlock x:Name="lblPkgSlowNetwork" Grid.Row="11" Grid.Column="0" Text="Slow Network:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
-                        <ComboBox  x:Name="cboPkgSlowNetwork" Grid.Row="11" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
+                        <ComboBox  x:Name="cboPkgSlowNetwork" Grid.Row="11" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
                             <ComboBoxItem Tag="DoNotRunProgram"                                 Content="Do not run program" IsSelected="True"/>
                             <ComboBoxItem Tag="DownloadContentFromDistributionPointAndLocally"  Content="Download content from DP and run locally"/>
                             <ComboBoxItem Tag="RunProgramFromDistributionPoint"                 Content="Run program from DP"/>
                         </ComboBox>
                         <TextBlock x:Name="lblPkgRerun" Grid.Row="12" Grid.Column="0" Text="Rerun Behavior:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
-                        <ComboBox  x:Name="cboPkgRerun" Grid.Row="12" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
+                        <ComboBox  x:Name="cboPkgRerun" Grid.Row="12" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
                             <ComboBoxItem Tag="NeverRerunDeployedProgram"         Content="Never rerun deployed program" IsSelected="True"/>
                             <ComboBoxItem Tag="AlwaysRerunProgram"                Content="Always rerun program"/>
                             <ComboBoxItem Tag="RerunIfFailedPreviousAttempt"      Content="Rerun if failed previous attempt"/>
@@ -480,8 +487,16 @@
             <!-- Ring deployment pane: shares Grid.Row 1 with formPane; one of the two is visible. -->
             <Grid Grid.Row="1" x:Name="ringPane" Margin="16,6,16,6" Visibility="Collapsed">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="0,0,12,0">
-                    <Grid>
+                <!-- The two grids share the free height (star rows); the view scrolls when the window is smaller than the minimum rows. -->
+                <Grid Margin="0,0,12,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="160"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="160"/>
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -498,7 +513,7 @@
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Object Type:" Style="{StaticResource FormLabelStyle}" Margin="0,8,12,8"/>
                         <ComboBox x:Name="cboRingType" Grid.Row="0" Grid.Column="1" Width="280" HorizontalAlignment="Left"
-                                  FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,8,0,8">
+                                  FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,8,0,8">
                             <ComboBoxItem Content="Application" Tag="Application" IsSelected="True"/>
                             <ComboBoxItem Content="Package" Tag="Package"/>
                             <ComboBoxItem Content="Task sequence" Tag="TaskSequence"/>
@@ -506,17 +521,17 @@
                         </ComboBox>
 
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Object:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
-                        <TextBox x:Name="txtRingObject" Grid.Row="1" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"
+                        <TextBox x:Name="txtRingObject" Grid.Row="1" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8"
                                  Controls:TextBoxHelper.Watermark="Name of the application, package, task sequence, or update group"/>
                         <Button x:Name="btnRingBrowseObject" Grid.Row="1" Grid.Column="2" Content="Browse..." Style="{StaticResource InlineButtonStyle}" Margin="8,0,0,8"
                                 ToolTip="Pick the object from the site."/>
 
                         <TextBlock x:Name="lblRingProgram" Grid.Row="2" Grid.Column="0" Text="Program:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
-                        <ComboBox x:Name="cboRingProgram" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="28"
+                        <ComboBox x:Name="cboRingProgram" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="26"
                                   VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed"/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Ring Plan:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
-                        <ComboBox x:Name="cboRingPlan" Grid.Row="3" Grid.Column="1" FontSize="12" Height="28" VerticalContentAlignment="Center" Margin="0,0,0,8"/>
+                        <ComboBox x:Name="cboRingPlan" Grid.Row="3" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8"/>
                         <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,8">
                             <Button x:Name="btnRingReloadPlans" Content="Reload" Style="{StaticResource InlineButtonStyle}" Margin="0,0,8,0"
                                     ToolTip="Read the ring plan files again."/>
@@ -525,21 +540,21 @@
                         </StackPanel>
 
                         <TextBlock x:Name="lblRingStart" Grid.Row="4" Grid.Column="0" Text="Plan Start:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
-                        <StackPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
-                            <Controls:DateTimePicker x:Name="dtpRingStart" Width="240" FontSize="12" Height="28"/>
+                        <WrapPanel Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
+                            <Controls:DateTimePicker x:Name="dtpRingStart" Width="240" FontSize="12" Height="26"/>
                             <Button x:Name="btnRingExpand" Content="Expand" MinWidth="90" Margin="8,0,0,0"
                                     Style="{StaticResource InlineButtonStyle}"
                                     ToolTip="Calculate the dates of every ring from the plan start."/>
                             <CheckBox x:Name="chkRingHold" Content="Hold later rings (create ring 1 now, promote the rest)" FontSize="12"
                                       VerticalAlignment="Center" Margin="16,0,0,0"/>
-                        </StackPanel>
+                        </WrapPanel>
 
                         <TextBlock x:Name="txtRingPlanInfo" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextTrimming="CharacterEllipsis"
                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                    Foreground="{DynamicResource MahApps.Brushes.Gray1}" Margin="0,0,0,4"/>
                     </Grid>
 
-                    <DockPanel Margin="0,10,0,6" LastChildFill="False">
+                    <DockPanel Grid.Row="1" Margin="0,10,0,6" LastChildFill="False">
                         <TextBlock DockPanel.Dock="Left" Text="Expansion Preview" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"
                                    ToolTip="Edits in the preview apply to this run only."/>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -554,12 +569,12 @@
                                     ToolTip="Create the ring deployments on the site."/>
                         </StackPanel>
                     </DockPanel>
-                    <DataGrid x:Name="dgRingPreview" Height="140" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                    <DataGrid x:Name="dgRingPreview" Grid.Row="2" Style="{StaticResource ViewDataGrid}" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
                               RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
                               AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                               CanUserSortColumns="False" SelectionMode="Single" SelectionUnit="FullRow"
                               GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0"
-                              ColumnHeaderHeight="28" FontSize="12">
+                              FontSize="12">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="#" Binding="{Binding Index}" IsReadOnly="True" Width="32"/>
                             <DataGridTextColumn Header="Ring" Binding="{Binding Name}" IsReadOnly="True" Width="96"/>
@@ -580,7 +595,7 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <DockPanel Margin="0,14,0,6" LastChildFill="False">
+                    <DockPanel Grid.Row="3" Margin="0,14,0,6" LastChildFill="False">
                         <TextBlock x:Name="lblRingRuns" DockPanel.Dock="Left" Text="Open Runs" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"/>
                         <Button x:Name="btnRingRefreshRuns" DockPanel.Dock="Right" Content="Refresh and Reconcile" MinWidth="150" Margin="0"
                                 Style="{StaticResource InlineButtonStyle}"
@@ -588,12 +603,12 @@
                         <CheckBox x:Name="chkRingShowClosed" DockPanel.Dock="Right" Content="Show closed runs" FontSize="12"
                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
                     </DockPanel>
-                    <DataGrid x:Name="dgRingRuns" Height="140" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                    <DataGrid x:Name="dgRingRuns" Grid.Row="4" Style="{StaticResource ViewDataGrid}" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
                               RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
                               AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
                               SelectionMode="Single" SelectionUnit="FullRow"
                               GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0"
-                              ColumnHeaderHeight="28" FontSize="12">
+                              FontSize="12">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Run" Binding="{Binding RunLabel}" Width="3*" MinWidth="120">
                                 <DataGridTextColumn.ElementStyle>
@@ -623,7 +638,7 @@
                             <DataGridTemplateColumn Header="" Width="90">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Content="Promote" Height="24" MinWidth="70" Margin="2" Padding="8,0,8,0"
+                                        <Button Content="Promote" Height="20" MinWidth="70" Margin="2" Padding="8,0,8,0"
                                                 IsEnabled="{Binding CanPromote}"
                                                 ToolTip="{Binding PromoteTip}" ToolTipService.ShowOnDisabled="True">
                                             <Button.Style>
@@ -642,7 +657,7 @@
                             </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
-                </StackPanel>
+                </Grid>
                 </ScrollViewer>
             </Grid>
 

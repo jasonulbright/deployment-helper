@@ -4547,7 +4547,22 @@ $window.Add_SourceInitialized({
     }
 })
 
+# The view row takes its own height and the log row takes the rest. A window that is smaller than the view scrolls the view:
+# the view row gets a MaxHeight of the free height above the minimum log pane.
+$script:ContentGrid = $window.FindName('contentGrid')
+$script:RowView     = $window.FindName('rowView')
+$script:UpdateViewMax = {
+    $g = $script:ContentGrid
+    if (-not $g -or $g.ActualHeight -le 0) { return }
+    $other = 0.0
+    foreach ($i in 0, 2, 4) { $other += $g.RowDefinitions[$i].ActualHeight }
+    $script:RowView.MaxHeight = [Math]::Max($script:RowView.MinHeight, $g.ActualHeight - $other - $g.RowDefinitions[3].MinHeight)
+}
+$script:ContentGrid.Add_SizeChanged({ & $script:UpdateViewMax })
+
 $window.Add_Loaded({
+    # The first start, with no saved window state, opens maximized: the design size is a 1080p work area.
+    if (-not (Test-Path -LiteralPath (Get-WindowStatePath))) { $window.WindowState = [System.Windows.WindowState]::Maximized }
     try {
         Initialize-SuiteFooter -Window $window -StatusName 'txtStatus' -OnOpenOptions {
             Show-OptionsDialog -Owner $window -InitialSection 'Connection'

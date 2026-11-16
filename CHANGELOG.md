@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Compact density for a 1080p work area: 36 px sidebar, 26 px controls, 24 px rows.
+- Share the free height between the view and the log pane, so no view leaves vacant space.
+- Open maximized on first start; capture the maximized window, the work area of a 1080p screen.
+- Guide capture reports a verdict and lists guide images that no capture run produced.
+
 ## [2026.11.15.0027] - 2026-11-15
 
 ## 7 disabled controls now dim
