@@ -6,7 +6,7 @@ if ($patched -eq $t) { throw 'The module lookup function was not found. The miss
 Set-Content -LiteralPath $f -Value $patched -Encoding UTF8
 Remove-Item Env:SMS_ADMIN_UI_PATH -ErrorAction SilentlyContinue
 $win = Start-App 'start-deploymenthelper.ps1' 'Deployment Helper'
-Size-Win $win 1440 900
+Maximize-Win $win
 $win = Find-Top 'Deployment Helper' 10
 Set-Text (Get-El $win 'txtTargetName') 'Doc Demo Viewer 1.0'; Set-Text (Get-El $win 'txtCollection') 'All Workstations'
 Invoke-El (Get-El $win 'btnValidate')

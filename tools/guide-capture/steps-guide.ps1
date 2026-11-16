@@ -1,5 +1,5 @@
 $win = Start-App 'start-deploymenthelper.ps1' 'Deployment Helper'
-Size-Win $win 1440 900
+Maximize-Win $win
 $win = Find-Top 'Deployment Helper' 10
 function Rows($grid) { @((Get-El $win $grid).FindAll('Descendants', (New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::DataItem)))) }
 function WinNames { $c = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window); (@($root.FindAll('Descendants', $c)) | ForEach-Object { $_.Current.Name }) -join ' ; ' }
@@ -46,6 +46,8 @@ Section 'apps validate' {
   Set-Text (Get-El $win 'txtTargetName') 'Doc Demo Viewer 1.0'; Set-Text (Get-El $win 'txtCollection') 'All Workstations'
   Select-El (Get-El $win 'radAvailable'); Start-Sleep -Milliseconds 500; Shot $win 'apps-filled'
   Invoke-El (Get-El $win 'btnValidate'); Start-Sleep -Seconds 12; Shot $win 'apps-validated'
+  # D-21: the run also samples the colors of the shot controls (text over fill).
+  foreach ($id in 'btnApps', 'btnBrowseTarget', 'btnValidate', 'btnOptions') { Sample-El (Get-El $win $id) $id }
   Log ('deploy enabled: ' + (Get-El $win 'btnDeploy').Current.IsEnabled)
 }
 Section 'apps required' {
