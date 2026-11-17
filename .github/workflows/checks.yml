@@ -1,7 +1,7 @@
 name: Checks
 
 # Lint and tests (Invoke-Checks.ps1) on Windows PowerShell 5.1 and PowerShell 7.
-# The repository has no window test, so no job sets SUITE_ALLOW_WINDOW_TESTS.
+# No job sets SUITE_ALLOW_WINDOW_TESTS, so the window tests are skipped here. The lab runs them.
 on:
   pull_request:
   push:

@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Add tests for the start script: shell logic, script contract, start-up without the console, and window layout.
 - Compact density for a 1080p work area: 36 px sidebar, 26 px controls, 24 px rows.
 - Share the free height between the view and the log pane, so no view leaves vacant space.
 - Open maximized on first start; capture the maximized window, the work area of a 1080p screen.
