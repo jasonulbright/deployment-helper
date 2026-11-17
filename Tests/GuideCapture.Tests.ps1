@@ -15,17 +15,20 @@ Describe 'Invoke-GuideCapture' {
         @($errors) | Should -BeNullOrEmpty
     }
 
-    It 'takes the lock file with New-Item and -ErrorAction Stop, and answers busy on an IOException' {
+    It 'takes the lock file with New-Item and -ErrorAction Stop, and reads the holder on an IOException' {
         $commands = @($script:Ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'New-Item' -and $n.Extent.Text -match 'ItemType\s+File' }, $true))
         $commands.Count | Should -BeGreaterOrEqual 1
         $commands[0].Extent.Text | Should -Match '-ErrorAction\s+Stop'
         $catches = @($script:Ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CatchClauseAst] -and @($n.CatchTypes | Where-Object { $_.TypeName.FullName -eq 'System.IO.IOException' }).Count -gt 0 }, $true))
         $catches.Count | Should -BeGreaterOrEqual 1
-        $catches[0].Extent.Text | Should -Match "return 'busy'"
+        $catches[0].Extent.Text | Should -Match "'held: \{0\}\|\{1\}\|\{2\}'"
     }
 
-    It 'removes a lock file that is older than 60 minutes' {
-        $script:Text | Should -Match 'TotalMinutes\s+-gt\s+60'
+    It 'removes a lock only after 30 minutes with no running owner, and reports the removal (D-16)' {
+        $script:Text | Should -Match '\[int\]\$age -gt 30 -and \$aliveLab -ne ''True'' -and -not \(Get-Process -Id \$ownerPid'
+        $script:Text | Should -Match 'The stale lab lock .* was removed'
+        $script:Text | Should -Match '''unknown: '' \+ \$held'
+        $script:Text | Should -Not -Match 'TotalMinutes\s+-gt\s+60'
     }
 
     It 'never deletes C:\guide itself, only its own folder and the lock file' {
@@ -49,7 +52,7 @@ Describe 'Invoke-GuideCapture' {
         $kill = $f.IndexOf('$stopRunner')
         $unregister = $f.IndexOf('Unregister-ScheduledTask')
         $folder = $f.IndexOf('Remove-Item $r -Recurse')
-        $lock = $f.IndexOf('Remove-Item $l -Force')
+        $lock = $f.IndexOf('Remove-Item -LiteralPath $path -Force')
         $kill | Should -BeGreaterOrEqual 0
         $unregister | Should -BeGreaterThan $kill
         $folder | Should -BeGreaterThan $unregister
@@ -65,10 +68,10 @@ Describe 'Invoke-GuideCapture' {
         $script:Text.Substring(0, $timeout).LastIndexOf('$stopRunner') | Should -BeGreaterThan $script:Text.IndexOf('if (-not $done) {')
     }
 
-    It 'renames a stale lock before it deletes it, and treats a lost lock as busy' {
-        $script:Text | Should -Match 'Move-Item -LiteralPath \$l -Destination \$old'
-        $script:Text.IndexOf('Move-Item -LiteralPath $l') | Should -BeLessThan $script:Text.IndexOf('Remove-Item -LiteralPath $old')
-        $script:Text | Should -Match 'if \(-not \$item\) \{ return ''busy'' \}'
+    It 'writes the lock text owner|pid|start, refreshes it in the poll loop and retries at once when the lock is gone' {
+        $script:Text | Should -Match ('lockText = ' + [regex]::Escape('''{0}|{1}|{2}'' -f $app, $PID'))
+        $script:Text | Should -Match 'LastWriteTime = Get-Date'
+        $script:Text | Should -Match 'if \(\$got -eq ''gone''\) \{ continue \}'
     }
 
     It 'names the app in the lab by a constant, so a worktree uses the same folder' {
@@ -86,6 +89,6 @@ Describe 'Invoke-GuideCapture' {
         $body.IndexOf('$haveLock = $true') | Should -BeGreaterThan -1
         $body.IndexOf('Register-ScheduledTask') | Should -BeGreaterThan $body.IndexOf('$haveLock = $true')
         $try.Finally.Extent.Text | Should -Match 'if \(\$haveLock\)'
-        $script:Text | Should -Match "\`$lockFile = 'C:\\guide\\capture\.lock'"
+        $script:Text | Should -Match "\`$lockPath = 'C:\\guide\\capture\.lock'"
     }
 }
