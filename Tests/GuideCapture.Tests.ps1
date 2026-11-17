@@ -79,4 +79,13 @@ Describe 'Invoke-GuideCapture' {
     It 'excludes .claude from the files that it copies' {
         $script:Text | Should -Match "'\.claude'"
     }
+
+    It 'takes C:\guide\capture.lock before it registers the scheduled task and releases it only when it took it' {
+        $try = $script:Ast.Find({ param($n) $n -is [System.Management.Automation.Language.TryStatementAst] -and $null -ne $n.Finally }, $true)
+        $body = $try.Body.Extent.Text
+        $body.IndexOf('$haveLock = $true') | Should -BeGreaterThan -1
+        $body.IndexOf('Register-ScheduledTask') | Should -BeGreaterThan $body.IndexOf('$haveLock = $true')
+        $try.Finally.Extent.Text | Should -Match 'if \(\$haveLock\)'
+        $script:Text | Should -Match "\`$lockFile = 'C:\\guide\\capture\.lock'"
+    }
 }
