@@ -9,6 +9,10 @@
 - Open maximized on first start; capture the maximized window, the work area of a 1080p screen.
 - Guide capture reports a verdict and lists guide images that no capture run produced.
 
+### Fixed
+
+- Add a guard that every button of the vendored SuiteCommon dialogs takes ThemedButtonStyle, and vendor the dialogs that do.
+
 ## [2026.11.15.0027] - 2026-11-15
 
 ## 7 disabled controls now dim
