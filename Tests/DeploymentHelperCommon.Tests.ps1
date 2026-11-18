@@ -1243,3 +1243,53 @@ Describe 'Result errors keep raw exception text out of the window' {
         $r.Error | Should -Not -Match 'raw provider detail'
     }
 }
+
+Describe 'A failed lookup is an error, not "not found"' {
+    It 'leaves no fault when the object does not exist' {
+        Mock Get-CMApplication -ModuleName DeploymentHelperCommon { $null }
+        Test-ApplicationExists -ApplicationName 'Nope' | Should -BeNullOrEmpty
+        Get-DeploymentLookupFault | Should -BeNullOrEmpty
+    }
+
+    It 'names the failure of a read that fails for good' {
+        Mock Get-CMApplication -ModuleName DeploymentHelperCommon { throw 'Invalid query' }
+        Test-ApplicationExists -ApplicationName 'Broken' | Should -BeNullOrEmpty
+        Get-DeploymentLookupFault | Should -Be 'Could not read application. The log file has the reason.'
+    }
+
+    It 'clears the fault at the next lookup' {
+        Mock Get-CMApplication -ModuleName DeploymentHelperCommon { throw 'Invalid query' }
+        $null = Test-ApplicationExists -ApplicationName 'Broken'
+        Mock Get-CMApplication -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ LocalizedDisplayName = 'A'; SoftwareVersion = '1'; PackageID = 'P1' } }
+        Test-ApplicationExists -ApplicationName 'A' | Should -Not -BeNullOrEmpty
+        Get-DeploymentLookupFault | Should -BeNullOrEmpty
+    }
+
+    It 'retries a transient fault and finds the object' {
+        $global:DhFx = @{ Hit = 0 }
+        Mock Get-CMApplication -ModuleName DeploymentHelperCommon { $global:DhFx.Hit++; if ($global:DhFx.Hit -eq 1) { throw 'The operation has timed out.' }; [PSCustomObject]@{ LocalizedDisplayName = 'A'; SoftwareVersion = '1'; PackageID = 'P1' } }
+        Test-ApplicationExists -ApplicationName 'A' | Should -Not -BeNullOrEmpty
+        $global:DhFx.Hit | Should -Be 2
+        Get-DeploymentLookupFault | Should -BeNullOrEmpty
+        Remove-Variable -Name DhFx -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    It 'names the failure of a collection lookup' {
+        Mock Get-CMCollection -ModuleName DeploymentHelperCommon { throw 'Invalid query' }
+        Test-CollectionValid -CollectionId 'MCM00001' | Should -BeNullOrEmpty
+        Get-DeploymentLookupFault | Should -Match 'Could not read collection'
+    }
+
+    It 'says "could not be read" in a ring check when the object read fails' {
+        Mock Get-CMApplication -ModuleName DeploymentHelperCommon { throw 'Invalid query' }
+        $r = Test-RingPreflight -Type Application -ObjectName 'X' -Rings @()
+        $r.ObjectMessage | Should -Match "could not be read"
+    }
+
+    It 'reports the fault in the status line of every validate handler of the shell' {
+        $text = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\start-deploymenthelper.ps1') -Raw
+        $text | Should -Not -Match "Set-StatusText -Text '(Application|Package|SUG|Task sequence) not found\.'"
+        $text | Should -Not -Match "Set-StatusText -Text 'Collection invalid\.'"
+        ([regex]::Matches($text, 'Get-LookupStatusText -NotFound')).Count | Should -BeGreaterOrEqual 8
+    }
+}
