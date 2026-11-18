@@ -84,11 +84,19 @@ function Get-ErrorDetailText {
 # Validation
 # ---------------------------------------------------------------------------
 
+# The text of the last lookup that failed with an error (not "not found"). Empty when the last lookup ended without an
+# error. The shell reads it to tell "the object does not exist" from "the read failed".
+$script:LookupFault = ''
+function Get-DeploymentLookupFault {
+    return [string]$script:LookupFault
+}
+
 function Test-ApplicationExists {
     param([Parameter(Mandatory)][string]$ApplicationName)
 
+    $script:LookupFault = ''
     try {
-        $app = Get-CMApplication -Name $ApplicationName -DisableWildcardHandling -ErrorAction Stop
+        $app = Invoke-SuiteCMRead -Description "Application lookup '$ApplicationName'" -ScriptBlock { Get-CMApplication -Name $ApplicationName -DisableWildcardHandling -ErrorAction Stop }
         if ($null -eq $app) {
             Write-Log "Application not found: $ApplicationName" -Level WARN
             return $null
@@ -98,6 +106,7 @@ function Test-ApplicationExists {
     }
     catch {
         Write-Log "Error querying application '$ApplicationName': $_" -Level ERROR
+        $script:LookupFault = 'Could not read application. The log file has the reason.'
         return $null
     }
 }
@@ -117,6 +126,7 @@ function Search-CMApplicationByName {
     }
     catch {
         Write-Log "Error searching applications: $_" -Level ERROR
+        $script:LookupFault = 'Could not read applications. The log file has the reason.'
         return @()
     }
 }
@@ -133,6 +143,7 @@ function Search-CMCollectionByName {
     }
     catch {
         Write-Log "Error searching collections: $_" -Level ERROR
+        $script:LookupFault = 'Could not read collections. The log file has the reason.'
         return @()
     }
 }
@@ -474,12 +485,15 @@ function Test-CollectionValid {
         [Parameter(Mandatory, ParameterSetName = 'ById')][string]$CollectionId
     )
 
+    $script:LookupFault = ''
     $label = if ($PSCmdlet.ParameterSetName -eq 'ById') { $CollectionId } else { $CollectionName }
     try {
-        $col = if ($PSCmdlet.ParameterSetName -eq 'ById') {
-            Get-CMCollection -Id $CollectionId -ErrorAction Stop
-        } else {
-            Get-CMCollection -Name $CollectionName -DisableWildcardHandling -ErrorAction Stop
+        $col = Invoke-SuiteCMRead -Description "Collection lookup '$label'" -ScriptBlock {
+            if ($PSCmdlet.ParameterSetName -eq 'ById') {
+                Get-CMCollection -Id $CollectionId -ErrorAction Stop
+            } else {
+                Get-CMCollection -Name $CollectionName -DisableWildcardHandling -ErrorAction Stop
+            }
         }
         if ($null -eq $col) {
             Write-Log "Collection not found: $label" -Level WARN
@@ -494,6 +508,7 @@ function Test-CollectionValid {
     }
     catch {
         Write-Log "Error querying collection '$label': $_" -Level ERROR
+        $script:LookupFault = 'Could not read collection. The log file has the reason.'
         return $null
     }
 }
@@ -605,8 +620,9 @@ function Get-DeploymentPreview {
 function Test-SUGExists {
     param([Parameter(Mandatory)][string]$SUGName)
 
+    $script:LookupFault = ''
     try {
-        $sug = Get-CMSoftwareUpdateGroup -Name $SUGName -DisableWildcardHandling -ErrorAction Stop
+        $sug = Invoke-SuiteCMRead -Description "Software update group lookup '$SUGName'" -ScriptBlock { Get-CMSoftwareUpdateGroup -Name $SUGName -DisableWildcardHandling -ErrorAction Stop }
         if ($null -eq $sug) {
             Write-Log "Software Update Group not found: $SUGName" -Level WARN
             return $null
@@ -619,6 +635,7 @@ function Test-SUGExists {
     }
     catch {
         Write-Log "Error querying SUG '$SUGName': $_" -Level ERROR
+        $script:LookupFault = 'Could not read SUG. The log file has the reason.'
         return $null
     }
 }
@@ -1052,6 +1069,7 @@ function Search-CMPackageByName {
     }
     catch {
         Write-Log "Error searching packages: $_" -Level ERROR
+        $script:LookupFault = 'Could not read packages. The log file has the reason.'
         return @()
     }
 }
@@ -1059,8 +1077,9 @@ function Search-CMPackageByName {
 function Test-PackageExists {
     param([Parameter(Mandatory)][string]$PackageName)
 
+    $script:LookupFault = ''
     try {
-        $pkg = Get-CMPackage -Name $PackageName -Fast -DisableWildcardHandling -ErrorAction Stop
+        $pkg = Invoke-SuiteCMRead -Description "Package lookup '$PackageName'" -ScriptBlock { Get-CMPackage -Name $PackageName -Fast -DisableWildcardHandling -ErrorAction Stop }
         if ($null -eq $pkg) {
             Write-Log "Package not found: $PackageName" -Level WARN
             return $null
@@ -1070,6 +1089,7 @@ function Test-PackageExists {
     }
     catch {
         Write-Log "Error querying package '$PackageName': $_" -Level ERROR
+        $script:LookupFault = 'Could not read package. The log file has the reason.'
         return $null
     }
 }
@@ -1128,6 +1148,7 @@ function Search-CMSoftwareUpdateGroupByName {
     }
     catch {
         Write-Log "Error searching SUGs: $_" -Level ERROR
+        $script:LookupFault = 'Could not read SUGs. The log file has the reason.'
         return @()
     }
 }
@@ -1169,6 +1190,7 @@ function Search-CMTaskSequenceByName {
     }
     catch {
         Write-Log "Error searching task sequences: $_" -Level ERROR
+        $script:LookupFault = 'Could not read task sequence. The log file has the reason.'
         return @()
     }
 }
@@ -1176,8 +1198,9 @@ function Search-CMTaskSequenceByName {
 function Test-TaskSequenceExists {
     param([Parameter(Mandatory)][string]$TaskSequenceName)
 
+    $script:LookupFault = ''
     try {
-        $ts = Get-CMTaskSequence -Name $TaskSequenceName -Fast -DisableWildcardHandling -ErrorAction Stop
+        $ts = Invoke-SuiteCMRead -Description "Task sequence lookup '$TaskSequenceName'" -ScriptBlock { Get-CMTaskSequence -Name $TaskSequenceName -Fast -DisableWildcardHandling -ErrorAction Stop }
         if ($null -eq $ts) {
             Write-Log "Task sequence not found: $TaskSequenceName" -Level WARN
             return $null
@@ -1187,6 +1210,7 @@ function Test-TaskSequenceExists {
     }
     catch {
         Write-Log "Error querying task sequence '$TaskSequenceName': $_" -Level ERROR
+        $script:LookupFault = 'Could not read task sequence. The log file has the reason.'
         return $null
     }
 }
@@ -2803,7 +2827,11 @@ function Test-RingPreflight {
     }
 
     $objectOk = $null -ne $object
-    $objectMessage = if ($objectOk) { '' } else { ("{0} '{1}' was not found." -f $Type, $ObjectName) }
+    $objectMessage = ''
+    if (-not $objectOk) {
+        $fault = Get-DeploymentLookupFault
+        $objectMessage = if ($fault) { ("{0} '{1}' could not be read: {2}" -f $Type, $ObjectName, $fault) } else { ("{0} '{1}' was not found." -f $Type, $ObjectName) }
+    }
 
     if ($objectOk -and $ExpectedObjectId) {
         $identity = Get-RingObjectIdentity -Type $Type -TargetObject $object -ProgramName $ProgramName

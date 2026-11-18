@@ -342,6 +342,14 @@ function Set-StatusText {
     $txtStatus.Text = $Text
 }
 
+# "Not found" and "the read failed" are different results. A lookup that ended in an error leaves its text in
+# Get-DeploymentLookupFault; the status line then names the failure instead of saying the object does not exist.
+function Get-LookupStatusText {
+    param([Parameter(Mandatory)][string]$NotFound)
+    $fault = Get-DeploymentLookupFault
+    if ($fault) { Add-LogLine -Message $fault; return ('Lookup failed. {0}' -f $fault) }
+    return $NotFound
+}
 # Shows the site code and the site server of the saved settings at the right end of the footer. The footer is read-only text.
 function Update-FooterSite {
     try { Update-SuiteFooter -Window $window -SiteCode ([string]$global:Prefs['SiteCode']) -SiteServer ([string]$global:Prefs['SMSProvider']) }
@@ -1242,7 +1250,7 @@ $script:InvokeAppsValidate = {
         $app = Test-ApplicationExists -ApplicationName $appName
         if ($null -eq $app) {
             Set-CheckGlyph -Index 1 -State 'Fail'
-            Set-StatusText -Text 'Application not found.'
+            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Application not found.')
             return
         }
         Set-CheckGlyph -Index 1 -State 'Pass'
@@ -1258,7 +1266,7 @@ $script:InvokeAppsValidate = {
         $col = Test-CollectionValid -CollectionName $collName
         if ($null -eq $col) {
             Set-CheckGlyph -Index 3 -State 'Fail'
-            Set-StatusText -Text 'Collection invalid.'
+            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Collection invalid.')
             return
         }
         Set-CheckGlyph -Index 3 -State 'Pass'
@@ -1355,7 +1363,7 @@ $script:InvokePackagesValidate = {
         $pkg = Test-PackageExists -PackageName $pkgName
         if ($null -eq $pkg) {
             Set-CheckGlyph -Index 1 -State 'Fail'
-            Set-StatusText -Text 'Package not found.'
+            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Package not found.')
             return
         }
         if ($cboProgram.Items.Count -eq 0) {
@@ -1383,7 +1391,7 @@ $script:InvokePackagesValidate = {
         $col = Test-CollectionValid -CollectionName $collName
         if ($null -eq $col) {
             Set-CheckGlyph -Index 3 -State 'Fail'
-            Set-StatusText -Text 'Collection invalid.'
+            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Collection invalid.')
             return
         }
         Set-CheckGlyph -Index 3 -State 'Pass'
@@ -1566,7 +1574,7 @@ $script:InvokeSUGValidate = {
         $sug = Test-SUGExists -SUGName $sugName
         if ($null -eq $sug) {
             Set-CheckGlyph -Index 1 -State 'Fail'
-            Set-StatusText -Text 'SUG not found.'
+            Set-StatusText -Text (Get-LookupStatusText -NotFound 'SUG not found.')
             return
         }
         Set-CheckGlyph -Index 1 -State 'Pass'
@@ -1581,7 +1589,7 @@ $script:InvokeSUGValidate = {
         $col = Test-CollectionValid -CollectionName $collName
         if ($null -eq $col) {
             Set-CheckGlyph -Index 3 -State 'Fail'
-            Set-StatusText -Text 'Collection invalid.'
+            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Collection invalid.')
             return
         }
         Set-CheckGlyph -Index 3 -State 'Pass'
@@ -1767,7 +1775,7 @@ $script:InvokeTaskSequencesValidate = {
         $ts = Test-TaskSequenceExists -TaskSequenceName $tsName
         if ($null -eq $ts) {
             Set-CheckGlyph -Index 1 -State 'Fail'
-            Set-StatusText -Text 'Task sequence not found.'
+            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Task sequence not found.')
             return
         }
         Set-CheckGlyph -Index 1 -State 'Pass'
@@ -1788,7 +1796,7 @@ $script:InvokeTaskSequencesValidate = {
         $col = Test-CollectionValid -CollectionName $collName
         if ($null -eq $col) {
             Set-CheckGlyph -Index 3 -State 'Fail'
-            Set-StatusText -Text 'Collection invalid.'
+            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Collection invalid.')
             return
         }
         Set-CheckGlyph -Index 3 -State 'Pass'
