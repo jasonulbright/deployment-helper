@@ -35,12 +35,12 @@ The [user guide](docs/index.md) walks every view, dialog and setting with images
 
 - PowerShell 5.1
 - .NET Framework 4.8 or later
-- Configuration Manager admin console installed locally
+- Configuration Manager console installed locally
 - Configuration Manager role permissions sufficient for application, package, task sequence, and software update deployment
 
 ## Install
 
-On first launch, open **Options > Connection** and set the site code + SMS Provider FQDN, then use the sidebar to pick a deployment type. The footer shows the saved values at the right end. It is read-only text: select it to open **Options**, and change the values only there. Four default deployment templates are written to the `Templates\` folder and two ring plans to the `Rings\` folder automatically.
+On first launch, open **Options > Connection** and set the site code and the SMS Provider FQDN, then use the sidebar to pick a deployment type. The footer shows the saved values at the right end. It is read-only text: select it to open **Options**, and change the values only there. Four default deployment templates are written to the `Templates\` folder and two ring plans to the `Rings\` folder automatically.
 
 ## Templates
 
@@ -51,11 +51,11 @@ On first run, four default templates are written to `Templates\`:
 - Server Pilot (Available, Display in Software Center)
 - Server Production (Required, Hide All)
 
-Edit, duplicate, or delete via **Options > Templates**. Each template is a simple JSON file; edits survive app restarts.
+Edit, duplicate, or delete a template in **Options > Templates**. Each template is a simple JSON file; edits survive app restarts.
 
 ## Ring deployments
 
-A ring plan is a named, ordered list of rings in `Rings\<plan>.json`. Each ring names one device collection by CollectionID, a purpose, and day offsets from the plan start. A ring run makes one ordinary Configuration Manager deployment per ring. The site does not know that the deployments form a sequence; only the tool's files record it.
+Ring is the planning term of this tool, not a Configuration Manager object. A ring is one step of a rollout: one device collection that gets one deployment. A ring plan is a named, ordered list of rings in `Rings\<plan>.json`. Each ring names one device collection by CollectionID, a purpose, and day offsets from the plan start. A ring run makes one ordinary Configuration Manager deployment per ring. The site does not know that the deployments form a sequence; only the tool's files record it.
 
 ![Ring deployment](screenshots/rings-dark.png)
 
@@ -65,10 +65,10 @@ To run a plan:
 
 1. Select **Ring deployment** in the sidebar.
 2. Select the object type, then the object. For a package, select the program.
-3. Select the plan and the plan start. Click **Expand** to compute each ring's dates.
+3. Select the plan and the plan start. Select **Expand** to compute each ring's dates.
 4. Set each ring's collection in the preview, or set `CollectionID` in the plan file. Edits in the preview apply to this run only.
-5. Click **Validate**. Each ring must pass the five checks and the plan rules.
-6. Click **Create Deployments**. The confirmation lists every deployment that the run creates.
+5. Select **Validate**. Each ring must pass the five checks and the plan rules.
+6. Select **Create Deployments**. The confirmation lists every deployment that the run creates.
 
 Plan rules:
 
@@ -132,7 +132,7 @@ The run-state folder is set in **Options > Logging**. The default is `Rings\runs
 | `AllowBoundaryFallback`, `AllowMicrosoftUpdate`, `RequirePostRebootFullScan` | Software update groups only |
 | `TaskSequenceAvailability`, `ShowTaskSequenceProgress` | Task sequences only |
 | `FastNetworkOption`, `SlowNetworkOption`, `RerunBehavior` | Packages only; same values as the Packages view |
-| `DPGroup` | DP group that receives the content before this ring's deployment is created (not for software update groups) |
+| `DPGroup` | Distribution point group that receives the content before this ring's deployment is created (not for software update groups) |
 | `SuccessThresholdPercent` | Empty, or 0 to 100 |
 
 Before creating a deployment, the tool checks that the configured audit log can be opened for writing. Every ring deployment then writes one audit record with `PlanName`, `RingIndex`, `RingName`, and `RunId`. If the append still fails after Configuration Manager creates a deployment, the tool reports its ID and stops before creating later rings.
@@ -141,7 +141,7 @@ Before creating a deployment, the tool checks that the configured audit log can 
 
 | File | Purpose |
 |------|---------|
-| `DeploymentHelper.prefs.json` | Site code, SMS provider, audit log path, ring run-state folder |
+| `DeploymentHelper.prefs.json` | Site code, SMS Provider, audit log path, ring run-state folder |
 | `DeploymentHelper.windowstate.json` | Window size, position, theme, last-used deployment type |
 | `Logs\DeploymentHelper-*.log` | Per-session tool log |
 | `Logs\deployment-audit.jsonl` | Immutable deployment audit trail |

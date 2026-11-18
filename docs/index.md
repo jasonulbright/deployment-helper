@@ -8,7 +8,7 @@ Deployment Helper creates Configuration Manager deployments for applications, pa
 
 ## Core
 
-- [Application deployment](core/apps.md): the form, the five checks, Browse, DP groups, templates and the confirmation.
+- [Application deployment](core/apps.md): the form, the five checks, Browse, distribution point groups, templates and the confirmation.
 - [Packages, task sequences and software update groups](core/other-types.md): the forms of the three other types.
 - [Ring deployment](core/rings.md): one object, one ring plan, one deployment for each ring.
 - [Ring plan files from Update Planner](ring-plan-format.md): how Deployment Helper loads a Suite ring plan.

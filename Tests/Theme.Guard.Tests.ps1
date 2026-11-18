@@ -260,7 +260,7 @@ Describe 'No banned word in the UI text and the documents (c)' {
 
     It 'checks one sentence (the check itself)' {
         Test-OneSentence 'Deploy an application to a device collection.' | Should -BeTrue
-        Test-OneSentence 'Pick the device collection (Shift+click reloads the list).' | Should -BeTrue
+        Test-OneSentence 'Pick the device collection (hold Shift to reload the list).' | Should -BeTrue
         Test-OneSentence 'Pick the object. Then select OK.' | Should -BeFalse
         Test-OneSentence 'pick the object.' | Should -BeFalse
         Test-OneSentence 'Pick the object' | Should -BeFalse

@@ -110,8 +110,8 @@ This guide opened the dialog and selected **Cancel**. It did not create a deploy
 |---|---|---|
 | The **Deploy** button is missing. | Not all checks passed, or no validation ran. | Select **Validate** and fix the failing checks. |
 | The log shows `Run Validate first.` | **Deploy** ran without a validation. | Select **Validate**. |
-| The log shows `Content not fully distributed: 0/0 DP(s) succeeded.` | The content is on no distribution point. | Select the DP groups and **Distribute Content**. |
-| `Deployment Blocked` | The schedule or the notification is not valid. | Read the text of the dialog and change the form. |
+| The log shows `Content not fully distributed: 0/0 distribution point(s) succeeded.` | The content is on no distribution point. | Select the distribution point groups and **Distribute Content**. |
+| `Deployment Blocked` | The schedule or the notification is not valid. | View the text of the dialog and change the form. |
 
 ## Links
 

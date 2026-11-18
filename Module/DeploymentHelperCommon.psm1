@@ -4,10 +4,10 @@
 
 .DESCRIPTION
     Import this module to get:
-      - Structured logging and CM site connection management via the
+      - Structured logging and ConfigMgr site connection management by using the
         vendored SuiteCommon module (Lib\SuiteCommon)
       - Pre-execution validation (Test-ApplicationExists, Test-ContentDistributed, Test-CollectionValid, Test-CollectionSafe, Test-DuplicateDeployment)
-      - DP group management (Get-DPGroupList, Start-ContentDistributionToGroups)
+      - Distribution point group management (Get-DPGroupList, Start-ContentDistributionToGroups)
       - Deployment preview and execution (Get-DeploymentPreview, Invoke-ApplicationDeployment)
       - Immutable deployment audit log (Write-DeploymentLog, Get-DeploymentHistory)
       - Deployment templates (Get-DeploymentTemplates)
@@ -297,7 +297,7 @@ function Test-ContentDistributed {
     try {
         $status = Get-CMDistributionStatus -Id $Application.PackageID -ErrorAction Stop
         if ($null -eq $status) {
-            Write-Log "No distribution status found for $($Application.LocalizedDisplayName) - content may not be distributed to any DP" -Level WARN
+            Write-Log "No distribution status found for $($Application.LocalizedDisplayName) - content may not be distributed to any distribution point" -Level WARN
             return @{ Targeted = 0; NumberSuccess = 0; NumberInProgress = 0; NumberErrors = 0; IsFullyDistributed = $false }
         }
 
@@ -310,7 +310,7 @@ function Test-ContentDistributed {
         }
 
         if ($result.IsFullyDistributed) {
-            Write-Log "Content fully distributed: $($result.NumberSuccess)/$($result.Targeted) DPs"
+            Write-Log "Content fully distributed: $($result.NumberSuccess)/$($result.Targeted) distribution points"
         } else {
             Write-Log ("Content NOT fully distributed: {0}/{1} success, {2} errors, {3} in progress" -f
                 $result.NumberSuccess, $result.Targeted, $result.NumberErrors, $result.NumberInProgress) -Level WARN
@@ -326,11 +326,11 @@ function Test-ContentDistributed {
 function Get-DPGroupList {
     try {
         $groups = Get-CMDistributionPointGroup -ErrorAction Stop | Sort-Object Name
-        Write-Log "Retrieved $($groups.Count) DP group(s)"
+        Write-Log "Retrieved $($groups.Count) distribution point group(s)"
         return $groups
     }
     catch {
-        Write-Log "Error retrieving DP groups: $_" -Level ERROR
+        Write-Log "Error retrieving distribution point groups: $_" -Level ERROR
         return @()
     }
 }
@@ -346,15 +346,15 @@ function Start-ContentDistributionToGroups {
     foreach ($groupName in $DPGroupNames) {
         try {
             Start-CMContentDistribution -ApplicationName $Application.LocalizedDisplayName -DistributionPointGroupName $groupName -ErrorAction Stop
-            Write-Log "Content distribution started to DP group '$groupName'"
+            Write-Log "Content distribution started to distribution point group '$groupName'"
             $results += @{ Group = $groupName; Success = $true }
         }
         catch {
             if ($_.Exception.Message -match 'already been targeted') {
-                Write-Log "Content already distributed to DP group '$groupName'" -Level INFO
+                Write-Log "Content already distributed to distribution point group '$groupName'" -Level INFO
                 $results += @{ Group = $groupName; Success = $true; AlreadyTargeted = $true }
             } else {
-                Write-Log "Error distributing to DP group '$groupName': $_" -Level ERROR
+                Write-Log "Error distributing to distribution point group '$groupName': $_" -Level ERROR
                 $results += @{ Group = $groupName; Success = $false; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The content could not be distributed. See the log file.') }
             }
         }
@@ -366,11 +366,11 @@ function Invoke-ContentDistributionToGroups {
     <#
     .SYNOPSIS
         Distribute content (application / package / task sequence) to one or
-        more DP groups. Polymorphic; dispatches by -Type.
+        more distribution point groups. Polymorphic; dispatches by -Type.
 
     .DESCRIPTION
         Wraps Start-CMContentDistribution. 'already been targeted' is treated
-        as an informational success so re-submitting a DP group is harmless.
+        as an informational success so re-submitting a distribution point group is harmless.
     #>
     param(
         [Parameter(Mandatory)][ValidateSet('Application','Package','TaskSequence')][string]$Type,
@@ -388,7 +388,7 @@ function Invoke-ContentDistributionToGroups {
         }
         try {
             Start-CMContentDistribution @p
-            Write-Log "Content distribution started to DP group '$groupName' ($Type)"
+            Write-Log "Content distribution started to distribution point group '$groupName' ($Type)"
             $results += @{ Group = $groupName; Success = $true }
         }
         catch {
@@ -397,10 +397,10 @@ function Invoke-ContentDistributionToGroups {
             if ($_.Exception.Message -match 'already been targeted' -or
                 $_.Exception.Message -match 'already been distributed' -or
                 $_.Exception.Message -match 'No content destination.*already been distributed') {
-                Write-Log "DP group '$groupName' already has this content"
+                Write-Log "Distribution point group '$groupName' already has this content"
                 $results += @{ Group = $groupName; Success = $true; AlreadyTargeted = $true }
             } else {
-                Write-Log "Error distributing to DP group '$groupName': $_" -Level ERROR
+                Write-Log "Error distributing to distribution point group '$groupName': $_" -Level ERROR
                 $results += @{ Group = $groupName; Success = $false; Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The content could not be distributed. See the log file.') }
             }
         }
@@ -411,14 +411,14 @@ function Invoke-ContentDistributionToGroups {
 function Get-ContentTargetedDPGroups {
     <#
     .SYNOPSIS
-        Returns the list of DP group names that currently hold this content.
+        Returns the list of distribution point group names that currently hold this content.
 
     .DESCRIPTION
         Queries SMS_DPGroupContentInfo against the connected site's WMI
         namespace. ObjectID format differs by content type:
           - Packages, Task Sequences, OS Images, Boot Images, Driver Packages:
-            PackageID (e.g., "MCM00289")
-          - Applications: CI_UniqueID / ModelName (e.g.,
+            PackageID (for example, "MCM00289")
+          - Applications: CI_UniqueID / ModelName (for example,
             "ScopeId_.../Application_...")
         Pass the right identifier for the target type. For a convenience
         helper that picks the right identifier automatically, see the
@@ -469,7 +469,7 @@ function Get-ContentTargetedDPGroups {
             if ($g) { $names += [string]$g.Name }
         }
         $unique = @($names | Sort-Object -Unique)
-        Write-Log "Content '$ObjectID' is already targeted to DP groups: $($unique -join ', ')"
+        Write-Log "Content '$ObjectID' is already targeted to distribution point groups: $($unique -join ', ')"
         return $unique
     }
     catch {
@@ -680,7 +680,7 @@ function Invoke-DeploymentValidation {
             if ($dist.IsFullyDistributed) { & $addGlyph 2 'Pass' }
             else {
                 & $addGlyph 2 'Fail'
-                & $addLog ('Content not fully distributed: {0}/{1} DP(s) succeeded.' -f $dist.NumberSuccess, $dist.Targeted)
+                & $addLog ('Content not fully distributed: {0}/{1} distribution point(s) succeeded.' -f $dist.NumberSuccess, $dist.Targeted)
             }
         }
         'SUG' { & $addGlyph 2 'Pass' }
@@ -2526,7 +2526,7 @@ function Test-RingDeploymentIdForm {
     <#
     .SYNOPSIS
         True when the ID has the form the per-type cmdlets take: a GUID
-        (AssignmentUniqueID) for an application or update group, an
+        (AssignmentUniqueID) for an application or software update group, an
         8-character AdvertisementID for a package or task sequence.
     #>
     param(
@@ -2919,7 +2919,7 @@ function Test-RingPreflight {
         Ok; Message; DuplicateCheckError; ExistingDeployments }.
 
         -SkipContentCheck counts the content check as passed without a read.
-        Rechecks at create time use it: distribution to a ring's new DP group
+        Rechecks at create time use it: distribution to a ring's new distribution point group
         leaves the content in progress, and a content check there would block
         that ring and every later ring of the run.
     #>
@@ -2967,7 +2967,7 @@ function Test-RingPreflight {
         $dist = Test-ContentDistributed -Application $object
         if (-not $dist.IsFullyDistributed) {
             $contentOk = $false
-            $contentMessage = ('Content is not fully distributed: {0}/{1} DP(s) succeeded.' -f $dist.NumberSuccess, $dist.Targeted)
+            $contentMessage = ('Content is not fully distributed: {0}/{1} distribution point(s) succeeded.' -f $dist.NumberSuccess, $dist.Targeted)
         }
     }
 

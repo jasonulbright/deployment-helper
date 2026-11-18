@@ -464,7 +464,7 @@ Describe 'Get-DPGroupsLoaded' {
         Get-DPGroupsLoaded | Should -Be @('DPG1', 'DPG2')
         Get-DPGroupsLoaded | Should -Be @('DPG1', 'DPG2')
         Should -Invoke Get-DPGroupList -Times 1 -Exactly
-        $txtLog.Text | Should -Match 'Loaded 2 DP group\(s\)\.'
+        $txtLog.Text | Should -Match 'Loaded 2 distribution point group\(s\)\.'
     }
 
     It 'loads again on a forced reload' {
@@ -534,7 +534,7 @@ Describe 'Ring helpers' {
         $ring = [PSCustomObject]@{ Index = 2; Name = 'Pilot'; Purpose = 'Required'; AvailableDateTime = [datetime]'2026-11-16T08:00:00'; DeadlineDateTime = [datetime]'2026-11-18T17:30:00'; DPGroup = 'DPG1' }
         $coll = [PSCustomObject]@{ Name = 'Pilot devices'; CollectionID = 'MCM00042'; MemberCount = 17 }
         $line = Format-RingLine -Ring $ring -Collection $coll -Type 'Application'
-        $line | Should -Be "Ring 2 'Pilot' -> Pilot devices (MCM00042, 17 members)`n    Required, available 2026-11-16 08:00, deadline 2026-11-18 17:30; first distribute to DP group DPG1"
+        $line | Should -Be "Ring 2 'Pilot' -> Pilot devices (MCM00042, 17 members)`n    Required, available 2026-11-16 08:00, deadline 2026-11-18 17:30; first distribute to distribution point group DPG1"
     }
 
     It 'leaves out the deadline for an Available ring, the DP group for a software update group, and marks a held ring' {

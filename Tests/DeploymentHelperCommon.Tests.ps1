@@ -1348,7 +1348,7 @@ Describe 'Invoke-DeploymentValidation' {
         Mock Test-ContentDistributed -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ IsFullyDistributed = $false; NumberSuccess = 1; Targeted = 3 } }
         $r = Invoke-DeploymentValidation -Type Application -ObjectName 'X' -CollectionName 'Coll'
         ($r.Events | Where-Object { $_.Kind -eq 'Glyph' -and $_.Index -eq 2 }).State | Should -Be 'Fail'
-        ($r.Events | Where-Object { $_.Kind -eq 'Log' }).Text | Should -Match '1/3 DP'
+        ($r.Events | Where-Object { $_.Kind -eq 'Log' }).Text | Should -Match '1/3 distribution point'
         @($r.Events | Where-Object { $_.Kind -eq 'Glyph' }).Count | Should -Be 5
     }
 

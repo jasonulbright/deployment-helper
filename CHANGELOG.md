@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Use ConfigMgr terms in the window text, the log messages and the guide: for example, distribution point group, software update group and Configuration Manager console.
+- Define ring as the planning term of this tool in the README and the guide.
+
 ## [2026.11.18.0028] - 2026-11-18
 
 ## 12 changes: background validation, honest lookup errors, 1080p layout

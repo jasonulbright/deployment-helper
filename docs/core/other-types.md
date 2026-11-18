@@ -37,7 +37,7 @@ Use it to deploy a classic package and program, a task sequence or a software up
 ### Software update groups
 
 1. Select **Software Update Groups** in the sidebar.
-2. Select the update group and the collection. The options include **Fall back to Microsoft Update if no DP has content**, **Allow fallback to neighbor boundary groups** and **Require post-reboot full scan**.
+2. Select the software update group and the collection. The options include **Fall back to Microsoft Update if no distribution point has content**, **Allow fallback to neighbor boundary groups** and **Require post-reboot full scan**.
 3. Select **Validate**, then **Deploy**.
 
 ![The Software Update Groups form](../images/sug-form.png)
@@ -54,7 +54,7 @@ The controls are those of [Application deployment](apps.md), plus:
 | **Fast Network**, **Slow Network**, **Rerun Behavior** | Package | How the client downloads and reruns the program. |
 | **Availability** | Task sequence | The clients or media that get the task sequence. |
 | **Show task sequence progress on client** | Task sequence | Shows the progress. |
-| **Fall back to Microsoft Update if no DP has content** and the next two | Software update group | Fallback and scan options. |
+| **Fall back to Microsoft Update if no distribution point has content** and the next two | Software update group | Fallback and scan options. |
 
 ## Limits
 

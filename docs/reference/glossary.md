@@ -25,12 +25,12 @@ None.
 | Audit log | The append-only JSONL file with one record for each deployment attempt. |
 | Template | A saved set of form values in `Templates`. |
 | Ring plan | An ordered list of rings in `Rings\<plan>.json`. |
-| Ring | One collection of a plan with its dates and options. |
+| Ring | The planning term of this tool: one collection of a plan with its dates and options. Configuration Manager has no ring object. |
 | Run | One use of a plan for one object. |
 | Held ring | A ring that the tool has not created yet. Promote creates it. |
 | Promote | Creates the next held ring after the checks and the threshold. |
 | Reconcile | Reads the site to update the state of a run. |
-| DP group | A group of distribution points. |
+| Distribution point group | A group of distribution points. |
 | Built-in collection | A collection whose ID starts with `SMS`. The tool blocks it. |
 | SMS Provider | The server role that gives access to the site data. |
 
