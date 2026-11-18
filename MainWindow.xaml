@@ -327,7 +327,7 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="160"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
@@ -335,7 +335,7 @@
                         <!-- Target name (label changes per type) -->
                         <TextBlock x:Name="lblTargetName" Grid.Row="0" Grid.Column="0" Text="Application:" Style="{StaticResource FormLabelStyle}" Margin="0,8,12,8"/>
                         <TextBox x:Name="txtTargetName" Grid.Row="0" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,8,0,8"
-                                 Controls:TextBoxHelper.Watermark="e.g. 7-Zip 26.00"/>
+                                 Controls:TextBoxHelper.Watermark="For example, 7-Zip 26.00"/>
                         <Button x:Name="btnBrowseTarget" Grid.Row="0" Grid.Column="2" Content="Browse..." Style="{StaticResource InlineButtonStyle}" Margin="8,8,0,8"
                                 ToolTip="Pick the object from the site."/>
 
@@ -348,7 +348,7 @@
                         <!-- Collection -->
                         <TextBlock Grid.Row="2" Grid.Column="0" Text="Collection:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <TextBox x:Name="txtCollection" Grid.Row="2" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8"
-                                 Controls:TextBoxHelper.Watermark="Device collection name (e.g. Workstations - Pilot)"/>
+                                 Controls:TextBoxHelper.Watermark="Device collection name, for example Workstations - Pilot"/>
                         <Button x:Name="btnBrowseCollection" Grid.Row="2" Grid.Column="2" Content="Browse..." Style="{StaticResource InlineButtonStyle}" Margin="8,0,0,8"
                                 ToolTip="Pick a device collection from the site."/>
 
@@ -412,14 +412,14 @@
 
                         <TextBlock x:Name="lblPkgFastNetwork" Grid.Row="10" Grid.Column="0" Text="Fast Network:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <ComboBox  x:Name="cboPkgFastNetwork" Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
-                            <ComboBoxItem Tag="DownloadContentFromDistributionPointAndRunLocally" Content="Download content from DP and run locally" IsSelected="True"/>
-                            <ComboBoxItem Tag="RunProgramFromDistributionPoint"                    Content="Run program from DP"/>
+                            <ComboBoxItem Tag="DownloadContentFromDistributionPointAndRunLocally" Content="Download content from distribution point and run locally" IsSelected="True"/>
+                            <ComboBoxItem Tag="RunProgramFromDistributionPoint"                    Content="Run program from distribution point"/>
                         </ComboBox>
                         <TextBlock x:Name="lblPkgSlowNetwork" Grid.Row="11" Grid.Column="0" Text="Slow Network:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <ComboBox  x:Name="cboPkgSlowNetwork" Grid.Row="11" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
                             <ComboBoxItem Tag="DoNotRunProgram"                                 Content="Do not run program" IsSelected="True"/>
-                            <ComboBoxItem Tag="DownloadContentFromDistributionPointAndLocally"  Content="Download content from DP and run locally"/>
-                            <ComboBoxItem Tag="RunProgramFromDistributionPoint"                 Content="Run program from DP"/>
+                            <ComboBoxItem Tag="DownloadContentFromDistributionPointAndLocally"  Content="Download content from distribution point and run locally"/>
+                            <ComboBoxItem Tag="RunProgramFromDistributionPoint"                 Content="Run program from distribution point"/>
                         </ComboBox>
                         <TextBlock x:Name="lblPkgRerun" Grid.Row="12" Grid.Column="0" Text="Rerun Behavior:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
                         <ComboBox  x:Name="cboPkgRerun" Grid.Row="12" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed">
@@ -442,7 +442,7 @@
                             <CheckBox x:Name="chkSugOverrideSW"   Content="Override maintenance window" FontSize="12" Margin="0,0,0,4"/>
                             <CheckBox x:Name="chkSugAllowRestart" Content="Allow restart outside maintenance window"         FontSize="12" Margin="0,0,0,4"/>
                             <CheckBox x:Name="chkSugMetered"      Content="Allow download on metered network" FontSize="12" Margin="0,0,0,4"/>
-                            <CheckBox x:Name="chkMSFallback"       Content="Fall back to Microsoft Update if no DP has content" FontSize="12" Margin="0,0,0,4"/>
+                            <CheckBox x:Name="chkMSFallback"       Content="Fall back to Microsoft Update if no distribution point has content" FontSize="12" Margin="0,0,0,4"/>
                             <CheckBox x:Name="chkBoundaryFallback" Content="Allow fallback to neighbor boundary groups" FontSize="12" Margin="0,0,0,4" IsChecked="True"/>
                             <CheckBox x:Name="chkFullScan"         Content="Require post-reboot full scan" FontSize="12" Margin="0,0,0,0" IsChecked="True"/>
                         </StackPanel>
@@ -527,7 +527,7 @@
 
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Object:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <TextBox x:Name="txtRingObject" Grid.Row="1" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8"
-                                 Controls:TextBoxHelper.Watermark="Name of the application, package, task sequence, or update group"/>
+                                 Controls:TextBoxHelper.Watermark="Name of the application, package, task sequence, or software update group"/>
                         <Button x:Name="btnRingBrowseObject" Grid.Row="1" Grid.Column="2" Content="Browse..." Style="{StaticResource InlineButtonStyle}" Margin="8,0,0,8"
                                 ToolTip="Pick the object from the site."/>
 
@@ -539,7 +539,7 @@
                         <ComboBox x:Name="cboRingPlan" Grid.Row="3" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8"/>
                         <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,8">
                             <Button x:Name="btnRingReloadPlans" Content="Reload" Style="{StaticResource InlineButtonStyle}" Margin="0,0,8,0"
-                                    ToolTip="Read the ring plan files again."/>
+                                    ToolTip="Reload the ring plan files."/>
                             <Button x:Name="btnRingOpenFolder" Content="Open Folder" Style="{StaticResource InlineButtonStyle}" Margin="0"
                                     ToolTip="Open the folder that holds the ring plan files."/>
                         </StackPanel>
@@ -565,7 +565,7 @@
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                             <Button x:Name="btnRingPickCollection" Content="Set Collection..." MinWidth="120" Margin="0,0,8,0"
                                     Style="{StaticResource DialogButton}"
-                                    ToolTip="Pick the device collection for the selected ring (Shift+click reloads the list)."/>
+                                    ToolTip="Pick the device collection for the selected ring (hold Shift to reload the list)."/>
                             <Button x:Name="btnRingValidate" Content="Validate" MinWidth="110" Margin="0,0,8,0"
                                     Style="{StaticResource DialogButton}"
                                     ToolTip="Run the five checks for every ring."/>
@@ -604,7 +604,7 @@
                         <TextBlock x:Name="lblRingRuns" DockPanel.Dock="Left" Text="Open Runs" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"/>
                         <Button x:Name="btnRingRefreshRuns" DockPanel.Dock="Right" Content="Refresh and Reconcile" MinWidth="150" Margin="0"
                                 Style="{StaticResource InlineButtonStyle}"
-                                ToolTip="Read the live counts, mark deleted deployments Removed and close finished runs."/>
+                                ToolTip="Get the live counts from the site, mark deleted deployments Removed and close finished runs."/>
                         <CheckBox x:Name="chkRingShowClosed" DockPanel.Dock="Right" Content="Show closed runs" FontSize="12"
                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
                     </DockPanel>

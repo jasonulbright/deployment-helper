@@ -14,8 +14,15 @@ public class NativeUi {
 $AE = [System.Windows.Automation.AutomationElement]
 $root = $AE::RootElement
 function Log([string]$m) { ('{0}  {1}' -f (Get-Date -Format 'HH:mm:ss'), $m) | Add-Content -LiteralPath (Join-Path $OutDir 'run.log') }
-function Find-Top([string]$Name, [int]$Seconds = 30) {
+# The condition for a window with this name. It matches only windows of the process that Start-App started, so a window of
+# another session or another tool with the same title is never taken for a dialog of this app.
+function New-WindowCondition([string]$Name) {
     $cond = New-Object System.Windows.Automation.AndCondition((New-Object System.Windows.Automation.PropertyCondition($AE::NameProperty, $Name)), (New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window)))
+    if ($script:proc) { $cond = New-Object System.Windows.Automation.AndCondition($cond, (New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, [int]$script:proc.Id))) }
+    $cond
+}
+function Find-Top([string]$Name, [int]$Seconds = 30) {
+    $cond = New-WindowCondition $Name
     $end = (Get-Date).AddSeconds($Seconds)
     do { $el = $root.FindFirst('Descendants', $cond); if ($el) { return $el }; Start-Sleep -Milliseconds 400 } while ((Get-Date) -lt $end)
     $names = @($root.FindAll('Children', [System.Windows.Automation.Condition]::TrueCondition) | ForEach-Object { $_.Current.Name + '|' + $_.Current.ClassName }) -join ' ; '
@@ -87,7 +94,7 @@ function Stop-App([string]$Script) {
 }
 function Section([string]$Name, [scriptblock]$Body) { Log ('== ' + $Name); try { & $Body } catch { Log ('ERROR in ' + $Name + ': ' + $_.Exception.Message + ' @ ' + $_.InvocationInfo.ScriptLineNumber) } }
 function Find-All([string]$Name) {
-    $cond = New-Object System.Windows.Automation.AndCondition((New-Object System.Windows.Automation.PropertyCondition($AE::NameProperty, $Name)), (New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window)))
+    $cond = New-WindowCondition $Name
     @($root.FindAll('Descendants', $cond))
 }
 function Find-Last([string]$Name, [int]$Seconds = 15) {

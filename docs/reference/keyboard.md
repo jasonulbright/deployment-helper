@@ -35,7 +35,7 @@ Select the **Apps** button in the sidebar, then press Tab. The focus goes in thi
 | Enter, Space | Press the focused button. |
 | Up, Down | Move in a list. |
 | Esc | Close a dialog, as **Cancel**. |
-| Shift+**Browse...** | Read the collections again from the site. |
+| Shift+**Browse...** | Reload the collections from the site. |
 
 ## Limits
 

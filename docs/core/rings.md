@@ -4,7 +4,7 @@ The **Ring Deployment** view deploys one object to the collections of a ring pla
 
 ## What it does
 
-A ring plan is a named, ordered list of rings in `Rings\<plan>.json`. Each ring names one device collection by its ID, a purpose and day offsets from the plan start. A ring run creates one ordinary Configuration Manager deployment for each ring. The site does not know that the deployments form a sequence. Only the files of the tool record it.
+Ring is the planning term of this tool, not a Configuration Manager object. A ring is one step of a rollout: one device collection that gets one deployment. A ring plan is a named, ordered list of rings in `Rings\<plan>.json`. Each ring names one device collection by its ID, a purpose and day offsets from the plan start. A ring run creates one ordinary Configuration Manager deployment for each ring. The site does not know that the deployments form a sequence. Only the files of the tool record it.
 
 ## When to use it
 
@@ -90,7 +90,7 @@ A plan file has a name, a description, `HoldLaterRings`, `TimeBasedOn` (`LocalTi
 | `AllowBoundaryFallback`, `AllowMicrosoftUpdate`, `RequirePostRebootFullScan` | Software update groups only. |
 | `TaskSequenceAvailability`, `ShowTaskSequenceProgress` | Task sequences only. |
 | `FastNetworkOption`, `SlowNetworkOption`, `RerunBehavior` | Packages only. |
-| `DPGroup` | The DP group that receives the content before the deployment of this ring is created. Not for software update groups. |
+| `DPGroup` | The distribution point group that receives the content before the deployment of this ring is created. Not for software update groups. |
 | `SuccessThresholdPercent` | Empty, or 0 to 100. |
 
 Every ring deployment writes one audit record with `PlanName`, `RingIndex`, `RingName` and `RunId`. If the audit log cannot be opened for writing, the tool does not create the deployment.

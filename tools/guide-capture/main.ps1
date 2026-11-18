@@ -6,7 +6,7 @@ $appDir = $GuideRoot
 $status = 'finished'
 try {
     . (Join-Path $ui 'guilib.ps1')
-    # Settings that the orchestrator passes in (site code, SMS provider).
+    # Settings that the orchestrator passes in (site code, SMS Provider).
     $Capture = Get-Content -LiteralPath (Join-Path $ui 'capture.json') -Raw | ConvertFrom-Json
     . (Join-Path $ui 'steps.ps1')
 }

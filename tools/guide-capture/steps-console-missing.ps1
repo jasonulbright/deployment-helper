@@ -10,8 +10,8 @@ Maximize-Win $win
 $win = Find-Top 'Deployment Helper' 10
 Set-Text (Get-El $win 'txtTargetName') 'Doc Demo Viewer 1.0'; Set-Text (Get-El $win 'txtCollection') 'All Workstations'
 Invoke-El (Get-El $win 'btnValidate')
-# Wait for the failed connection in the log. A fixed sleep is not evidence.
-if (-not (Wait-Until { (Get-ElText (Get-El $win 'txtLog')) -match 'Failed to connect' } 30)) { throw 'The failed connection did not show in the log.' }
+# Wait for the failed validation in the log (the background validation cannot connect without the console). A fixed sleep is not evidence.
+if (-not (Wait-Until { (Get-ElText (Get-El $win 'txtLog')) -match 'Validation failed' } 30)) { throw 'The failed validation did not show in the log.' }
 Start-Sleep -Seconds 1
 Shot $win 'console-missing-validate'
 Stop-App 'start-deploymenthelper.ps1'

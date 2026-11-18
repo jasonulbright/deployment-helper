@@ -6,7 +6,7 @@
     MahApps.Metro 2.4.10 WPF shell for deploying Apps, Packages, Task Sequences,
     and Software Update Groups to Configuration Manager device collections.
 
-    Four deployment types surface via sidebar buttons. All types share a unified
+    Four deployment types appear as sidebar buttons. All types share a unified
     form pane in the right column. Session 2 fully wires the Apps type
     (5-check validation plus Invoke-ApplicationDeployment). Packages, Task
     Sequences, and Software Update Groups ship their wiring in later sessions.
@@ -284,8 +284,8 @@ $script:ValidatedProgram      = $null
 $script:ValidatedTaskSequence = $null
 $script:ValidatedSUG          = $null
 
-# DP group cache + per-type selection state (global: for closure safety)
-$global:DPGroupsCache    = $null   # string[] of DP group names; $null = not loaded
+# Distribution point group cache + per-type selection state (global: for closure safety)
+$global:DPGroupsCache    = $null   # string[] of distribution point group names; $null = not loaded
 $global:SelectedDPGroups = @()     # names currently selected in the picker
 
 $script:TypeMeta = @{
@@ -293,7 +293,7 @@ $script:TypeMeta = @{
         Header      = 'Apps Deployment'
         Subheader   = 'Select an application and a device collection, then configure the deployment.'
         TargetLabel = 'Application:'
-        Watermark   = 'e.g. 7-Zip 26.00'
+        Watermark   = 'For example, 7-Zip 26.00'
         Check1Text  = 'Application exists in Configuration Manager'
     }
     'Packages' = @{
@@ -313,7 +313,7 @@ $script:TypeMeta = @{
     'SUG' = @{
         Header      = 'Software Update Groups Deployment'
         Subheader   = 'Select a software update group and a device collection.'
-        TargetLabel = 'Update Group:'
+        TargetLabel = 'Software Update Group:'
         Watermark   = 'Software update group name'
         Check1Text  = 'Software update group exists in Configuration Manager'
     }
@@ -666,12 +666,12 @@ function Connect-IfNeeded {
     $sc   = [string]$global:Prefs['SiteCode']
     $smsp = [string]$global:Prefs['SMSProvider']
     if ([string]::IsNullOrWhiteSpace($sc) -or [string]::IsNullOrWhiteSpace($smsp)) {
-        Add-LogLine -Message 'Site code and SMS provider not set. Open Options > Connection.'
+        Add-LogLine -Message 'Site code and SMS Provider not set. Open Options > Connection.'
         Set-StatusText -Text 'Connection not configured.'
         return $false
     }
 
-    Add-LogLine -Message ('Connecting to CM site {0} on {1}...' -f $sc, $smsp)
+    Add-LogLine -Message ('Connecting to ConfigMgr site {0} on {1}...' -f $sc, $smsp)
     Set-StatusText -Text 'Connecting...'
     $window.Cursor = [System.Windows.Input.Cursors]::Wait
     try {
@@ -1181,7 +1181,7 @@ function Show-BrowseDialog {
             $dlg.Close()
         }
         else {
-            [void](Show-ThemedMessage -Owner $dlg -Title 'Browse' -Message 'Select a row, then click OK.' -Buttons OK -Icon Info)
+            [void](Show-ThemedMessage -Owner $dlg -Title 'Browse' -Message 'Select a row, then select OK.' -Buttons OK -Icon Info)
         }
     })
 
@@ -1246,7 +1246,7 @@ function Start-ValidationWork {
     $sc   = [string]$global:Prefs['SiteCode']
     $smsp = [string]$global:Prefs['SMSProvider']
     if ([string]::IsNullOrWhiteSpace($sc) -or [string]::IsNullOrWhiteSpace($smsp)) {
-        Add-LogLine -Message 'Site code and SMS provider not set. Open Options > Connection.'
+        Add-LogLine -Message 'Site code and SMS Provider not set. Open Options > Connection.'
         Set-StatusText -Text 'Connection not configured.'
         return
     }
@@ -1510,7 +1510,7 @@ $script:InvokeSUGValidate = {
 
     if ([string]::IsNullOrWhiteSpace($sugName) -or [string]::IsNullOrWhiteSpace($collName)) {
         Add-LogLine -Message 'Software Update Group and Collection are required.'
-        Set-StatusText -Text 'Fill in Update Group and Collection to validate.'
+        Set-StatusText -Text 'Fill in Software Update Group and Collection to validate.'
         return
     }
 
@@ -1855,7 +1855,7 @@ $script:InvokeAppsDeploy = {
 }
 
 # =============================================================================
-# DP groups: cache + picker + distribute
+# Distribution point groups: cache + picker + distribute
 # =============================================================================
 function Get-DPGroupsLoaded {
     param([switch]$ForceReload)
@@ -1864,7 +1864,7 @@ function Get-DPGroupsLoaded {
     if (-not (Connect-IfNeeded)) { return @() }
     $names = @(Get-DPGroupList | ForEach-Object { [string]$_.Name })
     $global:DPGroupsCache = $names
-    Add-LogLine -Message ('Loaded {0} DP group(s).' -f $names.Count)
+    Add-LogLine -Message ('Loaded {0} distribution point group(s).' -f $names.Count)
     return $names
 }
 
@@ -2535,7 +2535,7 @@ function New-TemplatesPanel {
     $txtName = New-Object System.Windows.Controls.TextBox
     $txtName.Name = 'txtName'
     $txtName.FontSize = 12; $txtName.Height = 32; $txtName.VerticalContentAlignment = 'Center'; $txtName.Margin = '0,4,0,4'
-    [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtName, 'e.g. Workstations - Pilot (Available)')
+    [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtName, 'For example, Workstations - Pilot (Available)')
     [System.Windows.Controls.Grid]::SetRow($txtName, 0); [System.Windows.Controls.Grid]::SetColumn($txtName, 1); [System.Windows.Controls.Grid]::SetColumnSpan($txtName, 2)
     [void]$form.Children.Add($txtName)
 
@@ -3409,7 +3409,7 @@ function Invoke-RingValidate {
 function Invoke-RingOneDeployment {
     <#
     .SYNOPSIS
-        Distributes to the ring's DP group when it has one, creates the ring's
+        Distributes to the ring's distribution point group when it has one, creates the ring's
         deployment, and writes its audit record. Returns the deployment result.
     #>
     param(
@@ -3443,11 +3443,11 @@ function Invoke-RingOneDeployment {
             $dp = @(Invoke-ContentDistributionToGroups -Type $current.Type -TargetObject $current.Object -DPGroupNames @([string]$Ring.DPGroup))
             $failed = @($dp | Where-Object { -not $_.Success })
             if ($failed.Count -gt 0) {
-                $msg = ("Distribution to DP group '{0}' failed: {1}. The deployment was not created." -f $Ring.DPGroup, $failed[0].Error)
+                $msg = ("Distribution to distribution point group '{0}' failed: {1}. The deployment was not created." -f $Ring.DPGroup, $failed[0].Error)
                 $result = @{ Success = $false; DeploymentID = $null; DeploymentUniqueID = $null; Error = $msg }
             }
             else {
-                Add-LogLine -Message ('{0}: content sent to DP group {1}.' -f (Get-RingLabel -Ring $Ring), $Ring.DPGroup)
+                Add-LogLine -Message ('{0}: content sent to distribution point group {1}.' -f (Get-RingLabel -Ring $Ring), $Ring.DPGroup)
                 # A deployment another session creates during the distribution
                 # call would pass the first check; the check runs again here.
                 $pre = Test-RingPreflight -Type $current.Type -ObjectName $current.Name -ProgramName $current.ProgramName `
@@ -3504,7 +3504,7 @@ function Format-RingLine {
     param($Ring, $Collection, [string]$Type, [switch]$Held)
     $when = '{0}, available {1}' -f $Ring.Purpose, (Format-RingDate $Ring.AvailableDateTime)
     if ($Ring.DeadlineDateTime) { $when += ', deadline ' + (Format-RingDate $Ring.DeadlineDateTime) }
-    if ($Ring.DPGroup -and $Type -ne 'SUG') { $when += ('; first distribute to DP group {0}' -f $Ring.DPGroup) }
+    if ($Ring.DPGroup -and $Type -ne 'SUG') { $when += ('; first distribute to distribution point group {0}' -f $Ring.DPGroup) }
     $heldText = if ($Held) { ' (held)' } else { '' }
     return ("{0}{1} -> {2} ({3}, {4} members)`n    {5}" -f (Get-RingLabel -Ring $Ring), $heldText, $Collection.Name, $Collection.CollectionID, $Collection.MemberCount, $when)
 }
@@ -4112,12 +4112,12 @@ $btnDPPicker.Add_Click({
     if (-not (Connect-IfNeeded)) { return }
     $target = Get-CurrentDistributionTarget
     if (-not $target) {
-        Add-LogLine -Message ('Enter a valid {0} name before picking DP groups.' -f $script:CurrentType)
+        Add-LogLine -Message ('Enter a valid {0} name before picking distribution point groups.' -f $script:CurrentType)
         return
     }
     $groups = Get-DPGroupsLoaded
     if (-not $groups -or @($groups).Count -eq 0) {
-        Add-LogLine -Message 'No DP groups found in this site.'
+        Add-LogLine -Message 'No distribution point groups found in this site.'
         return
     }
     # WMI content-tracking identifier differs by type. See module docstring.
@@ -4137,14 +4137,14 @@ $btnDPPicker.Add_Click({
         $global:SelectedDPGroups = @($picked)
         Update-DPPickerButtonLabel
         if (@($picked).Count -gt 0) {
-            Add-LogLine -Message ('DP groups selected: {0}' -f ($picked -join ', '))
+            Add-LogLine -Message ('Distribution point groups selected: {0}' -f ($picked -join ', '))
         }
     }
 })
 
 $btnDistributeContent.Add_Click({
     if (@($global:SelectedDPGroups).Count -eq 0) {
-        Add-LogLine -Message 'Select one or more DP groups first.'
+        Add-LogLine -Message 'Select one or more distribution point groups first.'
         return
     }
     if (-not (Connect-IfNeeded)) { return }
@@ -4164,7 +4164,7 @@ $btnDistributeContent.Add_Click({
         $fail = @($results | Where-Object { -not $_.Success }).Count
         Add-LogLine -Message ('Distribution submitted: {0} succeeded, {1} failed.' -f $ok, $fail)
         if ($fail -eq 0) {
-            Set-StatusText -Text ('Distribution submitted for {0} DP group(s).' -f $ok)
+            Set-StatusText -Text ('Distribution submitted for {0} distribution point group(s).' -f $ok)
         } else {
             Set-StatusText -Text ('Distribution completed with {0} failure(s). See log.' -f $fail)
         }
