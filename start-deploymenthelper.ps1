@@ -1226,6 +1226,106 @@ function Show-CollectionBrowse {
 }
 
 # =============================================================================
+# Validation in the background
+# =============================================================================
+# The five checks run in a runspace of their own (Invoke-DeploymentValidation): the window shows its glyphs, log lines and
+# status text from the events that come back, and never waits for a Configuration Manager call. The objects that the
+# deploy step reads (name, ID, member count) come back as data.
+$script:ValidationRunspace = $null
+$script:ValidationWork     = $null
+
+function Start-ValidationWork {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Starts a read-only background validation.')]
+    param(
+        [Parameter(Mandatory)][ValidateSet('Application', 'Package', 'TaskSequence', 'SUG')][string]$Type,
+        [Parameter(Mandatory)][string]$ObjectName,
+        [Parameter(Mandatory)][string]$CollectionName,
+        [string]$ProgramName = ''
+    )
+    if ($script:ValidationWork) { return }
+    $sc   = [string]$global:Prefs['SiteCode']
+    $smsp = [string]$global:Prefs['SMSProvider']
+    if ([string]::IsNullOrWhiteSpace($sc) -or [string]::IsNullOrWhiteSpace($smsp)) {
+        Add-LogLine -Message 'Site code and SMS provider not set. Open Options > Connection.'
+        Set-StatusText -Text 'Connection not configured.'
+        return
+    }
+    if (-not $script:ValidationRunspace -or $script:ValidationRunspace.RunspaceStateInfo.State -ne 'Opened') {
+        $script:ValidationRunspace = New-SuiteBgRunspace -ModulePath $__modulePath -LogPath $toolLogPath
+    }
+    Set-StatusText -Text 'Validating...'
+    $btnValidate.IsEnabled = $false
+    $window.Cursor = [System.Windows.Input.Cursors]::Wait
+    $script:ValidationWork = Start-SuiteBgWork -Runspace $script:ValidationRunspace `
+        -ArgumentList $sc, $smsp, $Type, $ObjectName, $CollectionName, $ProgramName `
+        -ScriptBlock {
+            param($State, $Site, $Provider, $Type, $ObjectName, $CollectionName, $ProgramName)
+            if (-not (Test-CMConnection)) {
+                if (-not (Connect-CMSite -SiteCode $Site -SMSProvider $Provider)) { throw 'The background session could not connect to the site.' }
+            }
+            $State['Result'] = Invoke-DeploymentValidation -Type $Type -ObjectName $ObjectName -CollectionName $CollectionName -ProgramName $ProgramName
+        } `
+        -OnDone { param($state) Complete-ValidationWork -State $state }
+    $script:ValidationWork.State['Request'] = @{ Type = $Type; ObjectName = $ObjectName; CollectionName = $CollectionName; ProgramName = $ProgramName }
+}
+
+function Complete-ValidationWork {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Shows the result of a read-only validation.')]
+    param([Parameter(Mandatory)]$State)
+    $script:ValidationWork = $null
+    $window.Cursor = $null
+    $btnValidate.IsEnabled = $true
+    if ($State['Error']) {
+        try { Write-Log -Message ('Validation failed: {0}' -f $State['Error']) -Level ERROR -Quiet } catch { $null = $_ }
+        Add-LogLine -Message 'Validation failed. The log file has the details.'
+        Set-StatusText -Text 'Validation failed. See the log.'
+        return
+    }
+    $r = $State['Result']
+    $req = $State['Request']
+    if ($r.NeedProgram) {
+        # A package without a chosen program: fill the dropdown, then go on when the choice is clear.
+        if ($cboProgram.Items.Count -eq 0) { Update-PackageProgramDropdown -Programs @($r.Programs) }
+        if ($null -eq $cboProgram.SelectedItem) {
+            Set-CheckGlyph -Index 1 -State 'Fail'
+            Add-LogLine -Message 'Select a program from the dropdown.'
+            Set-StatusText -Text 'Program selection required.'
+            return
+        }
+        Start-ValidationWork -Type $req.Type -ObjectName $req.ObjectName -CollectionName $req.CollectionName -ProgramName ([string]$cboProgram.SelectedItem.Content)
+        return
+    }
+    foreach ($e in @($r.Events)) {
+        switch ($e.Kind) {
+            'Glyph'  { Set-CheckGlyph -Index ([int]$e.Index) -State ([string]$e.State) }
+            'Log'    { Add-LogLine -Message ([string]$e.Text) }
+            'Status' { Set-StatusText -Text ([string]$e.Text) }
+        }
+    }
+    # The run reached its end when the collection was found and checked: five glyphs are set.
+    $finished = ($null -ne $r.Collection) -and (@($r.Events | Where-Object { $_.Kind -eq 'Glyph' }).Count -ge 5)
+    if (-not $finished) { return }
+    switch ($req.Type) {
+        'Application'  { $script:ValidatedApp = $r.Object }
+        'Package'      { $script:ValidatedPackage = $r.Object; $script:ValidatedProgram = [string]$req.ProgramName }
+        'TaskSequence' { $script:ValidatedTaskSequence = $r.Object }
+        'SUG'          { $script:ValidatedSUG = $r.Object }
+    }
+    $script:ValidatedCollection = $r.Collection
+    $passAll = $true
+    for ($i = 1; $i -le 5; $i++) {
+        $g = switch ($i) { 1 {$glyphCheck1} 2 {$glyphCheck2} 3 {$glyphCheck3} 4 {$glyphCheck4} 5 {$glyphCheck5} }
+        if ($g.Text -ne [string]$script:GlyphPass) { $passAll = $false; break }
+    }
+    $script:AllChecksPassed = $passAll
+    if ($script:AllChecksPassed) {
+        $btnDeploy.Visibility = [System.Windows.Visibility]::Visible
+        Set-StatusText -Text 'All checks passed. Ready to deploy.'
+    } else {
+        Set-StatusText -Text 'Validation complete. Fix failing checks before deploying.'
+    }
+}
+# =============================================================================
 # Apps validation and deploy
 # =============================================================================
 $script:InvokeAppsValidate = {
@@ -1242,84 +1342,15 @@ $script:InvokeAppsValidate = {
         return
     }
 
-    if (-not (Connect-IfNeeded)) { return }
-
-    Set-StatusText -Text 'Validating...'
-    $window.Cursor = [System.Windows.Input.Cursors]::Wait
-    try {
-        $app = Test-ApplicationExists -ApplicationName $appName
-        if ($null -eq $app) {
-            Set-CheckGlyph -Index 1 -State 'Fail'
-            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Application not found.')
-            return
-        }
-        Set-CheckGlyph -Index 1 -State 'Pass'
-
-        $dist = Test-ContentDistributed -Application $app
-        if ($dist.IsFullyDistributed) {
-            Set-CheckGlyph -Index 2 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 2 -State 'Fail'
-            Add-LogLine -Message ('Content not fully distributed: {0}/{1} DP(s) succeeded.' -f $dist.NumberSuccess, $dist.Targeted)
-        }
-
-        $col = Test-CollectionValid -CollectionName $collName
-        if ($null -eq $col) {
-            Set-CheckGlyph -Index 3 -State 'Fail'
-            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Collection invalid.')
-            return
-        }
-        Set-CheckGlyph -Index 3 -State 'Pass'
-
-        $safe = Test-CollectionSafe -Collection $col
-        if ($safe.IsSafe) {
-            Set-CheckGlyph -Index 4 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 4 -State 'Fail'
-            Add-LogLine -Message ('Collection blocked: {0}' -f $safe.Reason)
-            Set-StatusText -Text 'Collection unsafe.'
-            return
-        }
-
-        $dup = Test-DuplicateDeployment -ApplicationName $appName -CollectionName $collName
-        $dupFailure = Get-DuplicateCheckFailure -Result $dup
-        if ($dupFailure) {
-            Set-CheckGlyph -Index 5 -State 'Fail'
-            Add-LogLine -Message ('Duplicate check failed; deployment is blocked: {0}' -f $dupFailure.Error)
-        } elseif ($null -eq $dup) {
-            Set-CheckGlyph -Index 5 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 5 -State 'Fail'
-            Add-LogLine -Message 'Duplicate deployment already exists.'
-        }
-
-        $script:ValidatedApp        = $app
-        $script:ValidatedCollection = $col
-
-        $passAll = $true
-        for ($i = 1; $i -le 5; $i++) {
-            $g = switch ($i) { 1 {$glyphCheck1} 2 {$glyphCheck2} 3 {$glyphCheck3} 4 {$glyphCheck4} 5 {$glyphCheck5} }
-            if ($g.Text -ne [string]$script:GlyphPass) { $passAll = $false; break }
-        }
-        $script:AllChecksPassed = $passAll
-
-        if ($script:AllChecksPassed) {
-            $btnDeploy.Visibility = [System.Windows.Visibility]::Visible
-            Set-StatusText -Text 'All checks passed. Ready to deploy.'
-        } else {
-            Set-StatusText -Text 'Validation complete. Fix failing checks before deploying.'
-        }
-    }
-    finally {
-        $window.Cursor = $null
-    }
+    Start-ValidationWork -Type 'Application' -ObjectName $appName -CollectionName $collName
 }
 
 function Update-PackageProgramDropdown {
-    param($Package)
+    param($Package, [object[]]$Programs)
     $cboProgram.Items.Clear()
-    if ($null -eq $Package) { return }
-    $programs = @(Get-CMPackagePrograms -Package $Package)
+    if ($null -eq $Package -and $null -eq $Programs) { return }
+    # With -Programs the list comes from the background validation: no Configuration Manager call here.
+    $programs = if ($PSBoundParameters.ContainsKey('Programs')) { @($Programs) } else { @(Get-CMPackagePrograms -Package $Package) }
     foreach ($p in $programs) {
         $item = New-Object System.Windows.Controls.ComboBoxItem
         $item.Content = $p.ProgramName
@@ -1354,93 +1385,11 @@ $script:InvokePackagesValidate = {
         return
     }
 
-    if (-not (Connect-IfNeeded)) { return }
+    # A package needs a program. Without a selection the first pass reads the programs of the package; the window fills the
+    # dropdown and, when the choice is clear, runs the checks again with the program.
+    $programName = if ($null -ne $cboProgram.SelectedItem) { [string]$cboProgram.SelectedItem.Content } else { '' }
 
-    Set-StatusText -Text 'Validating...'
-    $window.Cursor = [System.Windows.Input.Cursors]::Wait
-    try {
-        # Check 1: package exists + a program is selected
-        $pkg = Test-PackageExists -PackageName $pkgName
-        if ($null -eq $pkg) {
-            Set-CheckGlyph -Index 1 -State 'Fail'
-            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Package not found.')
-            return
-        }
-        if ($cboProgram.Items.Count -eq 0) {
-            Update-PackageProgramDropdown -Package $pkg
-        }
-        if ($null -eq $cboProgram.SelectedItem) {
-            Set-CheckGlyph -Index 1 -State 'Fail'
-            Add-LogLine -Message 'Select a program from the dropdown.'
-            Set-StatusText -Text 'Program selection required.'
-            return
-        }
-        $programName = [string]$cboProgram.SelectedItem.Content
-        Set-CheckGlyph -Index 1 -State 'Pass'
-
-        # Check 2: content distributed (shared helper works for packages too -- it keys off PackageID)
-        $dist = Test-ContentDistributed -Application $pkg
-        if ($dist.IsFullyDistributed) {
-            Set-CheckGlyph -Index 2 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 2 -State 'Fail'
-            Add-LogLine -Message ('Content not fully distributed: {0}/{1} DP(s) succeeded.' -f $dist.NumberSuccess, $dist.Targeted)
-        }
-
-        # Check 3: collection valid
-        $col = Test-CollectionValid -CollectionName $collName
-        if ($null -eq $col) {
-            Set-CheckGlyph -Index 3 -State 'Fail'
-            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Collection invalid.')
-            return
-        }
-        Set-CheckGlyph -Index 3 -State 'Pass'
-
-        # Check 4: collection safe
-        $safe = Test-CollectionSafe -Collection $col
-        if ($safe.IsSafe) {
-            Set-CheckGlyph -Index 4 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 4 -State 'Fail'
-            Add-LogLine -Message ('Collection blocked: {0}' -f $safe.Reason)
-            Set-StatusText -Text 'Collection unsafe.'
-            return
-        }
-
-        # Check 5: duplicate package+program+collection deployment
-        $dup = Test-DuplicatePackageDeployment -PackageID $pkg.PackageID -ProgramName $programName -CollectionName $collName
-        $dupFailure = Get-DuplicateCheckFailure -Result $dup
-        if ($dupFailure) {
-            Set-CheckGlyph -Index 5 -State 'Fail'
-            Add-LogLine -Message ('Duplicate check failed; deployment is blocked: {0}' -f $dupFailure.Error)
-        } elseif ($null -eq $dup) {
-            Set-CheckGlyph -Index 5 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 5 -State 'Fail'
-            Add-LogLine -Message 'Duplicate package/program deployment already exists.'
-        }
-
-        $script:ValidatedPackage    = $pkg
-        $script:ValidatedProgram    = $programName
-        $script:ValidatedCollection = $col
-
-        $passAll = $true
-        for ($i = 1; $i -le 5; $i++) {
-            $g = switch ($i) { 1 {$glyphCheck1} 2 {$glyphCheck2} 3 {$glyphCheck3} 4 {$glyphCheck4} 5 {$glyphCheck5} }
-            if ($g.Text -ne [string]$script:GlyphPass) { $passAll = $false; break }
-        }
-        $script:AllChecksPassed = $passAll
-
-        if ($script:AllChecksPassed) {
-            $btnDeploy.Visibility = [System.Windows.Visibility]::Visible
-            Set-StatusText -Text 'All checks passed. Ready to deploy.'
-        } else {
-            Set-StatusText -Text 'Validation complete. Fix failing checks before deploying.'
-        }
-    }
-    finally {
-        $window.Cursor = $null
-    }
+    Start-ValidationWork -Type 'Package' -ObjectName $pkgName -CollectionName $collName -ProgramName $programName
 }
 
 $script:InvokePackagesDeploy = {
@@ -1565,79 +1514,7 @@ $script:InvokeSUGValidate = {
         return
     }
 
-    if (-not (Connect-IfNeeded)) { return }
-
-    Set-StatusText -Text 'Validating...'
-    $window.Cursor = [System.Windows.Input.Cursors]::Wait
-    try {
-        # Check 1: SUG exists
-        $sug = Test-SUGExists -SUGName $sugName
-        if ($null -eq $sug) {
-            Set-CheckGlyph -Index 1 -State 'Fail'
-            Set-StatusText -Text (Get-LookupStatusText -NotFound 'SUG not found.')
-            return
-        }
-        Set-CheckGlyph -Index 1 -State 'Pass'
-
-        # Check 2: "Content distributed" doesn't apply to SUGs the same way -- they
-        # reference updates whose content lives in deployment packages. Mark
-        # pass informationally; operator still has to ensure update packages are
-        # distributed separately.
-        Set-CheckGlyph -Index 2 -State 'Pass'
-
-        # Check 3: collection valid
-        $col = Test-CollectionValid -CollectionName $collName
-        if ($null -eq $col) {
-            Set-CheckGlyph -Index 3 -State 'Fail'
-            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Collection invalid.')
-            return
-        }
-        Set-CheckGlyph -Index 3 -State 'Pass'
-
-        # Check 4: collection safe
-        $safe = Test-CollectionSafe -Collection $col
-        if ($safe.IsSafe) {
-            Set-CheckGlyph -Index 4 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 4 -State 'Fail'
-            Add-LogLine -Message ('Collection blocked: {0}' -f $safe.Reason)
-            Set-StatusText -Text 'Collection unsafe.'
-            return
-        }
-
-        # Check 5: duplicate SUG deployment
-        $dup = Test-DuplicateSUGDeployment -SUGName $sug.LocalizedDisplayName -CollectionName $collName
-        $dupFailure = Get-DuplicateCheckFailure -Result $dup
-        if ($dupFailure) {
-            Set-CheckGlyph -Index 5 -State 'Fail'
-            Add-LogLine -Message ('Duplicate check failed; deployment is blocked: {0}' -f $dupFailure.Error)
-        } elseif ($null -eq $dup) {
-            Set-CheckGlyph -Index 5 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 5 -State 'Fail'
-            Add-LogLine -Message 'Duplicate SUG deployment already exists.'
-        }
-
-        $script:ValidatedSUG        = $sug
-        $script:ValidatedCollection = $col
-
-        $passAll = $true
-        for ($i = 1; $i -le 5; $i++) {
-            $g = switch ($i) { 1 {$glyphCheck1} 2 {$glyphCheck2} 3 {$glyphCheck3} 4 {$glyphCheck4} 5 {$glyphCheck5} }
-            if ($g.Text -ne [string]$script:GlyphPass) { $passAll = $false; break }
-        }
-        $script:AllChecksPassed = $passAll
-
-        if ($script:AllChecksPassed) {
-            $btnDeploy.Visibility = [System.Windows.Visibility]::Visible
-            Set-StatusText -Text 'All checks passed. Ready to deploy.'
-        } else {
-            Set-StatusText -Text 'Validation complete. Fix failing checks before deploying.'
-        }
-    }
-    finally {
-        $window.Cursor = $null
-    }
+    Start-ValidationWork -Type 'SUG' -ObjectName $sugName -CollectionName $collName
 }
 
 $script:InvokeSUGDeploy = {
@@ -1766,85 +1643,7 @@ $script:InvokeTaskSequencesValidate = {
         return
     }
 
-    if (-not (Connect-IfNeeded)) { return }
-
-    Set-StatusText -Text 'Validating...'
-    $window.Cursor = [System.Windows.Input.Cursors]::Wait
-    try {
-        # Check 1: TS exists
-        $ts = Test-TaskSequenceExists -TaskSequenceName $tsName
-        if ($null -eq $ts) {
-            Set-CheckGlyph -Index 1 -State 'Fail'
-            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Task sequence not found.')
-            return
-        }
-        Set-CheckGlyph -Index 1 -State 'Pass'
-
-        # Check 2: content distribution -- N/A for TS. A task-sequence
-        # "package" is metadata only; all distributable content lives
-        # in the TS's referenced boot images / packages / apps, each
-        # tracked independently. Walking that reference tree is a v1.1
-        # candidate (Get-CMTaskSequenceDeployment's -InputObject
-        # Reference collection). For v1.0, mark PASS with an info log;
-        # ConfigMgr's deploy cmdlet will still error if a referenced item's
-        # content isn't on a reachable DP. User confirmed "content is
-        # fully distributed" surface via the console for this case.
-        Set-CheckGlyph -Index 2 -State 'Pass'
-        Add-LogLine -Message 'Check 2 (content) skipped for TS: referenced-content distribution enforced by Configuration Manager at deploy time. Verify in console if unsure.'
-
-        # Check 3: collection valid
-        $col = Test-CollectionValid -CollectionName $collName
-        if ($null -eq $col) {
-            Set-CheckGlyph -Index 3 -State 'Fail'
-            Set-StatusText -Text (Get-LookupStatusText -NotFound 'Collection invalid.')
-            return
-        }
-        Set-CheckGlyph -Index 3 -State 'Pass'
-
-        # Check 4: collection safe
-        $safe = Test-CollectionSafe -Collection $col
-        if ($safe.IsSafe) {
-            Set-CheckGlyph -Index 4 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 4 -State 'Fail'
-            Add-LogLine -Message ('Collection blocked: {0}' -f $safe.Reason)
-            Set-StatusText -Text 'Collection unsafe.'
-            return
-        }
-
-        # Check 5: duplicate TS deployment
-        $dup = Test-DuplicateTaskSequenceDeployment -TaskSequencePackageId $ts.PackageID -CollectionName $collName
-        $dupFailure = Get-DuplicateCheckFailure -Result $dup
-        if ($dupFailure) {
-            Set-CheckGlyph -Index 5 -State 'Fail'
-            Add-LogLine -Message ('Duplicate check failed; deployment is blocked: {0}' -f $dupFailure.Error)
-        } elseif ($null -eq $dup) {
-            Set-CheckGlyph -Index 5 -State 'Pass'
-        } else {
-            Set-CheckGlyph -Index 5 -State 'Fail'
-            Add-LogLine -Message 'Duplicate task sequence deployment already exists.'
-        }
-
-        $script:ValidatedTaskSequence = $ts
-        $script:ValidatedCollection   = $col
-
-        $passAll = $true
-        for ($i = 1; $i -le 5; $i++) {
-            $g = switch ($i) { 1 {$glyphCheck1} 2 {$glyphCheck2} 3 {$glyphCheck3} 4 {$glyphCheck4} 5 {$glyphCheck5} }
-            if ($g.Text -ne [string]$script:GlyphPass) { $passAll = $false; break }
-        }
-        $script:AllChecksPassed = $passAll
-
-        if ($script:AllChecksPassed) {
-            $btnDeploy.Visibility = [System.Windows.Visibility]::Visible
-            Set-StatusText -Text 'All checks passed. Ready to deploy.'
-        } else {
-            Set-StatusText -Text 'Validation complete. Fix failing checks before deploying.'
-        }
-    }
-    finally {
-        $window.Cursor = $null
-    }
+    Start-ValidationWork -Type 'TaskSequence' -ObjectName $tsName -CollectionName $collName
 }
 
 $script:InvokeTaskSequencesDeploy = {
@@ -4602,6 +4401,7 @@ $window.Add_Closing({
     }
     Stop-BgWork
     Close-SuiteBgRunspace -Runspace $script:BgRunspace
+    Close-SuiteBgRunspace -Runspace $script:ValidationRunspace
     $script:BgRunspace = $null
     try { Disconnect-CMSite } catch { <# Disconnecting from the CM site when the window closes is cleanup. #> $null = $_ }
 })
