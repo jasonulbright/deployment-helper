@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [2026.11.18.0028] - 2026-11-18
+
+## 12 changes: background validation, honest lookup errors, 1080p layout
+
 ### Changed
 
 - Add tests for the start script: shell logic, script contract, start-up without the console, and window layout.
