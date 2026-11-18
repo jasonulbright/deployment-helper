@@ -153,10 +153,15 @@
                     </Trigger>
                 </Style.Triggers>
             </Style>
+            <!-- Column headers keep the case of their text (Title Case, D-12). MahApps draws them in capitals by default. -->
+            <Style x:Key="GridHeaderStyle" TargetType="DataGridColumnHeader" BasedOn="{StaticResource MahApps.Styles.DataGridColumnHeader}">
+                <Setter Property="Controls:ControlsHelper.ContentCharacterCasing" Value="Normal"/>
+            </Style>
             <!-- The one DataGrid style of the main window: compact rows (24 px) and a 26 px column header at 1080p. -->
             <Style x:Key="ViewDataGrid" TargetType="DataGrid" BasedOn="{StaticResource MahApps.Styles.DataGrid}">
                 <Setter Property="ColumnHeaderHeight" Value="26"/>
                 <Setter Property="RowHeight" Value="24"/>
+                <Setter Property="ColumnHeaderStyle" Value="{StaticResource GridHeaderStyle}"/>
             </Style>
             <Style x:Key="GridRowStyle" TargetType="DataGridRow" BasedOn="{StaticResource MahApps.Styles.DataGridRow}">
                 <Style.Triggers>
