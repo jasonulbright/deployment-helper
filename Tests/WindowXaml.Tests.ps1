@@ -90,4 +90,10 @@ Describe 'Dialog text' {
         @($bad) | Should -BeNullOrEmpty
         $wrapper | Should -BeLessThan 3 -Because 'a literal title is the rule, a variable title is for the wrapper function only'
     }
+
+    It 'caps the view row in the script the way Window.Tests.ps1 does, so the log box stays in the window' {
+        # Window.Tests.ps1 applies this cap to the loaded XAML. Change both together.
+        $script:ShellText | Should -Match ([regex]::Escape('$script:RowView.MaxHeight = [Math]::Max($script:RowView.MinHeight, $g.ActualHeight - $other - $g.RowDefinitions[3].MinHeight)'))
+        $script:ShellText | Should -Match ([regex]::Escape('foreach ($i in 0, 2, 4) { $other += $g.RowDefinitions[$i].ActualHeight }'))
+    }
 }

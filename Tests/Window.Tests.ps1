@@ -63,6 +63,11 @@ BeforeAll {
                     foreach ($view in @(@{ Name = 'Deployment'; Show = $cfg.FormPane; Hide = $cfg.RingPane }, @{ Name = 'Ring Deployment'; Show = $cfg.RingPane; Hide = $cfg.FormPane })) {
                         $w.FindName($view.Show).Visibility = 'Visible'; $w.FindName($view.Hide).Visibility = 'Collapsed'
                         Wait-Layout $w
+                        # The start script caps the height of the view row, so that a small window scrolls the view and keeps the log box (UpdateViewMax). The XAML alone has no cap, so the test applies the same one.
+                        $grid = $w.FindName('contentGrid'); $rowView = $grid.RowDefinitions[1]
+                        $other = 0.0; foreach ($i in 0, 2, 4) { $other += $grid.RowDefinitions[$i].ActualHeight }
+                        $rowView.MaxHeight = [Math]::Max($rowView.MinHeight, $grid.ActualHeight - $other - $grid.RowDefinitions[3].MinHeight)
+                        Wait-Layout $w
                         $out += [PSCustomObject]@{
                             View      = $view.Name
                             Clipped   = @(Get-ClippedText $w)
@@ -155,14 +160,6 @@ Describe 'Layout <Theme> <Size>' -ForEach $script:Matrix -Skip:(-not $script:Win
     It 'keeps every button, box and list inside the window in the <View> view' -ForEach $script:ViewCases {
         $m = ($script:Measured['{0}|{1}' -f $Theme, $Size] | ForEach-Object { $_ } | Where-Object View -eq $View)
         $m | Should -Not -BeNullOrEmpty -Because 'the view was measured'
-        # Known defect: at 1024x720 the ring view needs more height than the window has, so the log box starts below the window.
-        # The test lists it, so a new defect fails and a fixed one asks for the entry to go. The fix belongs to the layout of the ring view.
-        $known = @('Ring Deployment|1024x720|txtLog')
-        $found = @($m.Offscreen | ForEach-Object { '{0}|{1}|{2}' -f $View, $Size, $_.Name })
-        $new = @($found | Where-Object { $known -notcontains $_ })
-        $fixed = @($known | Where-Object { $_ -like ('{0}|{1}|*' -f $View, $Size) -and $found -notcontains $_ })
-        $detail = @($m.Offscreen | ForEach-Object { '{0} at {1},{2} size {3}x{4}' -f $_.Name, $_.X, $_.Y, $_.W, $_.H })
-        $new | Should -BeNullOrEmpty -Because ('a control is outside the window: ' + ($detail -join '; '))
-        $fixed | Should -BeNullOrEmpty -Because ('a known defect is fixed: remove it from the list of this test: ' + ($fixed -join ', '))
+        $m.Offscreen | ForEach-Object { '{0} at {1},{2} size {3}x{4}' -f $_.Name, $_.X, $_.Y, $_.W, $_.H } | Should -BeNullOrEmpty
     }
 }
