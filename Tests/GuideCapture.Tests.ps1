@@ -59,10 +59,10 @@ Describe 'Invoke-GuideCapture' {
         $lock | Should -BeGreaterThan $folder
     }
 
-    It 'kills the runner and the app by the lab folder in the command line, and uses the step on a timeout' {
-        $script:Text | Should -Match 'Get-CimInstance Win32_Process'
-        $script:Text | Should -Match 'Stop-Process'
-        $script:Text | Should -Match 'CommandLine -like "\*\$r\\\*"'
+    It 'stops the runner and the app by the ledger of the run, and uses the step on a timeout' {
+        $script:Text | Should -Match 'run\.pids'
+        $script:Text | Should -Match 'Stop-Process -Id'
+        $script:Text | Should -Not -Match 'CommandLine'
         $timeout = $script:Text.IndexOf('The capture did not finish')
         $timeout | Should -BeGreaterThan 0
         $script:Text.Substring(0, $timeout).LastIndexOf('$stopRunner') | Should -BeGreaterThan $script:Text.IndexOf('if (-not $done) {')
