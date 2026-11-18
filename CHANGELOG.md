@@ -7,6 +7,10 @@
 - Use Configuration Manager terms in the window text, the log messages and the guide, for example distribution point group and software update group.
 - The README and the guide now define ring as the planning term of this tool.
 
+### Fixed
+
+- The guide capture tool stops only the processes that it started, by process id. It no longer stops PowerShell processes by command-line pattern, which could end the window of another session. A new guard test fails when a tool script stops a process by a pattern.
+
 ## [2026.11.18.0028] - 2026-11-18
 
 ## 12 changes: background validation, honest lookup errors, 1080p layout

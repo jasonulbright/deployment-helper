@@ -52,6 +52,19 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
+# Stops the processes that earlier runs of this tool recorded in the ledger on the lab VM (process id and start time), and nothing else.
+# No process is stopped by a command-line pattern: another session may own a process that matches (vault: testing-policy, 'Process rules on a lab VM').
+$stopRecorded = @'
+param($ledger)
+if (Test-Path -LiteralPath $ledger) {
+    foreach ($line in @(Get-Content -LiteralPath $ledger)) {
+        $id, $ticks = $line -split '\|', 2
+        $p = Get-Process -Id ([int]$id) -ErrorAction SilentlyContinue
+        if ($p -and $p.Id -ne $PID -and $p.StartTime.Ticks -eq [long]$ticks) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+    }
+    Remove-Item -LiteralPath $ledger -Force -ErrorAction SilentlyContinue
+}
+'@
 $repo = (Resolve-Path (Join-Path $here '..\..')).Path
 # The lab names are fixed, so a capture from a worktree uses the same folder and task name as one from the main folder.
 $app = 'deployment-helper'
@@ -64,9 +77,9 @@ $taskName = "GuideShots-$app"
 $lockPath = 'C:\guide\capture.lock'
 $lockText = '{0}|{1}|{2}' -f $app, $PID, (Get-Date).ToString('o')
 $haveLock = $false
-# The remote step that ends a capture: stop the task, then kill the runner and the app of this capture (the processes whose
-# command line holds the lab folder). It runs before the task is unregistered, the folder is removed and the lock is released.
-$stopRunner = 'param($t, $r) Stop-ScheduledTask $t -ErrorAction SilentlyContinue; Get-CimInstance Win32_Process -Filter "Name=''powershell.exe''" | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like "*$r\*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }'
+# The remote step that ends a capture: stop the task, then stop the processes that this capture
+# recorded in its ledger, by process id. It runs before the task is unregistered, the folder is removed and the lock is released.
+$stopRunner = 'param($t, $r) Stop-ScheduledTask $t -ErrorAction SilentlyContinue; $stop = {' + $stopRecorded + '}; & $stop (Join-Path $r ''ui\run.pids'')'
 $settings = @{ SiteCode = $SiteCode; SMSProvider = $SmsProvider } | ConvertTo-Json
 $failed = New-Object System.Collections.Generic.List[string]
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('guide-capture-' + [guid]::NewGuid().ToString('N'))
@@ -113,14 +126,14 @@ try {
     }
     foreach ($run in @(@{ Steps = 'steps-guide.ps1'; Prefs = $false }, @{ Steps = 'steps-console-missing.ps1'; Prefs = $true })) {
         $dest = $root
-        # Stop only the leftovers of an earlier capture: the capture runner and the copy of this app.
+        # Stop only the processes that an earlier capture recorded in its ledger, by process id.
         Invoke-Command $session {
-            param($d, $appName)
-            Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like "*$d\*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+            param($d)
+            & ([scriptblock]::Create($using:stopRecorded)) (Join-Path $d 'ui\run.pids')
             Start-Sleep -Seconds 2
             if (Test-Path $d) { Remove-Item $d -Recurse -Force }
             New-Item -ItemType Directory $d, (Join-Path $d 'ui') -Force | Out-Null
-        } -ArgumentList $dest, $app
+        } -ArgumentList $dest
         foreach ($item in Get-ChildItem -LiteralPath $repo -Force | Where-Object { $_.Name -notin '.git', '.claude', '.github', '.vs', '.vscode', '.idea', 'node_modules', 'TestOutput', 'Logs', 'History', 'Reports', 'Templates', 'Rings', 'screenshots', 'TestResults', 'docs', 'Tests', 'tools' -and $_.Name -notlike '*.prefs.json' -and $_.Name -notlike '*.windowstate.json' -and $_.Name -notlike '*.lastscan.json' -and $_.Name -notlike '*.suppressions.json' -and $_.Name -notlike '*.local.*' -and $_.Name -notlike '*.png' }) {
             Copy-Item -LiteralPath $item.FullName -Destination "$dest\$($item.Name)" -ToSession $session -Recurse -Force
         }
