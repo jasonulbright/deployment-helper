@@ -54,7 +54,7 @@ The controls are those of [Application deployment](apps.md), plus:
 | **Fast Network**, **Slow Network**, **Rerun Behavior** | Package | How the client downloads and reruns the program. |
 | **Availability** | Task sequence | The clients or media that get the task sequence. |
 | **Show task sequence progress on client** | Task sequence | Shows the progress. |
-| **Fall back to Microsoft Update if no distribution point has content** and the next two | Software update group | Fallback and scan options. |
+| **Fall back to Microsoft Update if no distribution point has content** and the next two | Software update group | Fallback and scan options. The first option lets clients download from Microsoft Update when no distribution point has the updates. |
 
 ## Limits
 

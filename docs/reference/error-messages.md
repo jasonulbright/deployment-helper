@@ -20,6 +20,7 @@ None.
 |---|---|---|---|
 | `Site code and SMS Provider not set. Open Options > Connection.` | Log | The site code or the provider is empty. | Set both in **Options > Connection**. |
 | `Failed to connect. Check site code, provider, and ConfigurationManager module.` | Log | The tool could not connect. The module is missing, or `SMS_ADMIN_UI_PATH` does not point to the `bin\i386` folder of the console, or the provider is wrong, or the account has no access. | Check the connection and the console. If the console is installed, set `SMS_ADMIN_UI_PATH` to its `bin\i386` folder and start the tool again. |
+| `Validation failed. The log file has the details.` | Log | The check could not run, for example because the console is missing or the SMS Provider is not reachable. | Open the log file in `Logs`, fix the cause and select **Validate** again. |
 | `Application and Collection are required.` | Log | A field is empty. | Fill both fields. The messages for the other types name their object. |
 | `Content not fully distributed: <n>/<m> distribution point(s) succeeded.` | Log | The content is not on all distribution points. | Distribute the content. |
 | `Collection blocked: <reason>` | Log | The collection is built-in or not a device collection. | Select a custom device collection. |
@@ -31,11 +32,11 @@ None.
 | `Deployment Blocked` | Dialog | The dates or the notification are not valid, or the audit log cannot be written. | View the text of the dialog. |
 | `Audit Log Write Failed` | Dialog | The audit log path is not writable. | Set a writable path in **Options > Logging**. |
 | `Package has <n> programs. Select one.` and `Select a program from the dropdown.` | Log | A package deployment needs a program. | Select the program in **Program**. |
-| `Browse load failed: <reason>` and `Load error: <reason>` | Log, dialog | The list could not load. | View the reason. Check the connection and the tool log. The log holds the full error text. |
+| `Browse load failed: <reason>` and `Load error: <reason>` | Log, dialog | The list could not load. | Review the reason in the log. Check the connection and the tool log. The log holds the full error text. |
 | `Ring plan refused:` | Log | The plan has a rule error. | View the text after the colon. |
 | `Select a ring plan.` | Log | No plan is selected. | Select a plan. |
 
-The image shows **Validate** on a computer without the console. The window stays open and the log names the cause.
+The image shows **Validate** on a computer without the console. The window stays open and the log says that the validation failed. The log file names the cause.
 
 ![Validate with the console missing](../images/console-missing-validate.png)
 

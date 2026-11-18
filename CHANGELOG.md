@@ -4,8 +4,8 @@
 
 ### Changed
 
-- Use ConfigMgr terms in the window text, the log messages and the guide: for example, distribution point group, software update group and Configuration Manager console.
-- Define ring as the planning term of this tool in the README and the guide.
+- Use Configuration Manager terms in the window text, the log messages and the guide, for example distribution point group and software update group.
+- The README and the guide now define ring as the planning term of this tool.
 
 ## [2026.11.18.0028] - 2026-11-18
 

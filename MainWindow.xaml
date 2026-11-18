@@ -327,7 +327,7 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="160"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
@@ -604,7 +604,7 @@
                         <TextBlock x:Name="lblRingRuns" DockPanel.Dock="Left" Text="Open Runs" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"/>
                         <Button x:Name="btnRingRefreshRuns" DockPanel.Dock="Right" Content="Refresh and Reconcile" MinWidth="150" Margin="0"
                                 Style="{StaticResource InlineButtonStyle}"
-                                ToolTip="Update the live counts from the site, mark deleted deployments Removed and close finished runs."/>
+                                ToolTip="Get the live counts from the site, mark deleted deployments Removed and close finished runs."/>
                         <CheckBox x:Name="chkRingShowClosed" DockPanel.Dock="Right" Content="Show closed runs" FontSize="12"
                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
                     </DockPanel>

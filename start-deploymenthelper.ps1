@@ -293,7 +293,7 @@ $script:TypeMeta = @{
         Header      = 'Apps Deployment'
         Subheader   = 'Select an application and a device collection, then configure the deployment.'
         TargetLabel = 'Application:'
-        Watermark   = 'e.g. 7-Zip 26.00'
+        Watermark   = 'For example, 7-Zip 26.00'
         Check1Text  = 'Application exists in Configuration Manager'
     }
     'Packages' = @{
@@ -313,7 +313,7 @@ $script:TypeMeta = @{
     'SUG' = @{
         Header      = 'Software Update Groups Deployment'
         Subheader   = 'Select a software update group and a device collection.'
-        TargetLabel = 'Update Group:'
+        TargetLabel = 'Software Update Group:'
         Watermark   = 'Software update group name'
         Check1Text  = 'Software update group exists in Configuration Manager'
     }
@@ -2535,7 +2535,7 @@ function New-TemplatesPanel {
     $txtName = New-Object System.Windows.Controls.TextBox
     $txtName.Name = 'txtName'
     $txtName.FontSize = 12; $txtName.Height = 32; $txtName.VerticalContentAlignment = 'Center'; $txtName.Margin = '0,4,0,4'
-    [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtName, 'e.g. Workstations - Pilot (Available)')
+    [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtName, 'For example, Workstations - Pilot (Available)')
     [System.Windows.Controls.Grid]::SetRow($txtName, 0); [System.Windows.Controls.Grid]::SetColumn($txtName, 1); [System.Windows.Controls.Grid]::SetColumnSpan($txtName, 2)
     [void]$form.Children.Add($txtName)
 
