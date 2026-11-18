@@ -1286,10 +1286,105 @@ Describe 'A failed lookup is an error, not "not found"' {
         $r.ObjectMessage | Should -Match "could not be read"
     }
 
-    It 'reports the fault in the status line of every validate handler of the shell' {
+    It 'reports the fault in the status line of every validate path' {
+        $module = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\Module\DeploymentHelperCommon.psm1') -Raw
+        $fn = [regex]::Match($module, '(?s)function Invoke-DeploymentValidation \{.*?\r?\nfunction Test-SUGExists').Value
+        ([regex]::Matches($fn, '& \$lookupStatus')).Count | Should -BeGreaterOrEqual 2
         $text = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\start-deploymenthelper.ps1') -Raw
         $text | Should -Not -Match "Set-StatusText -Text '(Application|Package|SUG|Task sequence) not found\.'"
-        $text | Should -Not -Match "Set-StatusText -Text 'Collection invalid\.'"
-        ([regex]::Matches($text, 'Get-LookupStatusText -NotFound')).Count | Should -BeGreaterOrEqual 8
+    }
+
+}
+
+Describe 'Invoke-DeploymentValidation' {
+    BeforeEach {
+        Mock Test-ApplicationExists -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ LocalizedDisplayName = 'App A'; PackageID = 'MCM00001' } }
+        Mock Test-PackageExists -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ Name = 'Pkg'; PackageID = 'MCM00002' } }
+        Mock Test-TaskSequenceExists -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ Name = 'TS'; PackageID = 'MCM00003' } }
+        Mock Test-SUGExists -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ LocalizedDisplayName = 'SUG A' } }
+        Mock Get-CMPackagePrograms -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ ProgramName = 'Install' }; [PSCustomObject]@{ ProgramName = 'Uninstall' } }
+        Mock Test-ContentDistributed -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ IsFullyDistributed = $true; NumberSuccess = 2; Targeted = 2 } }
+        Mock Test-CollectionValid -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ Name = 'Coll'; CollectionID = 'MCM00010'; MemberCount = 5 } }
+        Mock Test-CollectionSafe -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ IsSafe = $true; Reason = '' } }
+        Mock Test-DuplicateDeployment -ModuleName DeploymentHelperCommon { $null }
+        Mock Test-DuplicatePackageDeployment -ModuleName DeploymentHelperCommon { $null }
+        Mock Test-DuplicateTaskSequenceDeployment -ModuleName DeploymentHelperCommon { $null }
+        Mock Test-DuplicateSUGDeployment -ModuleName DeploymentHelperCommon { $null }
+    }
+
+    It 'passes all five checks for <Type> and returns the object and the collection' -ForEach @(
+        @{ Type = 'Application'; Program = '' }, @{ Type = 'Package'; Program = 'Install' }, @{ Type = 'TaskSequence'; Program = '' }, @{ Type = 'SUG'; Program = '' }
+    ) {
+        $r = Invoke-DeploymentValidation -Type $Type -ObjectName 'X' -CollectionName 'Coll' -ProgramName $Program
+        @($r.Events | Where-Object { $_.Kind -eq 'Glyph' } | ForEach-Object { '{0}{1}' -f $_.Index, $_.State }) | Should -Be @('1Pass', '2Pass', '3Pass', '4Pass', '5Pass')
+        $r.Object | Should -Not -BeNullOrEmpty
+        $r.Collection.CollectionID | Should -Be 'MCM00010'
+        $r.NeedProgram | Should -BeFalse
+    }
+
+    It 'stops a package without a program after the lookup and returns the programs' {
+        $r = Invoke-DeploymentValidation -Type Package -ObjectName 'Pkg' -CollectionName 'Coll'
+        $r.NeedProgram | Should -BeTrue
+        @($r.Programs).Count | Should -Be 2
+        @($r.Events).Count | Should -Be 0
+        Should -Invoke Test-CollectionValid -ModuleName DeploymentHelperCommon -Times 0
+    }
+
+    It 'says not found when the object does not exist and has no fault' {
+        Mock Test-ApplicationExists -ModuleName DeploymentHelperCommon { $null }
+        $r = Invoke-DeploymentValidation -Type Application -ObjectName 'X' -CollectionName 'Coll'
+        ($r.Events | Where-Object { $_.Kind -eq 'Status' }).Text | Should -Be 'Application not found.'
+        ($r.Events | Where-Object { $_.Kind -eq 'Glyph' }).State | Should -Be 'Fail'
+    }
+
+    It 'says the lookup failed when the read failed' {
+        Mock Get-CMApplication -ModuleName DeploymentHelperCommon { throw 'Invalid query' }
+        Mock Test-ApplicationExists -ModuleName DeploymentHelperCommon { & (Get-Module DeploymentHelperCommon) { $script:LookupFault = 'Could not read application. The log file has the reason.' }; $null }
+        $r = Invoke-DeploymentValidation -Type Application -ObjectName 'X' -CollectionName 'Coll'
+        ($r.Events | Where-Object { $_.Kind -eq 'Status' }).Text | Should -Be 'Lookup failed. Could not read application. The log file has the reason.'
+    }
+
+    It 'fails the content check and goes on' {
+        Mock Test-ContentDistributed -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ IsFullyDistributed = $false; NumberSuccess = 1; Targeted = 3 } }
+        $r = Invoke-DeploymentValidation -Type Application -ObjectName 'X' -CollectionName 'Coll'
+        ($r.Events | Where-Object { $_.Kind -eq 'Glyph' -and $_.Index -eq 2 }).State | Should -Be 'Fail'
+        ($r.Events | Where-Object { $_.Kind -eq 'Log' }).Text | Should -Match '1/3 DP'
+        @($r.Events | Where-Object { $_.Kind -eq 'Glyph' }).Count | Should -Be 5
+    }
+
+    It 'stops at an invalid collection and at an unsafe collection' {
+        Mock Test-CollectionValid -ModuleName DeploymentHelperCommon { $null }
+        $r = Invoke-DeploymentValidation -Type SUG -ObjectName 'X' -CollectionName 'Coll'
+        ($r.Events | Where-Object { $_.Kind -eq 'Status' }).Text | Should -Be 'Collection invalid.'
+        $r.Collection | Should -BeNullOrEmpty
+        Mock Test-CollectionValid -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ Name = 'Coll'; CollectionID = 'SMS00001'; MemberCount = 5 } }
+        Mock Test-CollectionSafe -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ IsSafe = $false; Reason = 'built-in' } }
+        $r2 = Invoke-DeploymentValidation -Type SUG -ObjectName 'X' -CollectionName 'Coll'
+        ($r2.Events | Where-Object { $_.Kind -eq 'Status' }).Text | Should -Be 'Collection unsafe.'
+        ($r2.Events | Where-Object { $_.Kind -eq 'Log' }).Text | Should -Be 'Collection blocked: built-in'
+    }
+
+    It 'fails the duplicate check when a deployment exists' {
+        Mock Test-DuplicateDeployment -ModuleName DeploymentHelperCommon { [PSCustomObject]@{ DeploymentID = 'D1' } }
+        $r = Invoke-DeploymentValidation -Type Application -ObjectName 'X' -CollectionName 'Coll'
+        ($r.Events | Where-Object { $_.Kind -eq 'Glyph' -and $_.Index -eq 5 }).State | Should -Be 'Fail'
+        ($r.Events | Where-Object { $_.Kind -eq 'Log' }).Text | Should -Be 'Duplicate deployment already exists.'
+    }
+
+    It 'runs in the background: the validate handlers of the shell make no Configuration Manager call and the window code has no window call in the module function' {
+        $shell = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\start-deploymenthelper.ps1') -Raw
+        foreach ($name in 'InvokeAppsValidate', 'InvokePackagesValidate', 'InvokeTaskSequencesValidate', 'InvokeSUGValidate') {
+            $m = [regex]::Match($shell, "(?s)\`$script:$name = \{.*?\r?\n\}\r?\n")
+            $m.Success | Should -BeTrue -Because $name
+            $m.Value | Should -Match 'Start-ValidationWork'
+            $m.Value | Should -Not -Match 'Connect-IfNeeded|Test-[A-Za-z]+Exists|Test-CollectionValid|Test-ContentDistributed|Get-CM[A-Z]'
+        }
+        $work = [regex]::Match($shell, '(?s)function Start-ValidationWork \{.*?\r?\nfunction Complete-ValidationWork')
+        $work.Value | Should -Match 'Start-SuiteBgWork -Runspace \$script:ValidationRunspace'
+        $work.Value | Should -Match 'Invoke-DeploymentValidation'
+        $work.Value | Should -Match 'Connect-CMSite -SiteCode \$Site'
+        $module = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\Module\DeploymentHelperCommon.psm1') -Raw
+        $fn = [regex]::Match($module, '(?s)function Invoke-DeploymentValidation \{.*?\r?\nfunction Test-SUGExists')
+        $fn.Value | Should -Not -Match '\$window|\$script:glyph|Set-CheckGlyph|Add-LogLine|Set-StatusText'
     }
 }

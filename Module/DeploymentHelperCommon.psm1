@@ -617,6 +617,119 @@ function Get-DeploymentPreview {
 # SUG Validation
 # ---------------------------------------------------------------------------
 
+function Invoke-DeploymentValidation {
+    <#
+    .SYNOPSIS
+        Runs the five pre-execution checks of one deployment target and returns what the window shows.
+    .DESCRIPTION
+        The checks are the same as before: the object exists, its content is distributed, the collection is valid,
+        the collection is safe, and no duplicate deployment exists. The function changes nothing and makes no
+        window call, so the shell runs it in the background runspace. It returns Events (Glyph, Log and Status
+        entries in the order the window plays them), the Object and the Collection that were found, and Programs.
+        For a package without a ProgramName it stops after the package lookup with NeedProgram = $true and the
+        programs of the package.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][ValidateSet('Application', 'Package', 'TaskSequence', 'SUG')][string]$Type,
+        [Parameter(Mandatory)][string]$ObjectName,
+        [Parameter(Mandatory)][string]$CollectionName,
+        [string]$ProgramName = ''
+    )
+    $script:LookupFault = ''
+    $events = New-Object System.Collections.Generic.List[object]
+    $result = [pscustomobject]@{ Events = @(); Object = $null; Collection = $null; ProgramName = $ProgramName; Programs = @(); NeedProgram = $false }
+    $finish = { $result.Events = $events.ToArray(); return $result }
+    $addGlyph = { param($Index, $State) [void]$events.Add(@{ Kind = 'Glyph'; Index = $Index; State = $State }) }
+    $addLog = { param($Text) [void]$events.Add(@{ Kind = 'Log'; Text = $Text }) }
+    $addStatus = { param($Text) [void]$events.Add(@{ Kind = 'Status'; Text = $Text }) }
+    $notFound = @{ Application = 'Application not found.'; Package = 'Package not found.'; TaskSequence = 'Task sequence not found.'; SUG = 'SUG not found.' }
+    $lookupStatus = {
+        param($NotFoundText)
+        $fault = Get-DeploymentLookupFault
+        if ($fault) { & $addLog $fault; return ('Lookup failed. {0}' -f $fault) }
+        return $NotFoundText
+    }
+
+    # Check 1: the object exists
+    $object = switch ($Type) {
+        'Application'  { Test-ApplicationExists -ApplicationName $ObjectName }
+        'Package'      { Test-PackageExists -PackageName $ObjectName }
+        'TaskSequence' { Test-TaskSequenceExists -TaskSequenceName $ObjectName }
+        'SUG'          { Test-SUGExists -SUGName $ObjectName }
+    }
+    if ($null -eq $object) {
+        & $addGlyph 1 'Fail'
+        & $addStatus (& $lookupStatus $notFound[$Type])
+        return (& $finish)
+    }
+    $result.Object = $object
+    if ($Type -eq 'Package') {
+        $result.Programs = @(Get-CMPackagePrograms -Package $object)
+        if ([string]::IsNullOrWhiteSpace($ProgramName)) {
+            $result.NeedProgram = $true
+            return (& $finish)
+        }
+    }
+    & $addGlyph 1 'Pass'
+
+    # Check 2: content distributed
+    switch ($Type) {
+        { $_ -in 'Application', 'Package' } {
+            $dist = Test-ContentDistributed -Application $object
+            if ($dist.IsFullyDistributed) { & $addGlyph 2 'Pass' }
+            else {
+                & $addGlyph 2 'Fail'
+                & $addLog ('Content not fully distributed: {0}/{1} DP(s) succeeded.' -f $dist.NumberSuccess, $dist.Targeted)
+            }
+        }
+        'SUG' { & $addGlyph 2 'Pass' }
+        'TaskSequence' {
+            & $addGlyph 2 'Pass'
+            & $addLog 'Check 2 (content) skipped for TS: referenced-content distribution enforced by Configuration Manager at deploy time. Verify in console if needed.'
+        }
+    }
+
+    # Check 3: the collection is valid
+    $col = Test-CollectionValid -CollectionName $CollectionName
+    if ($null -eq $col) {
+        & $addGlyph 3 'Fail'
+        & $addStatus (& $lookupStatus 'Collection invalid.')
+        return (& $finish)
+    }
+    & $addGlyph 3 'Pass'
+    $result.Collection = $col
+
+    # Check 4: the collection is safe
+    $safe = Test-CollectionSafe -Collection $col
+    if ($safe.IsSafe) { & $addGlyph 4 'Pass' }
+    else {
+        & $addGlyph 4 'Fail'
+        & $addLog ('Collection blocked: {0}' -f $safe.Reason)
+        & $addStatus 'Collection unsafe.'
+        return (& $finish)
+    }
+
+    # Check 5: no duplicate deployment
+    $dup = switch ($Type) {
+        'Application'  { Test-DuplicateDeployment -ApplicationName $ObjectName -CollectionName $CollectionName }
+        'Package'      { Test-DuplicatePackageDeployment -PackageID $object.PackageID -ProgramName $ProgramName -CollectionName $CollectionName }
+        'TaskSequence' { Test-DuplicateTaskSequenceDeployment -TaskSequencePackageId $object.PackageID -CollectionName $CollectionName }
+        'SUG'          { Test-DuplicateSUGDeployment -SUGName $object.LocalizedDisplayName -CollectionName $CollectionName }
+    }
+    $dupFailure = Get-DuplicateCheckFailure -Result $dup
+    $dupText = @{ Application = 'Duplicate deployment already exists.'; Package = 'Duplicate package/program deployment already exists.'; TaskSequence = 'Duplicate task sequence deployment already exists.'; SUG = 'Duplicate SUG deployment already exists.' }
+    if ($dupFailure) {
+        & $addGlyph 5 'Fail'
+        & $addLog ('Duplicate check failed; deployment is blocked: {0}' -f $dupFailure.Error)
+    } elseif ($null -eq $dup) {
+        & $addGlyph 5 'Pass'
+    } else {
+        & $addGlyph 5 'Fail'
+        & $addLog $dupText[$Type]
+    }
+    return (& $finish)
+}
 function Test-SUGExists {
     param([Parameter(Mandatory)][string]$SUGName)
 

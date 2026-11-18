@@ -17,6 +17,7 @@
 - Vendor SuiteCommon with the atomic settings save: the settings file is written to a temp file and replaced in one step, so a failed write cannot leave it truncated.
 - Capture tool lock follows D-16: the lock text is owner|pid|start, a lock is stale only after 30 minutes with no running owner process, a live owner lock is never removed, a removed lock is reported, and the holder refreshes it.
 - Report a failed lookup of an application, package, task sequence, software update group or collection as an error, not as "not found": the status line names the failure, and a transient fault is retried first.
+- Run the five validation checks of an application, package, task sequence or software update group in the background (Invoke-DeploymentValidation), so the window no longer waits for the site; the window shows the glyphs, log lines and status text from the events that come back.
 
 ### Added
 

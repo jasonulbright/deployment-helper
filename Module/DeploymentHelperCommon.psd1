@@ -13,6 +13,7 @@
         # Error text for the window
         'Get-UserErrorText'
         'Get-DeploymentLookupFault'
+        'Invoke-DeploymentValidation'
         'Get-ErrorDetailText'
 
         # Search
