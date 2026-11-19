@@ -20,6 +20,7 @@ $script:CMStubParameters = @{
     'Get-CMTaskSequence'             = @('Name', 'Fast', 'DisableWildcardHandling')
     'Get-CMSoftwareUpdateGroup'      = @('Name', 'DisableWildcardHandling')
     'Get-CMCollection'               = @('Id', 'Name', 'CollectionType', 'DisableWildcardHandling')
+    'Invoke-CMWmiQuery'              = @('Query', 'Option')
     'Get-CMDeployment'               = @('DeploymentId', 'CollectionName', 'FeatureType')
     'Get-CMApplicationDeployment'    = @('Name', 'DeploymentId', 'CollectionName', 'Summary', 'DisableWildcardHandling')
     'Get-CMPackageDeployment'        = @('DeploymentId', 'PackageId', 'ProgramName', 'CollectionName', 'Summary', 'DisableWildcardHandling')

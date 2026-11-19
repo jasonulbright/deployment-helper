@@ -13,7 +13,7 @@ BeforeAll {
     # Stub CM cmdlets so Pester can mock them without the CM console installed.
     # These do nothing by default -- each test overrides them via Mock.
     $cmStubs = @(
-        'Get-CMSite', 'Get-CMApplication', 'Get-CMCollection', 'Invoke-CMWmiQuery',
+        'Get-CMSite', 'Get-CMApplication', 'Get-CMCollection',
         'Get-CMPackage', 'Get-CMTaskSequence',
         'Get-CMSoftwareUpdateGroup', 'Get-CMDistributionStatus',
         'Get-CMDistributionPointGroup', 'Get-CMDeployment',
@@ -28,7 +28,7 @@ BeforeAll {
     }
 
     . (Join-Path $PSScriptRoot 'CMStubs.ps1')
-    Set-CMTestStub -Name 'Get-CMCollection', 'New-CMPackageDeployment', 'New-CMTaskSequenceDeployment', 'New-CMSchedule',
+    Set-CMTestStub -Name 'Get-CMCollection', 'Invoke-CMWmiQuery', 'New-CMPackageDeployment', 'New-CMTaskSequenceDeployment', 'New-CMSchedule',
         'Get-CMApplication', 'Get-CMPackage', 'Get-CMTaskSequence', 'Get-CMSoftwareUpdateGroup',
         'Get-CMApplicationDeployment', 'Get-CMPackageDeployment', 'Get-CMTaskSequenceDeployment', 'Get-CMUpdateGroupDeployment'
 
