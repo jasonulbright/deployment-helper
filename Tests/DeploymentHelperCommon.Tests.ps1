@@ -13,7 +13,7 @@ BeforeAll {
     # Stub CM cmdlets so Pester can mock them without the CM console installed.
     # These do nothing by default -- each test overrides them via Mock.
     $cmStubs = @(
-        'Get-CMSite', 'Get-CMApplication', 'Get-CMCollection',
+        'Get-CMSite', 'Get-CMApplication', 'Get-CMCollection', 'Invoke-CMWmiQuery',
         'Get-CMPackage', 'Get-CMTaskSequence',
         'Get-CMSoftwareUpdateGroup', 'Get-CMDistributionStatus',
         'Get-CMDistributionPointGroup', 'Get-CMDeployment',
