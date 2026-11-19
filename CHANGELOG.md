@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- The collection browser no longer reads every collection one by one. One query lists the collections, which took minutes at 2,000 collections before.
+
 ### Changed
 
 - Use Configuration Manager terms in the window text, the log messages and the guide, for example distribution point group and software update group.

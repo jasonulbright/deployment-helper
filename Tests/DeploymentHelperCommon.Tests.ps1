@@ -28,7 +28,7 @@ BeforeAll {
     }
 
     . (Join-Path $PSScriptRoot 'CMStubs.ps1')
-    Set-CMTestStub -Name 'Get-CMCollection', 'New-CMPackageDeployment', 'New-CMTaskSequenceDeployment', 'New-CMSchedule',
+    Set-CMTestStub -Name 'Get-CMCollection', 'Invoke-CMWmiQuery', 'New-CMPackageDeployment', 'New-CMTaskSequenceDeployment', 'New-CMSchedule',
         'Get-CMApplication', 'Get-CMPackage', 'Get-CMTaskSequence', 'Get-CMSoftwareUpdateGroup',
         'Get-CMApplicationDeployment', 'Get-CMPackageDeployment', 'Get-CMTaskSequenceDeployment', 'Get-CMUpdateGroupDeployment'
 
@@ -280,7 +280,7 @@ Describe 'Get-CMBrowseList' {
 
     Context 'Collections' {
         BeforeAll {
-            Mock Get-CMCollection -ModuleName DeploymentHelperCommon {
+            Mock Invoke-CMWmiQuery -ModuleName DeploymentHelperCommon {
                 @(
                     [PSCustomObject]@{ Name = 'All Systems'; CollectionID = 'SMS00001'; MemberCount = 100; LastRefreshTime = (Get-Date); IsBuiltIn = $true },
                     [PSCustomObject]@{ Name = 'Pilot'; CollectionID = 'MCM00010'; MemberCount = 5; LastRefreshTime = (Get-Date) }
@@ -288,9 +288,9 @@ Describe 'Get-CMBrowseList' {
             }
         }
 
-        It 'Requests device collections only and marks built-in rows' {
+        It 'Requests device collections only, with one SELECT of plain columns, and marks built-in rows' {
             $rows = Get-CMBrowseList -Type Collections
-            Should -Invoke Get-CMCollection -ModuleName DeploymentHelperCommon -Times 1 -Exactly -ParameterFilter { $CollectionType -eq 'Device' }
+            Should -Invoke Invoke-CMWmiQuery -ModuleName DeploymentHelperCommon -Times 1 -Exactly -ParameterFilter { $Query -match '^SELECT CollectionID, Name, MemberCount, LastRefreshTime FROM SMS_Collection WHERE CollectionType = 2$' -and $Option -eq 'Fast' }
             @($rows).Count | Should -Be 2
             ($rows | Where-Object CollectionID -eq 'SMS00001').IsBuiltIn | Should -BeTrue
             ($rows | Where-Object CollectionID -eq 'MCM00010').IsBuiltIn | Should -BeFalse
