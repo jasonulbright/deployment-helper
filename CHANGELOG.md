@@ -2,18 +2,19 @@
 
 ## [Unreleased]
 
-### Fixed
+## [2026.11.20.0029] - 2026-11-20
 
-- The collection browser no longer reads every collection one by one. One query lists the collections, which took minutes at 2,000 collections before.
+## 4 changes: one-query collection browser, ConfigMgr wording
 
 ### Changed
 
-- Use Configuration Manager terms in the window text, the log messages and the guide, for example distribution point group and software update group.
-- The README and the guide now define ring as the planning term of this tool.
+- Use ConfigMgr terms in window text, log messages and guide.
+- Define ring as the planning term in the README and guide.
 
 ### Fixed
 
-- The guide capture tool stops only the processes that it started, by process id. It no longer stops PowerShell processes by command-line pattern, which could end the window of another session. A new guard test fails when a tool script stops a process by a pattern.
+- List collections in the collection browser with one query.
+- Stop only the processes the guide capture tool started.
 
 ## [2026.11.18.0028] - 2026-11-18
 
