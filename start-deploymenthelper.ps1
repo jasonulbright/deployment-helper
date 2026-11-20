@@ -1074,9 +1074,9 @@ function Show-BrowseDialog {
             <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
 
-        <TextBox x:Name="txtFilter" Grid.Row="0" Grid.Column="0" FontSize="12" Height="32" VerticalContentAlignment="Center" Margin="0,0,8,8"/>
+        <TextBox x:Name="txtFilter" Grid.Row="0" Grid.Column="0" FontSize="12" Height="32" VerticalContentAlignment="Center" Margin="0,0,8,8" ToolTip="Enter text to narrow the list."/>
         <Button  x:Name="btnRefresh" Grid.Row="0" Grid.Column="1" Content="Refresh" Margin="0,0,0,8"
-                 Style="{StaticResource DialogButton}"/>
+                 Style="{StaticResource DialogButton}" ToolTip="Reload the list from the site."/>
 
         <DataGrid x:Name="dgResults" Grid.Row="1" Grid.ColumnSpan="2"
                   AutoGenerateColumns="False"
@@ -1948,9 +1948,9 @@ function Show-DPGroupPickerDialog {
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
             <Button x:Name="btnSelectAll"  Content="Select All"
-                    Style="{StaticResource DialogButton}"/>
+                    Style="{StaticResource DialogButton}" ToolTip="Check every distribution point group in the list."/>
             <Button x:Name="btnSelectNone" Content="Select None"
-                    Style="{StaticResource DialogButton}"/>
+                    Style="{StaticResource DialogButton}" ToolTip="Clear the check of every distribution point group."/>
         </StackPanel>
 
         <ListBox x:Name="lstGroups" Grid.Row="2" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}">
