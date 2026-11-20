@@ -3,7 +3,7 @@
 # opens no window and needs no ConfigMgr connection.
 #
 # Rule: every control in the audited list has a ToolTip attribute that is not empty, is ASCII only, ends in a period
-# and is not longer than 200 characters. Add the x:Name of a new control to the list when it gets a tooltip.
+# and is not longer than 100 characters, in one sentence (the same limit as Theme.Guard.Tests.ps1). Add the x:Name of a new control to the list when it gets a tooltip.
 
 BeforeDiscovery {
     # The x:Name of every audited control, grouped by the file that holds it.
@@ -35,7 +35,7 @@ BeforeAll {
     $script:TtRepoRoot = Split-Path -Parent $PSScriptRoot
     $script:TtNamespace = 'http://schemas.microsoft.com/winfx/2006/xaml/presentation'
     $script:TtKeyNamespace = 'http://schemas.microsoft.com/winfx/2006/xaml'
-    $script:TtMaxLength = 200
+    $script:TtMaxLength = 100
 
     # The XAML documents of one file: the file itself, or the XAML here-strings of a script.
     function Get-TtDocument {
@@ -76,6 +76,7 @@ Describe 'Tooltips of the audited controls' {
             $h.ToolTip | Should -Not -BeNullOrEmpty -Because ('{0} needs a ToolTip' -f $Name)
             $h.ToolTip | Should -Match '^[\x20-\x7E]+$' -Because ('the tooltip of {0} must be ASCII only' -f $Name)
             $h.ToolTip | Should -Match '\.$' -Because ('the tooltip of {0} must end in a period' -f $Name)
+            $h.ToolTip.TrimEnd('.') | Should -Not -Match '\.\s' -Because ('the tooltip of {0} must be one sentence' -f $Name)
             $h.ToolTip.Length | Should -BeLessOrEqual $script:TtMaxLength -Because ('the tooltip of {0} is too long' -f $Name)
         }
     }

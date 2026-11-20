@@ -355,8 +355,8 @@
                         <!-- Purpose -->
                         <TextBlock x:Name="lblPurpose" Grid.Row="3" Grid.Column="0" Text="Purpose:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,8">
-                            <RadioButton x:Name="radAvailable" Content="Available" GroupName="Purpose" IsChecked="True" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" ToolTip="Make the content available for users to install. No deadline applies."/>
-                            <RadioButton x:Name="radRequired"  Content="Required"  GroupName="Purpose" FontSize="12" VerticalAlignment="Center" ToolTip="Install the content on the devices at the deadline. Set the deadline below."/>
+                            <RadioButton x:Name="radAvailable" Content="Available" GroupName="Purpose" IsChecked="True" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" ToolTip="Make the content available for users to install, with no deadline."/>
+                            <RadioButton x:Name="radRequired"  Content="Required"  GroupName="Purpose" FontSize="12" VerticalAlignment="Center" ToolTip="Install the content on the devices when the deadline passes."/>
                         </StackPanel>
 
                         <!-- Available datetime -->
@@ -372,7 +372,7 @@
                         <!-- Notification (Apps type only; packages don't use UserNotification) -->
                         <TextBlock x:Name="lblNotification" Grid.Row="6" Grid.Column="0" Text="Notification:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
                         <ComboBox x:Name="cboNotification" Grid.Row="6" Grid.Column="1" Width="280" HorizontalAlignment="Left"
-                                  FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" ToolTip="Select what users see about the deployment. For a task sequence, select where it is available.">
+                                  FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" ToolTip="Select what users see about the deployment, or where a task sequence is available.">
                             <ComboBoxItem Content="Display All" IsSelected="True" Tag="DisplayAll"/>
                             <ComboBoxItem Content="Display in Software Center Only" Tag="DisplaySoftwareCenterOnly"/>
                             <ComboBoxItem Content="Hide All" Tag="HideAll"/>
@@ -411,7 +411,7 @@
                         </StackPanel>
 
                         <TextBlock x:Name="lblPkgFastNetwork" Grid.Row="10" Grid.Column="0" Text="Fast Network:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8" Visibility="Collapsed"/>
-                        <ComboBox  x:Name="cboPkgFastNetwork" Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed" ToolTip="Select how a device on a fast network runs the program: from the distribution point, or after a download.">
+                        <ComboBox  x:Name="cboPkgFastNetwork" Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed" ToolTip="Select how a device on a fast network runs the program.">
                             <ComboBoxItem Tag="DownloadContentFromDistributionPointAndRunLocally" Content="Download content from distribution point and run locally" IsSelected="True"/>
                             <ComboBoxItem Tag="RunProgramFromDistributionPoint"                    Content="Run program from distribution point"/>
                         </ComboBox>
@@ -443,7 +443,7 @@
                             <CheckBox x:Name="chkSugAllowRestart" Content="Allow restart outside maintenance window"         FontSize="12" Margin="0,0,0,4" ToolTip="Allow a restart that the deployment needs to happen outside the maintenance windows."/>
                             <CheckBox x:Name="chkSugMetered"      Content="Allow download on metered network" FontSize="12" Margin="0,0,0,4" ToolTip="Allow devices on a metered network to download the content."/>
                             <CheckBox x:Name="chkMSFallback"       Content="Fall back to Microsoft Update if no distribution point has content" FontSize="12" Margin="0,0,0,4" ToolTip="Let devices get the updates from Microsoft Update when no distribution point has them."/>
-                            <CheckBox x:Name="chkBoundaryFallback" Content="Allow fallback to neighbor boundary groups" FontSize="12" Margin="0,0,0,4" IsChecked="True" ToolTip="Let devices use a distribution point of a neighbor boundary group when their own group has none with the content."/>
+                            <CheckBox x:Name="chkBoundaryFallback" Content="Allow fallback to neighbor boundary groups" FontSize="12" Margin="0,0,0,4" IsChecked="True" ToolTip="Let devices use a neighbor boundary group when their own group has no content."/>
                             <CheckBox x:Name="chkFullScan"         Content="Require post-reboot full scan" FontSize="12" Margin="0,0,0,0" IsChecked="True" ToolTip="Run a full software updates scan on the device after the restart that the updates need."/>
                         </StackPanel>
                     </Grid>
@@ -536,7 +536,7 @@
                                   VerticalContentAlignment="Center" Margin="0,0,0,8" Visibility="Collapsed" ToolTip="Select the program of the package to deploy in rings."/>
 
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Ring Plan:" Style="{StaticResource FormLabelStyle}" Margin="0,0,12,8"/>
-                        <ComboBox x:Name="cboRingPlan" Grid.Row="3" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" ToolTip="Select the ring plan. The plan sets the rings, their collections, their timing and their thresholds."/>
+                        <ComboBox x:Name="cboRingPlan" Grid.Row="3" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,8" ToolTip="Select the ring plan that sets the rings, their collections, timing and thresholds."/>
                         <StackPanel Grid.Row="3" Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,8">
                             <Button x:Name="btnRingReloadPlans" Content="Reload" Style="{StaticResource InlineButtonStyle}" Margin="0,0,8,0"
                                     ToolTip="Reload the ring plan files."/>
@@ -551,7 +551,7 @@
                                     Style="{StaticResource InlineButtonStyle}"
                                     ToolTip="Calculate the dates of every ring from the plan start."/>
                             <CheckBox x:Name="chkRingHold" Content="Hold later rings (create ring 1 now, promote the rest)" FontSize="12"
-                                      VerticalAlignment="Center" Margin="16,0,0,0" ToolTip="Create only ring 1 now. The later rings wait until you promote them in the Open Runs list."/>
+                                      VerticalAlignment="Center" Margin="16,0,0,0" ToolTip="Create only ring 1 now and promote the later rings from the Open Runs list."/>
                         </WrapPanel>
 
                         <TextBlock x:Name="txtRingPlanInfo" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" FontSize="11" TextTrimming="CharacterEllipsis"
@@ -606,7 +606,7 @@
                                 Style="{StaticResource InlineButtonStyle}"
                                 ToolTip="Get the live counts from the site, mark deleted deployments Removed and close finished runs."/>
                         <CheckBox x:Name="chkRingShowClosed" DockPanel.Dock="Right" Content="Show closed runs" FontSize="12"
-                                  VerticalAlignment="Center" Margin="0,0,12,0" ToolTip="List the closed runs instead of the open runs. Closed runs are not read from the site again."/>
+                                  VerticalAlignment="Center" Margin="0,0,12,0" ToolTip="List the closed runs, which are not read from the site again, instead of the open runs."/>
                     </DockPanel>
                     <DataGrid x:Name="dgRingRuns" Grid.Row="4" Style="{StaticResource ViewDataGrid}" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
                               RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
