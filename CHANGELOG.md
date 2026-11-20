@@ -4,12 +4,13 @@
 
 ## [2026.11.20.0029] - 2026-11-20
 
-## 4 changes: one-query collection browser, ConfigMgr wording
+## 5 changes: one-query collection browser, ConfigMgr wording
 
 ### Changed
 
 - Use ConfigMgr terms in window text, log messages and guide.
 - Define ring as the planning term in the README and guide.
+- Add tooltips to buttons and fields.
 
 ### Fixed
 
