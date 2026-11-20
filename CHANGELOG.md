@@ -10,6 +10,7 @@
 
 - Use Configuration Manager terms in the window text, the log messages and the guide, for example distribution point group and software update group.
 - The README and the guide now define ring as the planning term of this tool.
+- Added tooltips to 41 controls: the deployment options, the ring options and the browse and distribution point group dialogs.
 
 ### Fixed
 
