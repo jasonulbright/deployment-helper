@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [2026.11.21.0030] - 2026-11-21
+
+## 1 new view: update 43 applications in two steps
+
+### Added
+
+- Add the Update Rollout view: collections of devices below the new version, and Required deployments of the new version.
+- Compare versions as numbers in the collection query, so that 9 is below 10.
+- Preview the member count of every query, and run a dry run, before anything is created.
+- Deploy to a test target first (Step 1), then create the production collections (Step 2) from a saved run.
+- Import a list, a CSV file, the applications of the site or the Check ConfigMgr results.
+
 ## [2026.11.20.0029] - 2026-11-20
 
 ## 5 changes: one-query collection browser, ConfigMgr wording
