@@ -19,6 +19,7 @@ Use it to set up an account, or to find out why a read or a deployment is refuse
 | **Deploy** of an application, a package, a task sequence or a software update group | The right to create a deployment of that type for the collection. |
 | **Distribute Content** | The right to distribute content to the distribution point groups. |
 | Ring runs and Promote | The rights of the deployment type for each ring collection. A ring with a `DPGroup` also needs the right to distribute content to that group. |
+| **Step 1** and **Step 2** of an update rollout | The right to create device collections and query membership rules, to move a collection to a console folder, and to create deployments of the application. |
 | The audit log and the run-state folder | Write access to the path. A UNC run-state folder needs write access to the share. |
 
 ## Steps

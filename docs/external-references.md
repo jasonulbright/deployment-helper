@@ -19,6 +19,7 @@ None.
 | Topic | Microsoft Learn |
 |---|---|
 | Configuration Manager PowerShell cmdlets | https://learn.microsoft.com/powershell/module/configurationmanager/ |
+| Create device collections and query membership rules | https://learn.microsoft.com/mem/configmgr/core/clients/manage/collections/create-collections |
 | Deploy applications | https://learn.microsoft.com/mem/configmgr/apps/deploy-use/deploy-applications |
 | Packages and programs | https://learn.microsoft.com/mem/configmgr/apps/deploy-use/packages-and-programs |
 | Manage task sequences | https://learn.microsoft.com/mem/configmgr/osd/deploy-use/manage-task-sequences-to-automate-tasks |

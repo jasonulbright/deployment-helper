@@ -24,6 +24,8 @@ None.
 | Check | One of the five tests before a deployment. |
 | Audit log | The append-only JSONL file with one record for each deployment attempt. |
 | Template | A saved set of form values in `Templates`. |
+| Update rollout | A run of the **Update Rollout** view: collections of devices below a new version, and their deployments, first to a test target and then to production. |
+| Rollout run | The saved plan of one update rollout in `Rollouts`. Step 2 reads it. |
 | Ring plan | An ordered list of rings in `Rings\<plan>.json`. |
 | Ring | The planning term of this tool: one collection of a plan with its dates and options. Configuration Manager has no ring object. |
 | Run | One use of a plan for one object. |

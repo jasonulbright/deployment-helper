@@ -17,6 +17,7 @@ Safe Configuration Manager deployment for Applications, Packages, Task Sequences
 - Five-check pre-execution validation (target exists, content distributed, collection valid, collection safe, no duplicate deployment)
 - Built-in collection guardrail: every collection whose ID starts with `SMS` (including `SMSDM*`) is blocked
 - Ring deployments: one object, one ring plan, one deployment per ring, all at once or ring by ring with Promote
+- Update rollout: from a list of applications, device collections of the devices with an older version installed (`App - Server - Installed - Version LT 1.2`) and a Required deployment of the new version to each, first to a test target, then to production; with a preview of the member count of every query and a dry run
 - Purpose + schedule sanity: block inverted deadlines, warn on backdated Available, block `Available + HideAll` silent-noop combo
 - Per-type option surfaces: Required extras (Override MW / Allow restart / Metered) on Apps; Packages network + rerun behavior; Task Sequence availability; SUG fallback + post-reboot scan
 - Deployment templates with a first-run seed of four defaults (Workstation Pilot/Production, Server Pilot/Production)
@@ -52,6 +53,12 @@ On first run, four default templates are written to `Templates\`:
 - Server Production (Required, Hide All)
 
 Edit, duplicate, or delete a template in **Options > Templates**. Each template is a simple JSON file; edits survive app restarts.
+
+## Update rollout
+
+The **Update Rollout** view updates many applications in two steps. A row names an application, the new version and the name of the installed software. The tool makes a device collection for the role Server and one for the role Workstation, named by a template, with a query for the devices that have the software installed with a version below the new version. The compare is numeric: version 9 is below version 10. The tool previews the member count of every query, then deploys the new version as Required: Step 1 to the test target, Step 2, after you confirm it, to the production collections. The run plan is saved between the two steps. Every created collection and deployment has an audit record. See [Update rollout](docs/core/update-rollout.md).
+
+![Update rollout](screenshots/rollout-dark.png)
 
 ## Ring deployments
 

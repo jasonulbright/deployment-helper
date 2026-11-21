@@ -4,8 +4,9 @@ $script:AppConfig = @{
     Shell           = 'start-deploymenthelper.ps1'
     Xaml            = 'MainWindow.xaml'
     LogLabel        = 'lblLogOutput'
-    WorkflowButtons = @('btnApps', 'btnPackages', 'btnTaskSequences', 'btnSUG', 'btnRings')
+    WorkflowButtons = @('btnApps', 'btnPackages', 'btnTaskSequences', 'btnSUG', 'btnRings', 'btnRollout')
     OptionsButtons  = @('btnOptions')
     FormPane        = 'formPane'
     RingPane        = 'ringPane'
+    RolloutPane     = 'rolloutPane'
 }

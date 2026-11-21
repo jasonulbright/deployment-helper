@@ -521,7 +521,7 @@ Describe 'Every button takes the shared themed style (e)' {
         $wf = [regex]::Match($script:ShellText, '\$script:WorkflowButtons\s*=\s*@\(([^)]*)\)').Groups[1].Value
         $opt = [regex]::Match($script:ShellText, '\$script:OptionsButtons\s*=\s*@\(([^)]*)\)').Groups[1].Value
         $sidebar = @(([regex]::Matches(($wf + ' ' + $opt), '\$(\w+)') | ForEach-Object { $_.Groups[1].Value }))
-        $sidebar.Count | Should -Be 6
+        $sidebar.Count | Should -Be 7
         foreach ($b in $buttons) {
             $name = $b.GetAttribute('Name', 'http://schemas.microsoft.com/winfx/2006/xaml')
             $chain = @(Get-ButtonStyleChain -Doc $x -Button $b)

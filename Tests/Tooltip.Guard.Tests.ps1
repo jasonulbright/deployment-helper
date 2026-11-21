@@ -20,9 +20,13 @@ BeforeDiscovery {
             'btnValidate', 'btnDeploy',
             'cboRingType', 'txtRingObject', 'btnRingBrowseObject', 'cboRingProgram', 'cboRingPlan', 'btnRingReloadPlans', 'btnRingOpenFolder',
             'dtpRingStart', 'btnRingExpand', 'chkRingHold', 'btnRingPickCollection', 'btnRingValidate', 'btnRingCreate',
-            'btnRingRefreshRuns', 'chkRingShowClosed'
+            'btnRingRefreshRuns', 'chkRingShowClosed',
+            'btnRollout', 'btnRoAdd', 'btnRoImport', 'btnRoLookup', 'btnRoRemove', 'txtRoTemplate', 'txtRoFolder',
+            'txtRoLimitServer', 'txtRoLimitWorkstation', 'txtRoLimitTest', 'txtRoTestCollection', 'txtRoRefresh', 'txtRoDelay',
+            'txtRoTestDeadline', 'txtRoProdDeadline', 'cboRoNotification', 'chkRoDryRun', 'cboRoRuns', 'btnRoOpenRun',
+            'btnRoPreview', 'btnRoStep1', 'btnRoStep2'
         )
-        'start-deploymenthelper.ps1' = @('txtFilter', 'btnRefresh', 'btnSelectAll', 'btnSelectNone')
+        'start-deploymenthelper.ps1' = @('txtFilter', 'btnRefresh', 'btnSelectAll', 'btnSelectNone', 'txtList', 'btnFile', 'btnCheck')
     }
     $script:TtCases = @()
     foreach ($file in $script:TtAudited.Keys) {
