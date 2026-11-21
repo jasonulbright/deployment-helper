@@ -35,6 +35,9 @@ None.
 | `Browse load failed: <reason>` and `Load error: <reason>` | Log, dialog | The list could not load. | Review the reason in the log. Check the connection and the tool log. The log holds the full error text. |
 | `Ring plan refused:` | Log | The plan has a rule error. | View the text after the colon. |
 | `Select a ring plan.` | Log | No plan is selected. | Select a plan. |
+| `Plan:` followed by a text, and the dialog `The plan has errors` | Log, dialog | A version is not a dotted number, a software name is empty, or two items have one collection name. | Fix the rows or the name template. |
+| `Blocked:` followed by a collection name | Log | An item of the update rollout failed a check. | View the reason in the **Details** column. |
+| `Step 1 Stopped` and `Step 2 Stopped` | Dialog | An item failed. The items before it stay. | View **Details** and the log. |
 
 The image shows **Validate** on a computer without the console. The window stays open and the log says that the validation failed. The log file names the cause.
 

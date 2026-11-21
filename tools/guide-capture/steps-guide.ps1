@@ -92,6 +92,34 @@ Section 'rings' {
   Invoke-El (Get-El $win 'btnRingExpand'); Start-Sleep -Seconds 3; Shot $win 'rings-expanded'
   Invoke-El (Get-El $win 'btnRingRefreshRuns'); Start-Sleep -Seconds 3; Shot $win 'rings-runs'
 }
+Section 'rollout' {
+  Invoke-El (Get-El $win 'btnRollout'); Start-Sleep -Seconds 3; Shot $win 'rollout-empty'
+  Dump-Tree $win 'rollout'
+  Invoke-El (Get-El $win 'btnRoAdd'); Start-Sleep -Seconds 8
+  $d = Find-Last 'Add Applications' 20
+  Shot $d 'dialog-rollout-add'; Dump-Tree $d 'dialog-rollout-add'
+  $cancel = Get-El $d 'btnCancel' -Quiet
+  if (-not $cancel) { throw 'No Cancel button in Add Applications' }
+  Invoke-El $cancel; Start-Sleep -Seconds 1
+  Invoke-El (Get-El $win 'btnRoImport'); Start-Sleep -Seconds 2
+  $d = Find-Last 'Import List' 10
+  Set-Text (Get-El $d 'txtList') ("Application,NewVersion,InstalledSoftwareName,Role`r`n7-Zip (x64 edition) - 26.03,26.03,7-Zip,Both`r`nCMCO-CANARY-App,1.0,CMCO-CANARY,Workstation")
+  Start-Sleep -Milliseconds 500; Shot $d 'dialog-rollout-import'
+  Invoke-El (Get-El $d 'btnOK'); Start-Sleep -Seconds 2
+  Shot $win 'rollout-rows'
+  Invoke-El (Get-El $win 'btnRoPreview'); Start-Sleep -Seconds 20; Shot $win 'rollout-plan'
+  # The Step 1 button is hidden until the test items pass. Never invoke a hidden button. The step answers Cancel and confirms nothing.
+  $b = Get-El $win 'btnRoStep1' -Quiet
+  if (-not $b -or $b.Current.IsOffscreen) { Log 'ERROR: Step 1 is not shown, so no confirmation was captured.' }
+  else {
+    Invoke-El $b; Start-Sleep -Seconds 3
+    $d = Find-Last 'Confirm Step 1' 10
+    Shot $d 'dialog-rollout-step1'; Dump-Tree $d 'dialog-rollout-step1'
+    $c = Get-El $d 'Cancel' -Quiet
+    if (-not $c) { throw 'No Cancel button in Confirm Step 1. Nothing was answered.' }
+    Invoke-El $c; Start-Sleep -Seconds 2
+  }
+}
 Section 'tab order' { Invoke-El (Get-El $win 'btnApps'); Focus-Win $win; Click-El (Get-El $win 'btnApps'); 1..16 | ForEach-Object { Send-Keys '{TAB}'; $f = [System.Windows.Automation.AutomationElement]::FocusedElement; Log ('tab -> ' + $f.Current.AutomationId + ' / ' + $f.Current.Name) } }
 Section 'light' {
   Toggle-El (Get-El $win 'toggleTheme'); Start-Sleep -Seconds 1

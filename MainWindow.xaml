@@ -257,6 +257,8 @@
                                 ToolTip="Deploy a software update group to a device collection."/>
                         <Button x:Name="btnRings"           Content="Ring Deployment"        Style="{StaticResource WorkflowButtonStyle}"
                                 ToolTip="Deploy one object to several device collections in rings."/>
+                        <Button x:Name="btnRollout"         Content="Update Rollout"         Style="{StaticResource WorkflowButtonStyle}"
+                                ToolTip="Update applications: collections of devices below the new version, then deployments."/>
 
                         <Button x:Name="btnOptions"         Content="Options"                Style="{StaticResource OptionsButtonStyle}"
                                 Margin="8,16,8,2"
@@ -660,6 +662,163 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Update rollout pane: shares Grid.Row 1 with formPane and ringPane; one of the three is visible. -->
+            <Grid Grid.Row="1" x:Name="rolloutPane" Margin="16,6,16,6" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid Margin="0,0,12,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="130"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="130"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,4,0,6" LastChildFill="False">
+                        <TextBlock DockPanel.Dock="Left" Text="Applications" Style="{StaticResource SectionHeaderStyle}" Margin="0" VerticalAlignment="Center"
+                                   ToolTip="One row for each application to update, with its new version, software name and role."/>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button x:Name="btnRoAdd" Content="Add Applications..." MinWidth="140" Margin="0,0,8,0" Style="{StaticResource DialogButton}"
+                                    ToolTip="Pick applications that are published in the site."/>
+                            <Button x:Name="btnRoImport" Content="Import List..." MinWidth="110" Margin="0,0,8,0" Style="{StaticResource DialogButton}"
+                                    ToolTip="Paste a list or read a CSV file with the applications and their new versions."/>
+                            <Button x:Name="btnRoLookup" Content="Look Up Names" MinWidth="120" Margin="0,0,8,0" Style="{StaticResource DialogButton}"
+                                    ToolTip="Look up the installed-software name of the selected rows in the inventory."/>
+                            <Button x:Name="btnRoRemove" Content="Remove" MinWidth="90" Margin="0" Style="{StaticResource DialogButton}"
+                                    ToolTip="Remove the selected rows from the list."/>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <DataGrid x:Name="dgRoRows" Grid.Row="1" Style="{StaticResource ViewDataGrid}" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                              RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
+                              AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                              CanUserSortColumns="False" SelectionMode="Extended" SelectionUnit="FullRow"
+                              GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0" FontSize="12">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Application" Binding="{Binding Application, Mode=TwoWay}" Width="2*" MinWidth="90"/>
+                            <DataGridTextColumn Header="Site Version" Binding="{Binding CurrentVersion}" IsReadOnly="True" Width="104"/>
+                            <DataGridTextColumn Header="New Version" Binding="{Binding NewVersion, Mode=TwoWay}" Width="108"/>
+                            <DataGridTextColumn Header="Installed Software Name" Binding="{Binding SoftwareName, Mode=TwoWay}" Width="2*" MinWidth="90"/>
+                            <DataGridComboBoxColumn x:Name="colRoRole" Header="Role" SelectedItemBinding="{Binding Role, Mode=TwoWay}" Width="92"/>
+                            <DataGridTextColumn Header="Test Collection" Binding="{Binding TestCollection, Mode=TwoWay}" Width="*" MinWidth="130"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                        <TextBlock Text="Settings" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,6"
+                                   ToolTip="Set the name template, the limiting collections, the folder and the deployment times."/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Name Template:" Style="{StaticResource FormLabelStyle}" Margin="0,0,8,6"/>
+                            <TextBox x:Name="txtRoTemplate" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,12,6"
+                                     ToolTip="Sets the collection name, with {App}, {Role} and {Version} as placeholders."/>
+                            <TextBlock Grid.Row="0" Grid.Column="4" Text="Folder:" Style="{StaticResource FormLabelStyle}" Margin="0,0,8,6"/>
+                            <TextBox x:Name="txtRoFolder" Grid.Row="0" Grid.Column="5" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,6"
+                                     Controls:TextBoxHelper.Watermark="Optional"
+                                     ToolTip="Sets the console folder of new collections, below Device Collections; empty means the root."/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Server Limit:" Style="{StaticResource FormLabelStyle}" Margin="0,0,8,6"/>
+                            <TextBox x:Name="txtRoLimitServer" Grid.Row="1" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,12,6"
+                                     ToolTip="Sets the limiting collection of the Server collections, by name or by ID."/>
+                            <TextBlock Grid.Row="1" Grid.Column="2" Text="Workstation Limit:" Style="{StaticResource FormLabelStyle}" Margin="0,0,8,6"/>
+                            <TextBox x:Name="txtRoLimitWorkstation" Grid.Row="1" Grid.Column="3" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,12,6"
+                                     ToolTip="Sets the limiting collection of the Workstation collections, by name or by ID."/>
+                            <TextBlock Grid.Row="1" Grid.Column="4" Text="Test Limit:" Style="{StaticResource FormLabelStyle}" Margin="0,0,8,6"/>
+                            <TextBox x:Name="txtRoLimitTest" Grid.Row="1" Grid.Column="5" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,0,6"
+                                     ToolTip="Sets the limiting collection of a test collection that the rollout creates, by name or ID."/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Test Collection:" Style="{StaticResource FormLabelStyle}" Margin="0,0,8,0"/>
+                            <TextBox x:Name="txtRoTestCollection" Grid.Row="2" Grid.Column="1" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,12,0"
+                                     Controls:TextBoxHelper.Watermark="Existing collection"
+                                     ToolTip="Sets an existing test collection for every row; empty creates one from the template."/>
+                            <WrapPanel Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Refresh days:" Style="{StaticResource FormLabelStyle}" Margin="0,0,6,0"/>
+                                <TextBox x:Name="txtRoRefresh" Width="40" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,14,0"
+                                         ToolTip="Sets the days between membership updates of a new collection; 0 means manual updates."/>
+                                <TextBlock Text="Available in (h):" Style="{StaticResource FormLabelStyle}" Margin="0,0,6,0"/>
+                                <TextBox x:Name="txtRoDelay" Width="40" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,14,0"
+                                         ToolTip="Sets the hours from the start of a step until the deployment is available."/>
+                                <TextBlock Text="Test deadline (h):" Style="{StaticResource FormLabelStyle}" Margin="0,0,6,0"/>
+                                <TextBox x:Name="txtRoTestDeadline" Width="40" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,14,0"
+                                         ToolTip="Sets the hours from the available time to the deadline of the test deployment (1 or more)."/>
+                                <TextBlock Text="Production deadline (h):" Style="{StaticResource FormLabelStyle}" Margin="0,0,6,0"/>
+                                <TextBox x:Name="txtRoProdDeadline" Width="40" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,14,0"
+                                         ToolTip="Sets the hours from the available time to the deadline of the production deployment (1 or more)."/>
+                                <TextBlock Text="Notification:" Style="{StaticResource FormLabelStyle}" Margin="0,0,6,0"/>
+                                <ComboBox x:Name="cboRoNotification" Width="210" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0"
+                                          ToolTip="Select what the user sees when the deployment is available.">
+                                    <ComboBoxItem Content="Display all" Tag="DisplayAll"/>
+                                    <ComboBoxItem Content="Software Center only" Tag="DisplaySoftwareCenterOnly"/>
+                                    <ComboBoxItem Content="Hide all" Tag="HideAll"/>
+                                </ComboBox>
+                            </WrapPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <WrapPanel Grid.Row="3" Margin="0,10,0,6" Orientation="Horizontal">
+                        <TextBlock x:Name="txtRoRunInfo" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320" Margin="0,0,16,0"
+                                   Foreground="{DynamicResource MahApps.Brushes.Gray1}" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                            <CheckBox x:Name="chkRoDryRun" Content="Dry run" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0"
+                                      ToolTip="Show what a step would do; nothing is created and nothing is written to the audit log."/>
+                            <ComboBox x:Name="cboRoRuns" Width="230" FontSize="12" Height="26" VerticalContentAlignment="Center" Margin="0,0,8,0"
+                                      ToolTip="Select a saved run; a run keeps the plan between Step 1 and Step 2."/>
+                            <Button x:Name="btnRoOpenRun" Content="Open Run" MinWidth="90" Margin="0,0,8,0" Style="{StaticResource DialogButton}"
+                                    ToolTip="Load the selected saved run to continue with Step 2."/>
+                            <Button x:Name="btnRoPreview" Content="Preview Plan" MinWidth="110" Margin="0,0,8,0" Style="{StaticResource DialogButton}"
+                                    ToolTip="Run the checks and count the members of every query; nothing is created."/>
+                            <Button x:Name="btnRoStep1" Content="Step 1: Deploy to Test" MinWidth="160" Margin="0,0,8,0" Visibility="Collapsed" Style="{StaticResource DialogAccentButton}"
+                                    ToolTip="Create the test collections and deploy the new versions to the test targets."/>
+                            <Button x:Name="btnRoStep2" Content="Step 2: Create Production" MinWidth="170" Margin="0" Visibility="Collapsed" Style="{StaticResource DialogAccentButton}"
+                                    ToolTip="Create the production collections and deploy the new versions to them."/>
+                    </WrapPanel>
+
+                    <DataGrid x:Name="dgRoPlan" Grid.Row="4" Style="{StaticResource ViewDataGrid}" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                              RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
+                              AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
+                              SelectionMode="Single" SelectionUnit="FullRow"
+                              GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0" FontSize="12">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="32"/>
+                            <DataGridTextColumn Header="Step" Binding="{Binding Stage}" Width="60"/>
+                            <DataGridTextColumn Header="Application" Binding="{Binding Application}" Width="*" MinWidth="70"/>
+                            <DataGridTextColumn Header="Role" Binding="{Binding Role}" Width="90"/>
+                            <DataGridTextColumn Header="Collection" Binding="{Binding CollectionName}" Width="2*" MinWidth="90">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                        <Setter Property="ToolTip" Value="{Binding CollectionName}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Members" Binding="{Binding MemberCount}" Width="88"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="76"/>
+                            <DataGridTextColumn Header="Details" Binding="{Binding Message}" Width="2*" MinWidth="60">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                        <Setter Property="ToolTip" Value="{Binding Message}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

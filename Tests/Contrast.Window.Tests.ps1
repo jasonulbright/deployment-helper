@@ -30,7 +30,7 @@ BeforeAll {
                 $w = Open-TestWindow -XamlPath (Join-Path $Root $cfg.Xaml) -Dark $Arguments.Dark
                 Initialize-ShellTheme -Window $w -Dark $Arguments.Dark -WorkflowButtonNames $cfg.WorkflowButtons -OptionsButtonNames $cfg.OptionsButtons -LogLabelName $cfg.LogLabel
                 $rows = @()
-                foreach ($pane in @(@($cfg.FormPane, $cfg.RingPane), @($cfg.RingPane, $cfg.FormPane))) {
+                foreach ($pane in @(@($cfg.FormPane, $cfg.RingPane), @($cfg.RingPane, $cfg.FormPane), @($cfg.RolloutPane, $cfg.RingPane))) {
                     $w.FindName($pane[0]).Visibility = 'Visible'; $w.FindName($pane[1]).Visibility = 'Collapsed'
                     Wait-Layout $w
                     $rows += @(Get-InteractiveContrast -Window $w)

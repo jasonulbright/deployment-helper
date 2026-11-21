@@ -130,7 +130,9 @@ function Get-DhPreferences {
         SMSProvider             = ''
         DeploymentAuditLogPath  = Join-Path $PSScriptRoot 'Logs\deployment-audit.jsonl'
         RingRunStatePath        = Join-Path $PSScriptRoot 'Rings\runs'
+        RolloutRunPath          = Join-Path $PSScriptRoot 'Rollouts'
     }
+    foreach ($__kv in (Get-RolloutSettingDefault).GetEnumerator()) { if (-not $defaults.ContainsKey($__kv.Key)) { $defaults[$__kv.Key] = $__kv.Value } }
     if (Test-Path -LiteralPath $global:PrefsPath) {
         try {
             $loaded = Get-Content -LiteralPath $global:PrefsPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
@@ -526,6 +528,7 @@ $cboApplyTemplate   = $window.FindName('cboApplyTemplate')
 $pnlApplyTemplate   = $window.FindName('pnlApplyTemplate')
 $formPane           = $window.FindName('formPane')
 $btnRings           = $window.FindName('btnRings')
+$btnRollout         = $window.FindName('btnRollout')
 $ringPane           = $window.FindName('ringPane')
 $cboRingType        = $window.FindName('cboRingType')
 $txtRingObject      = $window.FindName('txtRingObject')
@@ -559,7 +562,7 @@ $dtpRingStart.SelectedDateTime = $__now.Date.AddHours($__now.Hour).AddMinutes(($
 # =============================================================================
 [void][ControlzEx.Theming.ThemeManager]::Current.ChangeTheme($window, 'Dark.Steel')
 
-$script:WorkflowButtons = @($btnApps, $btnPackages, $btnTaskSequences, $btnSUG, $btnRings)
+$script:WorkflowButtons = @($btnApps, $btnPackages, $btnTaskSequences, $btnSUG, $btnRings, $btnRollout)
 $script:OptionsButtons  = @($btnOptions)
 
 # Initialize-SuiteTheme must run before the first Set-ButtonTheme call
@@ -815,7 +818,7 @@ function Show-BrowseLoadingDialog {
     param(
         [Parameter(Mandatory)]$Owner,
         [Parameter(Mandatory)][string]$Title,
-        [Parameter(Mandatory)][ValidateSet('Apps', 'Packages', 'TaskSequences', 'SUG', 'Collections')][string]$Type
+        [Parameter(Mandatory)][ValidateSet('Apps', 'Packages', 'TaskSequences', 'SUG', 'Collections', 'RolloutApps')][string]$Type
     )
 
     $dlgXaml = @'
@@ -910,6 +913,7 @@ function Show-BrowseLoadingDialog {
 
             $label = switch ($Type) {
                 'Apps'          { 'applications' }
+                'RolloutApps'   { 'applications' }
                 'Packages'      { 'packages' }
                 'TaskSequences' { 'task sequences' }
                 'SUG'           { 'software update groups' }
@@ -3085,6 +3089,7 @@ $script:SetCurrentType = {
     $script:CurrentType = $Type
     $formPane.Visibility         = [System.Windows.Visibility]::Visible
     $ringPane.Visibility         = [System.Windows.Visibility]::Collapsed
+    $rolloutPane.Visibility      = [System.Windows.Visibility]::Collapsed
     $pnlApplyTemplate.Visibility = [System.Windows.Visibility]::Visible
     $meta = $script:TypeMeta[$Type]
     $txtModuleHeader.Text    = $meta.Header
@@ -3914,6 +3919,7 @@ $script:ShowRingView = {
     $script:CurrentType = 'Rings'
     $formPane.Visibility         = [System.Windows.Visibility]::Collapsed
     $ringPane.Visibility         = [System.Windows.Visibility]::Visible
+    $rolloutPane.Visibility      = [System.Windows.Visibility]::Collapsed
     $pnlApplyTemplate.Visibility = [System.Windows.Visibility]::Collapsed
     $txtModuleHeader.Text    = 'Ring Deployment'
     $txtModuleSubheader.Text = 'Deploy one object to the collections of a ring plan, one ring after another.'
@@ -4009,6 +4015,693 @@ $dgRingRuns.AddHandler([System.Windows.Controls.Primitives.ButtonBase]::ClickEve
     $row = $button.DataContext
     if ($null -eq $row -or -not $row.RunPath -or -not $row.ShowPromote) { return }
     Invoke-RingPromote -RunPath ([string]$row.RunPath) -RingIndex ([int]$row.Index)
+})
+
+# =============================================================================
+# Update rollout view
+#
+# Rows of applications become device collections ('App - Server - Installed - Version LT X') and Required
+# deployments. Preview Plan changes nothing. Step 1 deploys to the test targets and saves the run plan.
+# Step 2 creates the production collections and deployments of a saved run. The engine is in the module
+# (Rollout functions); this block holds the window glue.
+# =============================================================================
+$rolloutPane         = $window.FindName('rolloutPane')
+$dgRoRows            = $window.FindName('dgRoRows')
+$dgRoPlan            = $window.FindName('dgRoPlan')
+$btnRoAdd            = $window.FindName('btnRoAdd')
+$btnRoImport         = $window.FindName('btnRoImport')
+$btnRoLookup         = $window.FindName('btnRoLookup')
+$btnRoRemove         = $window.FindName('btnRoRemove')
+$btnRoPreview        = $window.FindName('btnRoPreview')
+$btnRoStep1          = $window.FindName('btnRoStep1')
+$btnRoStep2          = $window.FindName('btnRoStep2')
+$btnRoOpenRun        = $window.FindName('btnRoOpenRun')
+$cboRoRuns           = $window.FindName('cboRoRuns')
+$chkRoDryRun         = $window.FindName('chkRoDryRun')
+$txtRoRunInfo        = $window.FindName('txtRoRunInfo')
+$txtRoTemplate       = $window.FindName('txtRoTemplate')
+$txtRoFolder         = $window.FindName('txtRoFolder')
+$txtRoLimitServer    = $window.FindName('txtRoLimitServer')
+$txtRoLimitWorkstation = $window.FindName('txtRoLimitWorkstation')
+$txtRoLimitTest      = $window.FindName('txtRoLimitTest')
+$txtRoTestCollection = $window.FindName('txtRoTestCollection')
+$txtRoRefresh        = $window.FindName('txtRoRefresh')
+$txtRoDelay          = $window.FindName('txtRoDelay')
+$txtRoTestDeadline   = $window.FindName('txtRoTestDeadline')
+$txtRoProdDeadline   = $window.FindName('txtRoProdDeadline')
+$cboRoNotification   = $window.FindName('cboRoNotification')
+
+$script:RolloutRows         = New-Object System.Collections.ObjectModel.ObservableCollection[PSObject]
+$script:RolloutPlanRows     = New-Object System.Collections.ObjectModel.ObservableCollection[PSObject]
+$script:RolloutPlan         = $null
+$script:RolloutRun          = $null
+$script:RolloutRunPathFile  = ''
+$script:RolloutRunFiles     = @()
+$script:RolloutViewInitialized = $false
+$script:RolloutSuppress     = $false
+$dgRoRows.ItemsSource = $script:RolloutRows
+$dgRoPlan.ItemsSource = $script:RolloutPlanRows
+$dgRoRows.Columns[4].ItemsSource = @('Server', 'Workstation', 'Both')
+
+function Get-RolloutPrefTable {
+    $t = @{}
+    foreach ($k in @((Get-RolloutSettingDefault).Keys)) { if ($global:Prefs.ContainsKey($k)) { $t[$k] = $global:Prefs[$k] } }
+    return $t
+}
+
+function Get-RolloutRunFolder {
+    $p = [string]$global:Prefs['RolloutRunPath']
+    if ([string]::IsNullOrWhiteSpace($p)) { $p = Join-Path $PSScriptRoot 'Rollouts' }
+    return $p
+}
+
+function Update-RolloutSettingsUi {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    $s = ConvertTo-RolloutSettings -Prefs (Get-RolloutPrefTable)
+    $script:RolloutSuppress = $true
+    try {
+        $txtRoTemplate.Text         = [string]$s.RolloutNameTemplate
+        $txtRoFolder.Text           = [string]$s.RolloutFolder
+        $txtRoLimitServer.Text      = [string]$s.RolloutLimitingServer
+        $txtRoLimitWorkstation.Text = [string]$s.RolloutLimitingWorkstation
+        $txtRoLimitTest.Text        = [string]$s.RolloutLimitingTest
+        $txtRoTestCollection.Text   = [string]$s.RolloutTestCollection
+        $txtRoRefresh.Text          = [string]$s.RolloutRefreshDays
+        $txtRoDelay.Text            = [string]$s.RolloutAvailableDelayHours
+        $txtRoTestDeadline.Text     = [string]$s.RolloutTestDeadlineHours
+        $txtRoProdDeadline.Text     = [string]$s.RolloutProdDeadlineHours
+        $idx = 0
+        for ($i = 0; $i -lt $cboRoNotification.Items.Count; $i++) { if ([string]$cboRoNotification.Items[$i].Tag -eq [string]$s.RolloutNotification) { $idx = $i } }
+        $cboRoNotification.SelectedIndex = $idx
+    }
+    finally { $script:RolloutSuppress = $false }
+}
+
+function Get-RolloutSettingsFromUi {
+    <#
+    .SYNOPSIS
+        Reads the settings controls. Returns @{ Settings; Errors }. A number that is not a whole number is an error.
+    #>
+    $errors = New-Object System.Collections.Generic.List[string]
+    $num = {
+        param($Box, $Label, $Min)
+        $i = 0
+        if (-not [int]::TryParse(([string]$Box.Text).Trim(), [ref]$i) -or $i -lt $Min -or $i -gt 8760) { $errors.Add(('{0} must be a whole number from {1} to 8760.' -f $Label, $Min)); return 0 }
+        return $i
+    }
+    $prefs = @{
+        RolloutNameTemplate        = ([string]$txtRoTemplate.Text).Trim()
+        RolloutFolder              = ([string]$txtRoFolder.Text).Trim()
+        RolloutLimitingServer      = ([string]$txtRoLimitServer.Text).Trim()
+        RolloutLimitingWorkstation = ([string]$txtRoLimitWorkstation.Text).Trim()
+        RolloutLimitingTest        = ([string]$txtRoLimitTest.Text).Trim()
+        RolloutTestCollection      = ([string]$txtRoTestCollection.Text).Trim()
+        RolloutRefreshDays         = (& $num $txtRoRefresh 'Refresh days' 0)
+        RolloutAvailableDelayHours = (& $num $txtRoDelay 'Available in' 0)
+        RolloutTestDeadlineHours   = (& $num $txtRoTestDeadline 'Test deadline' 1)
+        RolloutProdDeadlineHours   = (& $num $txtRoProdDeadline 'Production deadline' 1)
+        RolloutNotification        = $(if ($cboRoNotification.SelectedItem) { [string]$cboRoNotification.SelectedItem.Tag } else { 'DisplayAll' })
+    }
+    if ([string]::IsNullOrWhiteSpace($prefs.RolloutNameTemplate)) { $errors.Add('The name template is empty.') }
+    return @{ Settings = (ConvertTo-RolloutSettings -Prefs $prefs); Prefs = $prefs; Errors = $errors.ToArray() }
+}
+
+function Save-RolloutSettingsFromUi {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Saves the preferences of this tool.')]
+    param()
+    if ($script:RolloutSuppress) { return }
+    $r = Get-RolloutSettingsFromUi
+    if (@($r.Errors).Count -gt 0) { return }
+    foreach ($k in @($r.Prefs.Keys)) { $global:Prefs[$k] = $r.Prefs[$k] }
+    try { Save-DhPreferences -Prefs $global:Prefs } catch { Add-LogLine -Message 'The rollout settings could not be saved.' }
+}
+
+function Format-RolloutPlanLine {
+    <#
+    .SYNOPSIS
+        Returns the confirmation text of one plan item: the collection, whether it is created or reused, the members and the deployment times.
+    #>
+    param([Parameter(Mandatory)]$Item, [Parameter(Mandatory)]$Schedule)
+    $action = if ($Item.Exists) { 'reuse the existing collection' } else { 'create the collection' }
+    $count = if ($null -ne $Item.MemberCount) { ('{0} member(s)' -f $Item.MemberCount) } else { 'members not counted' }
+    return ("{0} {1} -> {2}`n    {3}, {4}; deploy as Required, available {5}, deadline {6}" -f $Item.Application, $Item.Version, $Item.CollectionName, $action, $count,
+        $Schedule.Available.ToString('yyyy-MM-dd HH:mm'), $Schedule.Deadline.ToString('yyyy-MM-dd HH:mm'))
+}
+
+function Update-RolloutGrids {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    try { [void]$dgRoRows.CommitEdit([System.Windows.Controls.DataGridEditingUnit]::Row, $true) } catch { $null = $_ }
+    $dgRoRows.Items.Refresh()
+    $dgRoPlan.Items.Refresh()
+}
+
+function Update-RolloutButtons {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    $show1 = $false
+    if ($script:RolloutPlan -and $script:RolloutPlan.TestOk) { $show1 = $true }
+    $btnRoStep1.Visibility = if ($show1) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+    $show2 = $false
+    if ($script:RolloutRun) { $show2 = (@(Get-RolloutProdItem -Run $script:RolloutRun).Count -gt 0) }
+    $btnRoStep2.Visibility = if ($show2) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+    if ($script:RolloutRun) {
+        $items = @($script:RolloutRun.Items)
+        $testDone = @($items | Where-Object { $_.Stage -eq 'Test' -and $_.Status -eq 'Done' }).Count
+        $testAll = @($items | Where-Object { $_.Stage -eq 'Test' }).Count
+        $prodDone = @($items | Where-Object { $_.Stage -eq 'Prod' -and $_.Status -eq 'Done' }).Count
+        $prodAll = @($items | Where-Object { $_.Stage -eq 'Prod' }).Count
+        $txtRoRunInfo.Text = ('Run {0}: test {1}/{2} done, production {3}/{4} done.' -f $script:RolloutRun.RunId, $testDone, $testAll, $prodDone, $prodAll)
+    }
+    else { $txtRoRunInfo.Text = '' }
+}
+
+function Reset-RolloutPlan {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    $script:RolloutPlan = $null
+    if (-not $script:RolloutRun) { $script:RolloutPlanRows.Clear() }
+    Update-RolloutButtons
+}
+
+function Update-RolloutRunCombo {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    $script:RolloutRunFiles = @(Get-RolloutRunList -Folder (Get-RolloutRunFolder))
+    $cboRoRuns.Items.Clear()
+    foreach ($r in $script:RolloutRunFiles) { [void]$cboRoRuns.Items.Add(('{0} ({1})' -f $r.RunId, $r.State)) }
+    if ($cboRoRuns.Items.Count -gt 0) { $cboRoRuns.SelectedIndex = 0 }
+}
+
+function Add-RolloutRowSet {
+    <#
+    .SYNOPSIS
+        Adds rows to the grid. A row for an application and version that the grid has already is skipped. Returns the number added.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyCollection()][array]$Rows)
+    $added = 0
+    foreach ($r in $Rows) {
+        $dup = @($script:RolloutRows | Where-Object { $_.Application -eq $r.Application -and $_.NewVersion -eq $r.NewVersion }).Count -gt 0
+        if ($dup) { continue }
+        if (-not $r.SoftwareName) { $r.SoftwareName = Get-RolloutBaseName -Name $r.Application }
+        $script:RolloutRows.Add($r)
+        $added++
+    }
+    Update-RolloutGrids
+    Reset-RolloutPlan
+    return $added
+}
+
+function Show-RolloutAppDialog {
+    <#
+    .SYNOPSIS
+        Multi-select list of the applications of the site with a filter box. Returns the selected rows or $null.
+    #>
+    param([Parameter(Mandatory)]$Owner)
+    $loaded = Get-BrowseList -Owner $Owner -Title 'Add Applications' -Type 'RolloutApps'
+    if ($null -eq $loaded) { return $null }
+    $dlgXaml = @'
+<Controls:MetroWindow
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+    Title="Add Applications"
+    Width="820" Height="540"
+    MinWidth="560" MinHeight="360"
+    WindowStartupLocation="CenterOwner"
+    TitleCharacterCasing="Normal"
+    ShowIconOnTitleBar="False"
+    GlowBrush="{DynamicResource MahApps.Brushes.Accent}"
+    BorderThickness="1">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <!--SHARED_STYLES-->
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid Margin="16,12,16,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBox x:Name="txtFilter" Grid.Row="0" FontSize="12" Height="32" VerticalContentAlignment="Center" Margin="0,0,0,8" ToolTip="Enter text to narrow the list."/>
+        <DataGrid x:Name="dgResults" Grid.Row="1"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
+                  SelectionMode="Extended" SelectionUnit="FullRow" GridLinesVisibility="Horizontal"
+                  HeadersVisibility="Column" RowHeaderWidth="0" BorderThickness="1"
+                  BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                  RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
+                  ColumnHeaderHeight="28" EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding LocalizedDisplayName}" Width="*"/>
+                <DataGridTextColumn Header="Version" Binding="{Binding SoftwareVersion}" Width="110"/>
+                <DataGridTextColumn Header="Revision" Binding="{Binding CIVersion}" Width="80"/>
+                <DataGridTextColumn Header="Modified" Binding="{Binding DateLastModified}" Width="150"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <TextBlock x:Name="txtStatus" Grid.Row="2" FontSize="11" Margin="0,8,0,0" Foreground="{DynamicResource MahApps.Brushes.Gray1}" Text=""/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="btnOK" Content="Add" IsDefault="True" Style="{StaticResource DialogAccentButton}"/>
+            <Button x:Name="btnCancel" Content="Cancel" Margin="0" IsCancel="True" Style="{StaticResource DialogButton}"/>
+        </StackPanel>
+    </Grid>
+</Controls:MetroWindow>
+'@
+    [xml]$xml = $dlgXaml.Replace($script:SharedStyleMarker, (Get-SharedStyleXaml))
+    $reader = New-Object System.Xml.XmlNodeReader $xml
+    $dlg = [System.Windows.Markup.XamlReader]::Load($reader)
+    Install-TitleBarDragFallback -Window $dlg
+    $dlg.Owner = $Owner
+    Set-DialogTheme -Dialog $dlg
+    $txtFilter = $dlg.FindName('txtFilter')
+    $dgResults = $dlg.FindName('dgResults')
+    $txtStatus = $dlg.FindName('txtStatus')
+    $btnOK     = $dlg.FindName('btnOK')
+    $btnCancel = $dlg.FindName('btnCancel')
+    [MahApps.Metro.Controls.TextBoxHelper]::SetWatermark($txtFilter, 'Filter by name, version or CI ID')
+    $all = @($loaded.Items)
+    $applyFilter = {
+        $rows = Select-BrowseMatch -Items $all -Needle ([string]$txtFilter.Text)
+        $dgResults.ItemsSource = $rows
+        $txtStatus.Text = ('{0} of {1} application(s). Select one or more rows (Ctrl or Shift).' -f @($rows).Count, @($all).Count)
+    }
+    & $applyFilter
+    $txtFilter.Add_TextChanged({ & $applyFilter })
+    $script:RolloutDialogResult = $null
+    $btnOK.Add_Click({
+        $sel = @($dgResults.SelectedItems)
+        if ($sel.Count -eq 0) {
+            [void](Show-ThemedMessage -Owner $dlg -Title 'Add Applications' -Message 'Select one or more rows, then select Add.' -Buttons OK -Icon Info)
+            return
+        }
+        $script:RolloutDialogResult = $sel
+        $dlg.Close()
+    })
+    $btnCancel.Add_Click({ $script:RolloutDialogResult = $null; $dlg.Close() })
+    $dlg.Add_Loaded({ $txtFilter.Focus() })
+    [void]$dlg.ShowDialog()
+    return $script:RolloutDialogResult
+}
+
+function Show-RolloutImportDialog {
+    <#
+    .SYNOPSIS
+        Text box for a pasted list or a CSV, with a button that reads a file. Returns the text or $null.
+    #>
+    param([Parameter(Mandatory)]$Owner)
+    $dlgXaml = @'
+<Controls:MetroWindow
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+    Title="Import List"
+    Width="700" Height="460"
+    MinWidth="520" MinHeight="320"
+    WindowStartupLocation="CenterOwner"
+    TitleCharacterCasing="Normal"
+    ShowIconOnTitleBar="False"
+    GlowBrush="{DynamicResource MahApps.Brushes.Accent}"
+    BorderThickness="1">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <!--SHARED_STYLES-->
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid Margin="16,12,16,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,8"
+                   Text="Paste one application for each line: the name, a comma or a tab, and the new version. A CSV with the header Application, NewVersion and the optional columns InstalledSoftwareName, Role and TestCollection works too."/>
+        <TextBox x:Name="txtList" Grid.Row="1" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                 FontFamily="Cascadia Code, Consolas, Courier New" FontSize="12" ToolTip="Paste the list here."/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="btnFile" Content="Load File..." Style="{StaticResource DialogButton}" ToolTip="Read a CSV or text file into the box."/>
+            <Button x:Name="btnCheck" Content="Check Results" Style="{StaticResource DialogButton}" ToolTip="Fill the box with the updates that Check ConfigMgr found in App Packager."/>
+            <Button x:Name="btnOK" Content="Import" IsDefault="True" Style="{StaticResource DialogAccentButton}"/>
+            <Button x:Name="btnCancel" Content="Cancel" Margin="0" IsCancel="True" Style="{StaticResource DialogButton}"/>
+        </StackPanel>
+    </Grid>
+</Controls:MetroWindow>
+'@
+    [xml]$xml = $dlgXaml.Replace($script:SharedStyleMarker, (Get-SharedStyleXaml))
+    $reader = New-Object System.Xml.XmlNodeReader $xml
+    $dlg = [System.Windows.Markup.XamlReader]::Load($reader)
+    Install-TitleBarDragFallback -Window $dlg
+    $dlg.Owner = $Owner
+    Set-DialogTheme -Dialog $dlg
+    $txtList   = $dlg.FindName('txtList')
+    $btnFile   = $dlg.FindName('btnFile')
+    $btnCheck  = $dlg.FindName('btnCheck')
+    $btnOK     = $dlg.FindName('btnOK')
+    $btnCancel = $dlg.FindName('btnCancel')
+    $script:RolloutDialogResult = $null
+    $btnFile.Add_Click({
+        $ofd = New-Object Microsoft.Win32.OpenFileDialog
+        $ofd.Filter = 'CSV and text files (*.csv;*.txt)|*.csv;*.txt|All files (*.*)|*.*'
+        if ($ofd.ShowDialog($dlg)) {
+            try { $txtList.Text = [System.IO.File]::ReadAllText($ofd.FileName) }
+            catch { [void](Show-ThemedMessage -Owner $dlg -Title 'Import List' -Message 'The file could not be read.' -Buttons OK -Icon Error) }
+        }
+    })
+    $btnCheck.Add_Click({
+        $res = Import-RolloutCheckResult
+        foreach ($e in $res.Errors) { Add-LogLine -Message $e }
+        if (@($res.Rows).Count -eq 0) { [void](Show-ThemedMessage -Owner $dlg -Title 'Import List' -Message 'No update was found. Run Check ConfigMgr in App Packager first.' -Buttons OK -Icon Info); return }
+        $lines = @('Application,NewVersion,InstalledSoftwareName,Role') + @($res.Rows | ForEach-Object { '"{0}","{1}","{2}","{3}"' -f $_.Application, $_.NewVersion, $_.SoftwareName, $_.Role })
+        $txtList.Text = ($lines -join [Environment]::NewLine)
+    })
+    $btnOK.Add_Click({
+        if ([string]::IsNullOrWhiteSpace($txtList.Text)) {
+            [void](Show-ThemedMessage -Owner $dlg -Title 'Import List' -Message 'The list is empty.' -Buttons OK -Icon Info)
+            return
+        }
+        $script:RolloutDialogResult = [string]$txtList.Text
+        $dlg.Close()
+    })
+    $btnCancel.Add_Click({ $script:RolloutDialogResult = $null; $dlg.Close() })
+    $dlg.Add_Loaded({ $txtList.Focus() })
+    [void]$dlg.ShowDialog()
+    return $script:RolloutDialogResult
+}
+
+function Get-RolloutInputRow {
+    <#
+    .SYNOPSIS
+        Commits the pending edit and returns the grid rows as input rows.
+    #>
+    try { [void]$dgRoRows.CommitEdit([System.Windows.Controls.DataGridEditingUnit]::Row, $true) } catch { $null = $_ }
+    return @($script:RolloutRows | ForEach-Object { $_ })
+}
+
+function Invoke-RolloutPreview {
+    $ui = Get-RolloutSettingsFromUi
+    if (@($ui.Errors).Count -gt 0) {
+        [void](Show-ThemedMessage -Owner $window -Title 'Update Rollout' -Message ("Fix the settings:`n" + (Format-RingMessageList $ui.Errors)) -Buttons OK -Icon Error)
+        return
+    }
+    $rows = @(Get-RolloutInputRow)
+    if ($rows.Count -eq 0) { Add-LogLine -Message 'Add applications first.'; Set-StatusText -Text 'No applications.'; return }
+    $plan = New-RolloutPlan -Rows $rows -Settings $ui.Settings
+    if (@($plan.Errors).Count -gt 0) {
+        foreach ($e in $plan.Errors) { Add-LogLine -Message ('Plan: ' + $e) }
+        [void](Show-ThemedMessage -Owner $window -Title 'Update Rollout' -Message ("The plan has errors:`n" + (Format-RingMessageList $plan.Errors)) -Buttons OK -Icon Error)
+        Set-StatusText -Text 'The plan has errors.'
+        return
+    }
+    if (-not (Connect-IfNeeded)) { return }
+    $script:RolloutRun = $null
+    $script:RolloutPlan = $null
+    $script:RolloutPlanRows.Clear()
+    foreach ($it in $plan.Items) { $script:RolloutPlanRows.Add($it) }
+    Update-RolloutGrids
+    $window.Cursor = [System.Windows.Input.Cursors]::Wait
+    $cache = @{}
+    $okAll = $true
+    $testOk = $true
+    try {
+        $n = 0
+        foreach ($it in $plan.Items) {
+            $n++
+            Set-StatusText -Text ('Checking item {0} of {1}...' -f $n, @($plan.Items).Count)
+            $window.Dispatcher.Invoke([Action]{ }, [System.Windows.Threading.DispatcherPriority]::Background)
+            $r = Test-RolloutPlanOnSite -Items @($it) -Settings $ui.Settings -Cache $cache
+            if (-not $r.Ok) { $okAll = $false; if ($it.Stage -eq 'Test') { $testOk = $false } }
+        }
+    }
+    finally { $window.Cursor = $null }
+    Update-RolloutGrids
+    $script:RolloutPlan = @{ Items = @($plan.Items); Settings = $ui.Settings; Ok = $okAll; TestOk = $testOk }
+    foreach ($it in $plan.Items | Where-Object { $_.Status -eq 'Blocked' }) { Add-LogLine -Message ('Blocked: {0} ({1}): {2}' -f $it.Application, $it.CollectionName, $it.Message) }
+    Update-RolloutButtons
+    if ($okAll) { Set-StatusText -Text ('Plan ready: {0} item(s). Nothing was created.' -f @($plan.Items).Count) }
+    elseif ($testOk) { Set-StatusText -Text 'The test items pass. Some production items are blocked; see Details.' }
+    else { Set-StatusText -Text 'Blocked items found. Fix them, then preview again.' }
+}
+
+function Update-RolloutItemResult {
+    param([Parameter(Mandatory)]$Item, [Parameter(Mandatory)][hashtable]$Result, [switch]$DryRun)
+    if ($Result.CollectionId) { $Item.CollectionId = [string]$Result.CollectionId }
+    if ($DryRun) { $Item.Message = [string]$Result.Error; return }
+    if ($Result.Success) {
+        $Item.Status = 'Done'
+        $Item.DeploymentId = [string]$Result.DeploymentId
+        $Item.Exists = $true
+        $Item.Message = $(if ($Result.Created) { ('Collection {0} created; deployment {1}.' -f $Item.CollectionId, $Item.DeploymentId) } else { ('Deployment {0} created.' -f $Item.DeploymentId) })
+        if ($Result.Error) { $Item.Message += ' ' + $Result.Error }
+    }
+    else {
+        $Item.Status = 'Failed'
+        $Item.Message = [string]$Result.Error
+        if ($Result.Created) { $Item.Exists = $true }
+    }
+}
+
+function Invoke-RolloutStepRun {
+    <#
+    .SYNOPSIS
+        Runs the given items of a stage in order. A failed item stops the stage; the items after it stay Planned.
+        Returns the number of items that are Done.
+    #>
+    param(
+        [Parameter(Mandatory)][array]$Items,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Settings,
+        [Parameter(Mandatory)]$Schedule,
+        [Parameter(Mandatory)][string]$RunId,
+        [Parameter(Mandatory)][bool]$DryRun,
+        $Run
+    )
+    $done = 0
+    $window.Cursor = [System.Windows.Input.Cursors]::Wait
+    try {
+        foreach ($it in $Items) {
+            Set-StatusText -Text ('Running item {0}: {1}' -f $it.Index, $it.CollectionName)
+            $window.Dispatcher.Invoke([Action]{ }, [System.Windows.Threading.DispatcherPriority]::Background)
+            $res = Invoke-RolloutItem -Item $it -Settings $Settings -Schedule $Schedule -RunId $RunId -AuditLogPath $script:DeploymentAuditLog -DryRun:$DryRun
+            Update-RolloutItemResult -Item $it -Result $res -DryRun:$DryRun
+            if (-not $DryRun -and $Run) { try { [void](Save-RolloutRun -Folder (Get-RolloutRunFolder) -Run $Run) } catch { Add-LogLine -Message 'The run file could not be written.' } }
+            Update-RolloutGrids
+            if ($res.Success) { $done++; Add-LogLine -Message ('Item {0} {1}: {2}' -f $it.Index, $(if ($DryRun) { 'dry run' } else { 'done' }), $(if ($it.Message) { $it.Message } else { $it.CollectionName })) }
+            else { Add-LogLine -Message ('Item {0} failed: {1}' -f $it.Index, $res.Error); break }
+        }
+    }
+    finally { $window.Cursor = $null }
+    return $done
+}
+
+function Invoke-RolloutStep1 {
+    $plan = $script:RolloutPlan
+    if (-not $plan -or -not $plan.TestOk) { Add-LogLine -Message 'Run Preview Plan first.'; return }
+    $dry = ($chkRoDryRun.IsChecked -eq $true)
+    $settings = $plan.Settings
+    $testSched = Get-RolloutSchedule -Stage Test -Settings $settings
+    $prodSched = Get-RolloutSchedule -Stage Prod -Settings $settings
+    $why = Test-RolloutSchedule -Schedule $testSched
+    if (-not $why) { $why = Test-RolloutSchedule -Schedule $prodSched }
+    if ($why) { [void](Show-ThemedMessage -Owner $window -Title 'Update Rollout' -Message $why -Buttons OK -Icon Error); return }
+    $testItems = @($plan.Items | Where-Object { $_.Stage -eq 'Test' })
+    $prodCount = @($plan.Items | Where-Object { $_.Stage -eq 'Prod' }).Count
+    $lines = foreach ($it in $testItems) { Format-RolloutPlanLine -Item $it -Schedule $testSched }
+    if (-not $dry) {
+        if (-not (Test-DeploymentAuditReady)) { return }
+        $msg = ("Step 1 creates {0} test deployment(s). {1} production item(s) wait for Step 2.`n`n{2}`n`nA run file with the full plan is saved in {3}.`n`nContinue?" -f $testItems.Count, $prodCount, ($lines -join "`n"), (Get-RolloutRunFolder))
+        $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm Step 1' -Message $msg -Buttons OKCancel -Icon Question
+        if ($confirm -ne 'OK') { Add-LogLine -Message 'Step 1 cancelled by user.'; return }
+    }
+    $runId = New-RolloutRunId
+    $run = [PSCustomObject]@{ RunId = $runId; Created = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'); State = 'Planned'; Settings = $settings; Items = @($plan.Items) }
+    Add-LogLine -Message ('Rollout run {0}: step 1, {1} item(s){2}.' -f $runId, $testItems.Count, $(if ($dry) { ', dry run' } else { '' }))
+    $done = Invoke-RolloutStepRun -Items $testItems -Settings $settings -Schedule $testSched -RunId $runId -DryRun $dry -Run $run
+    if ($dry) { Set-StatusText -Text 'Dry run finished. Nothing was created.'; return }
+    if ($done -eq $testItems.Count) { $run.State = 'TestDone' }
+    try { [void](Save-RolloutRun -Folder (Get-RolloutRunFolder) -Run $run) } catch { Add-LogLine -Message 'The run file could not be written.' }
+    $script:RolloutRun = $run
+    $script:RolloutPlan = $null
+    Update-RolloutRunCombo
+    Update-RolloutButtons
+    if ($done -eq $testItems.Count) {
+        Set-StatusText -Text ('Step 1 done: {0} test deployment(s). Check the results, then run Step 2.' -f $done)
+        [void](Show-ThemedMessage -Owner $window -Title 'Step 1 Done' -Message ("Created {0} of {0} test deployment(s). Run ID {1}.`n`nWhen the test is good, select Step 2: Create Production. The run is saved, so Step 2 can run later." -f $done, $runId) -Buttons OK -Icon Info)
+    }
+    else {
+        Set-StatusText -Text ('Step 1 stopped after {0} of {1} item(s).' -f $done, $testItems.Count)
+        [void](Show-ThemedMessage -Owner $window -Title 'Step 1 Stopped' -Message ("Step 1 stopped after {0} of {1} item(s). See the Details column and the log.`n`nStep 2 stays blocked until every test item is done." -f $done, $testItems.Count) -Buttons OK -Icon Error)
+    }
+}
+
+function Invoke-RolloutStep2 {
+    $run = $script:RolloutRun
+    if (-not $run) { Add-LogLine -Message 'Open a run first.'; return }
+    $pending = @(Get-RolloutProdItem -Run $run)
+    if ($pending.Count -eq 0) { Add-LogLine -Message 'No production item can run. Every test item must be done first.'; return }
+    $dry = ($chkRoDryRun.IsChecked -eq $true)
+    $settings = ConvertTo-RolloutSettings -Prefs $run.Settings
+    $sched = Get-RolloutSchedule -Stage Prod -Settings $settings
+    $why = Test-RolloutSchedule -Schedule $sched
+    if ($why) { [void](Show-ThemedMessage -Owner $window -Title 'Update Rollout' -Message $why -Buttons OK -Icon Error); return }
+    if (-not (Connect-IfNeeded)) { return }
+    $window.Cursor = [System.Windows.Input.Cursors]::Wait
+    $cache = @{}
+    $okAll = $true
+    try {
+        $n = 0
+        foreach ($it in $pending) {
+            $n++
+            Set-StatusText -Text ('Checking item {0} of {1}...' -f $n, $pending.Count)
+            $window.Dispatcher.Invoke([Action]{ }, [System.Windows.Threading.DispatcherPriority]::Background)
+            $r = Test-RolloutPlanOnSite -Items @($it) -Settings $settings -Cache $cache
+            if (-not $r.Ok) { $okAll = $false }
+        }
+    }
+    finally { $window.Cursor = $null }
+    Update-RolloutGrids
+    if (-not $okAll) {
+        $bad = @($pending | Where-Object { $_.Status -eq 'Blocked' } | ForEach-Object { '{0}: {1}' -f $_.CollectionName, $_.Message })
+        foreach ($b in $bad) { Add-LogLine -Message ('Blocked: ' + $b) }
+        [void](Show-ThemedMessage -Owner $window -Title 'Step 2 Blocked' -Message ("These items fail the checks. Nothing was created.`n" + (Format-RingMessageList $bad)) -Buttons OK -Icon Error)
+        Set-StatusText -Text 'Step 2 blocked by the checks.'
+        return
+    }
+    $lines = foreach ($it in $pending) { Format-RolloutPlanLine -Item $it -Schedule $sched }
+    if (-not $dry) {
+        if (-not (Test-DeploymentAuditReady)) { return }
+        $msg = ("Step 2 creates {0} production deployment(s) of run {1}:`n`n{2}`n`nContinue?" -f $pending.Count, $run.RunId, ($lines -join "`n"))
+        $confirm = Show-ThemedMessage -Owner $window -Title 'Confirm Step 2' -Message $msg -Buttons OKCancel -Icon Question
+        if ($confirm -ne 'OK') { Add-LogLine -Message 'Step 2 cancelled by user.'; return }
+    }
+    Add-LogLine -Message ('Rollout run {0}: step 2, {1} item(s){2}.' -f $run.RunId, $pending.Count, $(if ($dry) { ', dry run' } else { '' }))
+    $done = Invoke-RolloutStepRun -Items $pending -Settings $settings -Schedule $sched -RunId ([string]$run.RunId) -DryRun $dry -Run $run
+    if ($dry) { Set-StatusText -Text 'Dry run finished. Nothing was created.'; return }
+    if (@(Get-RolloutProdItem -Run $run).Count -eq 0 -and @($run.Items | Where-Object { $_.Stage -eq 'Prod' -and $_.Status -ne 'Done' }).Count -eq 0) { $run.State = 'Closed' }
+    try { [void](Save-RolloutRun -Folder (Get-RolloutRunFolder) -Run $run) } catch { Add-LogLine -Message 'The run file could not be written.' }
+    Update-RolloutRunCombo
+    Update-RolloutButtons
+    if ($done -eq $pending.Count) {
+        Set-StatusText -Text ('Step 2 done: {0} production deployment(s).' -f $done)
+        [void](Show-ThemedMessage -Owner $window -Title 'Step 2 Done' -Message ("Created {0} of {0} production deployment(s). Run ID {1}." -f $done, $run.RunId) -Buttons OK -Icon Info)
+    }
+    else {
+        Set-StatusText -Text ('Step 2 stopped after {0} of {1} item(s).' -f $done, $pending.Count)
+        [void](Show-ThemedMessage -Owner $window -Title 'Step 2 Stopped' -Message ("Step 2 stopped after {0} of {1} item(s). See the Details column and the log.`n`nThe created objects stay in Configuration Manager. Open the run again to continue." -f $done, $pending.Count) -Buttons OK -Icon Error)
+    }
+}
+
+$script:ShowRolloutView = {
+    $script:CurrentType = 'Rollout'
+    $formPane.Visibility         = [System.Windows.Visibility]::Collapsed
+    $ringPane.Visibility         = [System.Windows.Visibility]::Collapsed
+    $rolloutPane.Visibility      = [System.Windows.Visibility]::Visible
+    $pnlApplyTemplate.Visibility = [System.Windows.Visibility]::Collapsed
+    $txtModuleHeader.Text    = 'Update Rollout'
+    $txtModuleSubheader.Text = 'Make collections of devices below the new version, then deploy the new version: test first, then production.'
+    if (-not $script:RolloutViewInitialized) {
+        $script:RolloutViewInitialized = $true
+        Update-RolloutSettingsUi
+        Update-RolloutRunCombo
+        Update-RolloutButtons
+    }
+    Set-StatusText -Text 'Viewing Update Rollout.'
+}
+
+$btnRollout.Add_Click({ & $script:ShowRolloutView })
+
+foreach ($tb in @($txtRoTemplate, $txtRoFolder, $txtRoLimitServer, $txtRoLimitWorkstation, $txtRoLimitTest, $txtRoTestCollection, $txtRoRefresh, $txtRoDelay, $txtRoTestDeadline, $txtRoProdDeadline)) {
+    $tb.Add_LostFocus({ Save-RolloutSettingsFromUi })
+    $tb.Add_TextChanged({ if (-not $script:RolloutSuppress) { Reset-RolloutPlan } })
+}
+$cboRoNotification.Add_SelectionChanged({ if (-not $script:RolloutSuppress) { Save-RolloutSettingsFromUi; Reset-RolloutPlan } })
+$dgRoRows.Add_CellEditEnding({ if (-not $script:RolloutSuppress) { Reset-RolloutPlan } })
+
+$btnRoAdd.Add_Click({
+    if (-not (Connect-IfNeeded)) { return }
+    $picked = Show-RolloutAppDialog -Owner $window
+    if (-not $picked) { return }
+    $s = (Get-RolloutSettingsFromUi).Settings
+    $rows = foreach ($a in @($picked)) {
+        $ver = [string]$a.SoftwareVersion
+        $new = if ($null -ne (ConvertTo-RolloutVersionPart -Version $ver)) { $ver } else { '' }
+        New-RolloutRow -Application ([string]$a.LocalizedDisplayName) -NewVersion $new -Role ([string]$s.RolloutDefaultRole) -CurrentVersion $ver
+    }
+    $n = Add-RolloutRowSet -Rows @($rows)
+    Add-LogLine -Message ('Added {0} application(s). Check the new versions and the software names.' -f $n)
+    Set-StatusText -Text ('{0} application(s) added.' -f $n)
+})
+
+$btnRoImport.Add_Click({
+    $text = Show-RolloutImportDialog -Owner $window
+    if ($null -eq $text) { return }
+    $s = (Get-RolloutSettingsFromUi).Settings
+    $r = ConvertFrom-RolloutList -Text $text -DefaultRole ([string]$s.RolloutDefaultRole)
+    foreach ($e in $r.Errors) { Add-LogLine -Message ('Import: ' + $e) }
+    $n = Add-RolloutRowSet -Rows @($r.Rows)
+    Add-LogLine -Message ('Imported {0} row(s); {1} line(s) refused.' -f $n, @($r.Errors).Count)
+    if (@($r.Errors).Count -gt 0) {
+        [void](Show-ThemedMessage -Owner $window -Title 'Import List' -Message ("Imported {0} row(s). These lines were refused:`n{1}" -f $n, (Format-RingMessageList $r.Errors)) -Buttons OK -Icon Warn)
+    }
+    Set-StatusText -Text ('{0} row(s) imported.' -f $n)
+})
+
+$btnRoRemove.Add_Click({
+    $sel = @($dgRoRows.SelectedItems)
+    foreach ($r in $sel) { [void]$script:RolloutRows.Remove($r) }
+    Update-RolloutGrids
+    Reset-RolloutPlan
+    Set-StatusText -Text ('{0} row(s) removed.' -f $sel.Count)
+})
+
+$btnRoLookup.Add_Click({
+    $targets = @($dgRoRows.SelectedItems)
+    if ($targets.Count -eq 0) { $targets = @(Get-RolloutInputRow) }
+    if ($targets.Count -eq 0) { Add-LogLine -Message 'Add applications first.'; return }
+    if (-not (Connect-IfNeeded)) { return }
+    $window.Cursor = [System.Windows.Input.Cursors]::Wait
+    try {
+        foreach ($r in $targets) {
+            Set-StatusText -Text ('Looking up {0}...' -f $r.Application)
+            $window.Dispatcher.Invoke([Action]{ }, [System.Windows.Threading.DispatcherPriority]::Background)
+            $code = Get-RolloutApplicationProductCode -ApplicationName $r.Application
+            $sug = Get-RolloutSoftwareNameSuggestion -ApplicationName $r.Application -ProductCode $code
+            $r.SoftwareName = [string]$sug.Name
+            Add-LogLine -Message ("Software name of '{0}': {1} (from {2})." -f $r.Application, $sug.Name, $sug.Source.ToLowerInvariant())
+        }
+    }
+    finally { $window.Cursor = $null }
+    Update-RolloutGrids
+    Reset-RolloutPlan
+    Set-StatusText -Text 'Software names read. Check them before you preview the plan.'
+})
+
+$btnRoPreview.Add_Click({ Invoke-RolloutPreview })
+$btnRoStep1.Add_Click({ Invoke-RolloutStep1 })
+$btnRoStep2.Add_Click({ Invoke-RolloutStep2 })
+
+$btnRoOpenRun.Add_Click({
+    $i = $cboRoRuns.SelectedIndex
+    if ($i -lt 0 -or $i -ge @($script:RolloutRunFiles).Count) { Add-LogLine -Message 'No saved run to open.'; return }
+    try { $run = Read-RolloutRun -Path ([string]$script:RolloutRunFiles[$i].Path) }
+    catch { Add-LogLine -Message (Get-UserErrorText -ErrorRecord $_ -Fallback 'The run file could not be read.'); return }
+    $script:RolloutRun = $run
+    $script:RolloutPlan = $null
+    $script:RolloutPlanRows.Clear()
+    foreach ($it in $run.Items) { $script:RolloutPlanRows.Add($it) }
+    Update-RolloutGrids
+    Update-RolloutButtons
+    Add-LogLine -Message ('Opened run {0}.' -f $run.RunId)
+    Set-StatusText -Text ('Run {0} opened.' -f $run.RunId)
 })
 
 # =============================================================================
@@ -4381,6 +5074,10 @@ $window.Add_Loaded({
     if ($script:SavedType -eq 'Rings') {
         & $script:SetCurrentType 'Apps'
         & $script:ShowRingView
+    }
+    elseif ($script:SavedType -eq 'Rollout') {
+        & $script:SetCurrentType 'Apps'
+        & $script:ShowRolloutView
     }
     elseif ($script:TypeMeta.ContainsKey($script:SavedType)) {
         & $script:SetCurrentType $script:SavedType

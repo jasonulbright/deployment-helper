@@ -26,7 +26,13 @@ $script:CMStubParameters = @{
     'Get-CMPackageDeployment'        = @('DeploymentId', 'PackageId', 'ProgramName', 'CollectionName', 'Summary', 'DisableWildcardHandling')
     'Get-CMTaskSequenceDeployment'   = @('DeploymentId', 'TaskSequenceId', 'CollectionName', 'Fast', 'Summary', 'DisableWildcardHandling')
     'Get-CMUpdateGroupDeployment'    = @('DeploymentId', 'Name', 'CollectionName', 'Summary', 'DisableWildcardHandling')
-    'New-CMSchedule'                 = @('Start', 'Nonrecurring', 'IsUtc')
+    'New-CMSchedule'                 = @('Start', 'Nonrecurring', 'IsUtc', 'RecurInterval', 'RecurCount')
+    'New-CMDeviceCollection'         = @('Name', 'LimitingCollectionId', 'RefreshType', 'RefreshSchedule', 'Comment')
+    'Add-CMDeviceCollectionQueryMembershipRule' = @('CollectionId', 'RuleName', 'QueryExpression')
+    'Move-CMObject'                  = @('FolderPath', 'InputObject')
+    'Invoke-CMCollectionUpdate'      = @('CollectionId')
+    'Remove-CMCollection'            = @('Id', 'Force')
+    'Get-CMDeploymentType'           = @('ApplicationName')
     'New-CMApplicationDeployment'    = @('Name', 'CollectionName', 'DeployPurpose', 'DeployAction', 'AvailableDateTime',
                                          'DeadlineDateTime', 'TimeBaseOn', 'UserNotification', 'OverrideServiceWindow',
                                          'RebootOutsideServiceWindow', 'UseMeteredNetwork')
@@ -43,7 +49,7 @@ $script:CMStubParameters = @{
                                          'UseUtcForExpireSchedule', 'SoftwareInstallation', 'SystemRestart', 'UseMeteredNetwork')
 }
 
-$script:CMStubSwitches = @('Summary', 'Fast', 'Nonrecurring', 'IsUtc', 'StandardProgram', 'DisableWildcardHandling')
+$script:CMStubSwitches = @('Summary', 'Fast', 'Nonrecurring', 'IsUtc', 'StandardProgram', 'DisableWildcardHandling', 'Force')
 
 function Set-CMTestStub {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Defines test stub functions in the test session.')]

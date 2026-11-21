@@ -22,9 +22,10 @@ None.
 | `DeploymentHelper.windowstate.json` | The size, the place, the theme and the last used type. | You close the window. |
 | `Logs\DeploymentHelper-<yyyyMMdd-HHmmss>.log` | The log of one session. | During the session. |
 | `Logs\DeploymentHelper-startup-<yyyyMMdd-HHmmss>.txt` | The PowerShell transcript of the start. | At the start. |
-| `Logs\deployment-audit.jsonl` | The audit trail. One record for each deployment attempt. Append-only. | You confirm a deployment, or a ring is created. |
+| `Logs\deployment-audit.jsonl` | The audit trail. One record for each deployment attempt. Append-only. | You confirm a deployment, a ring is created, or an update rollout creates a collection or a deployment. |
 | `Templates\*.json` | The deployment templates. Four are written at the first start. | You save a template in Options. |
 | `Rings\*.json` | The ring plans. Two are written at the first start. | You edit a plan file. |
+| `Rollouts\Rollout-<run ID>.json` | The run plan of an update rollout with the status of every item. | Step 1 and every item of a step. |
 | `Rings\runs\*.json` | The run state of held ring runs. `closed\` holds finished runs. | A held ring run changes. |
 | The file that you save in the Save As dialog (CSV or HTML) | The history export. The dialog starts in `Reports`, and you can choose another folder. | **Export CSV...** or **Export HTML...** in Options. |
 

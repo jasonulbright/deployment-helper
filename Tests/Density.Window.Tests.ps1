@@ -44,7 +44,7 @@ BeforeAll {
                 Initialize-ShellTheme -Window $w -Dark $Arguments.Dark -WorkflowButtonNames $cfg.WorkflowButtons -OptionsButtonNames $cfg.OptionsButtons -LogLabelName $cfg.LogLabel
                 Wait-Layout $w
                 $sidebar = @(foreach ($n in @($cfg.WorkflowButtons) + @($cfg.OptionsButtons)) { $b = $w.FindName($n); $p = $b.TransformToAncestor($w).Transform([System.Windows.Point]::new(0, 0)); [pscustomobject]@{ Name = $n; Top = $p.Y; Bottom = $p.Y + $b.ActualHeight; Height = $b.ActualHeight } })
-                $views = @(foreach ($view in @(@{ Name = 'Deployment'; Show = $cfg.FormPane; Hide = $cfg.RingPane }, @{ Name = 'Ring Deployment'; Show = $cfg.RingPane; Hide = $cfg.FormPane })) {
+                $views = @(foreach ($view in @(@{ Name = 'Deployment'; Show = $cfg.FormPane; Hide = $cfg.RingPane }, @{ Name = 'Ring Deployment'; Show = $cfg.RingPane; Hide = $cfg.FormPane }, @{ Name = 'Update Rollout'; Show = $cfg.RolloutPane; Hide = $cfg.RingPane })) {
                         $w.FindName($view.Show).Visibility = 'Visible'; $w.FindName($view.Hide).Visibility = 'Collapsed'
                         Wait-Layout $w
                         $pane = $w.FindName($view.Show)

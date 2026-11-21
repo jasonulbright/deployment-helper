@@ -60,7 +60,7 @@ BeforeAll {
                     $w = Open-TestWindow -XamlPath (Join-Path $Root $cfg.Xaml) -Dark $Arguments.Dark -Width $Arguments.W -Height $Arguments.H
                     Initialize-ShellTheme -Window $w -Dark $Arguments.Dark -WorkflowButtonNames $cfg.WorkflowButtons -OptionsButtonNames $cfg.OptionsButtons -LogLabelName $cfg.LogLabel
                     $out = @()
-                    foreach ($view in @(@{ Name = 'Deployment'; Show = $cfg.FormPane; Hide = $cfg.RingPane }, @{ Name = 'Ring Deployment'; Show = $cfg.RingPane; Hide = $cfg.FormPane })) {
+                    foreach ($view in @(@{ Name = 'Deployment'; Show = $cfg.FormPane; Hide = $cfg.RingPane }, @{ Name = 'Ring Deployment'; Show = $cfg.RingPane; Hide = $cfg.FormPane }, @{ Name = 'Update Rollout'; Show = $cfg.RolloutPane; Hide = $cfg.RingPane })) {
                         $w.FindName($view.Show).Visibility = 'Visible'; $w.FindName($view.Hide).Visibility = 'Collapsed'
                         Wait-Layout $w
                         # The start script caps the height of the view row, so that a small window scrolls the view and keeps the log box (UpdateViewMax). The XAML alone has no cap, so the test applies the same one.

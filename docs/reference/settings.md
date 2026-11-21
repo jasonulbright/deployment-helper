@@ -22,6 +22,10 @@ None.
 | `SMSProvider` | **SMS Provider** | Empty. |
 | `DeploymentAuditLogPath` | **Deployment Audit Log (JSONL)** | `Logs\deployment-audit.jsonl` beside the script. |
 | `RingRunStatePath` | **Ring Run-State Folder** | `Rings\runs` beside the script. |
+| `RolloutRunPath` | The folder of the update rollout run files. | `Rollouts` beside the script. |
+| `RolloutNameTemplate`, `RolloutFolder` | **Name Template** and **Folder** of the Update Rollout view. | `{App} - {Role} - Installed - Version LT {Version}`, empty. |
+| `RolloutLimitingServer`, `RolloutLimitingWorkstation`, `RolloutLimitingTest`, `RolloutTestCollection` | The limiting collections and the test collection of the Update Rollout view. | `All Systems` for the three limits, empty test collection. |
+| `RolloutRefreshDays`, `RolloutAvailableDelayHours`, `RolloutTestDeadlineHours`, `RolloutProdDeadlineHours`, `RolloutNotification`, `RolloutDefaultRole` | The refresh, the times, the notification and the default role of the Update Rollout view. | 1, 0, 24, 72, `DisplayAll`, `Both`. |
 
 `DeploymentHelper.windowstate.json` keeps the size, the place, the theme and the last used deployment type. A non-empty command line parameter `-SiteCode` or `-SMSProvider` overrides the saved value at the start. When you then select **OK** in Options, the tool saves the current values, including the overrides, to `DeploymentHelper.prefs.json`.
 

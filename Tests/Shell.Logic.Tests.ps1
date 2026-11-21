@@ -17,7 +17,7 @@ BeforeAll {
         'Test-DeploymentNotification', 'Test-DeploymentSchedule',
         'Get-DPGroupsLoaded', 'Update-DPPickerButtonLabel', 'Get-CurrentDistributionTarget', 'Get-CurrentDistributionType',
         'Get-RingSelectedType', 'Get-RingSelectedPlan', 'Format-RingDate', 'Reset-RingValidation',
-        'Format-RingMessageList', 'Format-RingLine', 'Get-RingRecordedId'
+        'Format-RingMessageList', 'Format-RingLine', 'Get-RingRecordedId', 'Format-RolloutPlanLine'
     foreach ($n in $wanted) {
         $def = $script:Ast.Find({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $x.Name -eq $n }, $true)
         if (-not $def) { throw "function $n not found in the script" }
@@ -612,5 +612,23 @@ Describe 'Preferences file' {
 
     It 'keeps the window state file beside the script' {
         Get-WindowStatePath | Should -BeLike '*\DeploymentHelper.windowstate.json'
+    }
+}
+
+Describe 'Format-RolloutPlanLine' {
+    BeforeAll { $script:Sched = @{ Available = [datetime]'2026-11-21T08:00:00'; Deadline = [datetime]'2026-11-24T08:00:00' } }
+
+    It 'says that a new collection is created, with the members and the times' {
+        $item = [PSCustomObject]@{ Application = '7-Zip'; Version = '26.06'; CollectionName = '7-Zip - Server - Installed - Version LT 26.06'; Exists = $false; MemberCount = 12 }
+        $text = Format-RolloutPlanLine -Item $item -Schedule $script:Sched
+        $text | Should -Match '7-Zip 26.06 -> 7-Zip - Server - Installed - Version LT 26.06'
+        $text | Should -Match 'create the collection, 12 member\(s\)'
+        $text | Should -Match 'available 2026-11-21 08:00, deadline 2026-11-24 08:00'
+    }
+
+    It 'says that an existing collection is reused and that uncounted members are not counted' {
+        $item = [PSCustomObject]@{ Application = 'A'; Version = '2'; CollectionName = 'Test PCs'; Exists = $true; MemberCount = $null }
+        $text = Format-RolloutPlanLine -Item $item -Schedule $script:Sched
+        $text | Should -Match 'reuse the existing collection, members not counted'
     }
 }

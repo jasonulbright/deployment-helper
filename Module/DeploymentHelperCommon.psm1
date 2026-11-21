@@ -160,7 +160,7 @@ function Get-CMBrowseList {
     #>
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('Apps', 'Packages', 'TaskSequences', 'SUG', 'Collections')]
+        [ValidateSet('Apps', 'Packages', 'TaskSequences', 'SUG', 'Collections', 'RolloutApps')]
         [string]$Type
     )
 
@@ -172,6 +172,9 @@ function Get-CMBrowseList {
             @(Get-CMApplication -Fast -ErrorAction Stop |
                 Select-Object LocalizedDisplayName, SoftwareVersion, CI_ID, DateLastModified |
                 Sort-Object LocalizedDisplayName)
+        }
+        'RolloutApps' {
+            @(Get-RolloutApplicationList | ForEach-Object { $_ } | Select-Object LocalizedDisplayName, SoftwareVersion, CIVersion, DateLastModified, CI_ID)
         }
         'Packages' {
             @(Get-CMPackage -Fast -ErrorAction Stop |
@@ -3035,4 +3038,987 @@ function Test-RingPreflight {
         ObjectMessage = if ($objectMessage) { $objectMessage } else { $contentMessage }
         Rings         = $ringResults
     }
+}
+
+# ---------------------------------------------------------------------------
+# Update rollout
+#
+# One row names an application, the new version (XXX) and the name of the installed software. The rollout makes
+# device collections named by a template, for example 'App - Server - Installed - Version LT XXX', whose query
+# lists the devices that have the software installed with a version below XXX, and one Required deployment of the
+# new application to each collection. Step 1 deploys to a test target. Step 2 creates the production collections
+# and their deployments. The run plan (every object, with its query) is written to a run file at Step 1, so
+# that Step 2 can run days later. Nothing outside the objects of the run plan is created, changed or removed.
+# ---------------------------------------------------------------------------
+
+$script:RolloutRoles          = @('Server', 'Workstation', 'Both')
+$script:RolloutDefaultName    = '{App} - {Role} - Installed - Version LT {Version}'
+$script:RolloutRuleName       = 'Installed version below'
+$script:RolloutPlanName       = 'Update rollout'
+$script:RolloutArpClasses     = @('SMS_G_System_ADD_REMOVE_PROGRAMS', 'SMS_G_System_ADD_REMOVE_PROGRAMS_64')
+$script:RolloutNotification   = @('DisplayAll', 'DisplaySoftwareCenterOnly', 'HideAll')
+$script:RolloutNameMaxLength  = 255
+
+# ---- Versions and the query ------------------------------------------------
+
+function ConvertTo-RolloutVersionPart {
+    <#
+    .SYNOPSIS
+        Splits a dotted version into its numeric components, or returns $null when the text is not a plain dotted version.
+    .DESCRIPTION
+        Accepts one to six components of digits, with an optional leading v. Leading zeros of a component are dropped.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Version)
+    $text = ([string]$Version).Trim()
+    if ($text -match '^[vV](?=\d)') { $text = $text.Substring(1) }
+    if ($text -notmatch '^\d{1,9}(\.\d{1,9}){0,5}$') { return $null }
+    # The comma keeps a one-component version an array; a bare return would unroll it to a string.
+    return ,@($text.Split('.') | ForEach-Object { [string][decimal]$_ })
+}
+
+function Compare-RolloutVersion {
+    <#
+    .SYNOPSIS
+        Compares two dotted versions by number, component by component. A missing component counts as 0.
+        Returns -1, 0 or 1.
+    #>
+    param([Parameter(Mandatory)][string]$Left, [Parameter(Mandatory)][string]$Right)
+    $l = ConvertTo-RolloutVersionPart -Version $Left
+    $r = ConvertTo-RolloutVersionPart -Version $Right
+    if ($null -eq $l) { throw ("Version '{0}' is not a dotted number such as 24.8 or 1.2.3.4." -f $Left) }
+    if ($null -eq $r) { throw ("Version '{0}' is not a dotted number such as 24.8 or 1.2.3.4." -f $Right) }
+    $n = [Math]::Max($l.Count, $r.Count)
+    for ($i = 0; $i -lt $n; $i++) {
+        $a = if ($i -lt $l.Count) { [decimal]$l[$i] } else { [decimal]0 }
+        $b = if ($i -lt $r.Count) { [decimal]$r[$i] } else { [decimal]0 }
+        if ($a -lt $b) { return -1 }
+        if ($a -gt $b) { return 1 }
+    }
+    return 0
+}
+
+function Get-RolloutDigitClass {
+    param([int]$Low, [int]$High)
+    if ($Low -eq $High) { return [string]$Low }
+    return ('[{0}-{1}]' -f $Low, $High)
+}
+
+function Get-RolloutBelowPattern {
+    <#
+    .SYNOPSIS
+        Returns the LIKE patterns (without a terminator) of every whole number below one component. A whole number is
+        written without leading zeros. The patterns use the character ranges that the LIKE operator of WQL supports.
+    #>
+    param([Parameter(Mandatory)][string]$Component)
+    $digits = $Component.Length
+    $out = New-Object System.Collections.Generic.List[string]
+    for ($len = 1; $len -lt $digits; $len++) {
+        if ($len -eq 1) { $out.Add('[0-9]') } else { $out.Add('[1-9]' + ('[0-9]' * ($len - 1))) }
+    }
+    for ($p = 1; $p -le $digits; $p++) {
+        $digit = [int][string]$Component[$p - 1]
+        $low = if ($p -eq 1 -and $digits -gt 1) { 1 } else { 0 }
+        $high = $digit - 1
+        if ($high -lt $low) { continue }
+        $out.Add($Component.Substring(0, $p - 1) + (Get-RolloutDigitClass -Low $low -High $high) + ('[0-9]' * ($digits - $p)))
+    }
+    return $out.ToArray()
+}
+
+function Get-RolloutPrefixForm {
+    <#
+    .SYNOPSIS
+        Returns every way that the first components of a version can be written when a component may carry one
+        leading zero (7-Zip writes 26.03.00.0 for 26.3). Each form ends with a dot unless -NoTrailingDot is set.
+    #>
+    param([Parameter(Mandatory)][string[]]$Part, [switch]$NoTrailingDot)
+    $forms = New-Object System.Collections.Generic.List[string]
+    $forms.Add('')
+    foreach ($component in $Part) {
+        $next = New-Object System.Collections.Generic.List[string]
+        foreach ($f in $forms) {
+            $lead = $(if ($f.Length -eq 0) { '' } else { $f + '.' })
+            $next.Add($lead + $component)
+            $next.Add($lead + '0' + $component)
+        }
+        $forms = $next
+    }
+    if ($NoTrailingDot) { return $forms.ToArray() }
+    return @($forms | ForEach-Object { $_ + '.' })
+}
+
+function Get-RolloutVersionLikeClause {
+    <#
+    .SYNOPSIS
+        Returns the LIKE patterns that match every version text below the given version.
+    .DESCRIPTION
+        WQL compares strings, not versions: '9.0' < '10.0' is false for a string compare. This function builds the
+        numeric compare with LIKE patterns. A version text is below V when its first different component is smaller
+        than the component of V, or when it ends early and the rest of V is not all zero. A component below N is a
+        number with fewer digits, or a number with the same digits whose first different digit is smaller.
+        A component may carry leading zeros: one in the components that must equal a component of V, up to two in the
+        component that is smaller (26.03.00.0 is read as 26.3.0.0).
+        Limits: the components up to the first difference must be digits (a text such as 2024a or v1.2 never matches),
+        the text after that component is not read (1.2.3-beta is below 30.0 because 1 is below 30), and a component
+        with more leading zeros than above is not matched. Compare-RolloutVersion defines the order that these
+        patterns reproduce; the tests check the two against each other.
+    #>
+    param([Parameter(Mandatory)][string]$Version)
+    $parts = ConvertTo-RolloutVersionPart -Version $Version
+    if ($null -eq $parts) { throw ("Version '{0}' is not a dotted number such as 24.8 or 1.2.3.4." -f $Version) }
+    $n = $parts.Count
+    $clauses = New-Object System.Collections.Generic.List[string]
+    for ($i = 0; $i -lt $n; $i++) {
+        $prefixes = @('')
+        if ($i -gt 0) { $prefixes = @(Get-RolloutPrefixForm -Part @($parts[0..($i - 1)])) }
+        foreach ($prefix in $prefixes) {
+            foreach ($p in (Get-RolloutBelowPattern -Component $parts[$i])) {
+                foreach ($zeros in '', '0', '00') {
+                    $clauses.Add($prefix + $zeros + $p)
+                    $clauses.Add($prefix + $zeros + $p + '.%')
+                }
+            }
+        }
+    }
+    for ($m = 1; $m -lt $n; $m++) {
+        $rest = @($parts[$m..($n - 1)])
+        if (@($rest | Where-Object { $_ -ne '0' }).Count -gt 0) { foreach ($f in (Get-RolloutPrefixForm -Part @($parts[0..($m - 1)]) -NoTrailingDot)) { $clauses.Add($f) } }
+    }
+    $unique = @($clauses | Select-Object -Unique)
+    if ($unique.Count -gt 3000) { throw ("Version '{0}' has too many parts for one query." -f $Version) }
+    return $unique
+}
+
+function ConvertTo-RolloutLikeText {
+    <#
+    .SYNOPSIS
+        Escapes a text for the inside of a WQL string that a LIKE operator reads: the quote, and the characters
+        that LIKE treats as wildcards.
+    #>
+    param([AllowEmptyString()][string]$Text)
+    $t = [string]$Text
+    $t = $t.Replace('[', '[[]').Replace('%', '[%]').Replace('_', '[_]')
+    return $t.Replace("'", "''")
+}
+
+function New-RolloutQuery {
+    <#
+    .SYNOPSIS
+        Builds the WQL query of a rollout collection: the devices with software installed (ADD_REMOVE_PROGRAMS and
+        the 64-bit class) whose display name contains the software name and whose version is below the new version.
+    .DESCRIPTION
+        -LimitingCollectionId adds the limiting collection to the query. Only the member count preview uses it; a
+        collection takes its limit from its own limiting collection.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Builds a query text in memory.')]
+    param(
+        [Parameter(Mandatory)][string]$SoftwareName,
+        [Parameter(Mandatory)][string]$Version,
+        [string]$LimitingCollectionId
+    )
+    $name = ([string]$SoftwareName).Trim()
+    if ($name.Length -eq 0) { throw 'The name of the installed software is empty.' }
+    $clauses = @(Get-RolloutVersionLikeClause -Version $Version)
+    $like = ConvertTo-RolloutLikeText -Text $name
+    $subs = foreach ($class in $script:RolloutArpClasses) {
+        $ver = ($clauses | ForEach-Object { "{0}.Version like '{1}'" -f $class, $_ }) -join ' or '
+        "SMS_R_System.ResourceId in (select {0}.ResourceID from {0} where {0}.DisplayName like '%{1}%' and ({2}))" -f $class, $like, $ver
+    }
+    $where = '(' + ($subs -join ' or ') + ')'
+    if ($LimitingCollectionId) {
+        if ($LimitingCollectionId -notmatch '^[A-Za-z0-9]{8}$') { throw 'The limiting collection ID is not valid.' }
+        $where += (" and SMS_R_System.ResourceId in (select ResourceID from SMS_CM_RES_COLL_{0})" -f $LimitingCollectionId.ToUpperInvariant())
+    }
+    return ('select SMS_R_System.ResourceID,SMS_R_System.ResourceType,SMS_R_System.Name,SMS_R_System.SMSUniqueIdentifier,SMS_R_System.ResourceDomainORWorkgroup,SMS_R_System.Client from SMS_R_System where ' + $where)
+}
+
+# ---- Names and settings ----------------------------------------------------
+
+function Expand-RolloutName {
+    <#
+    .SYNOPSIS
+        Fills the collection name template: {App}, {Role} and {Version}.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Template,
+        [Parameter(Mandatory)][string]$Application,
+        [Parameter(Mandatory)][string]$Role,
+        [Parameter(Mandatory)][string]$Version
+    )
+    $name = $Template
+    $name = [regex]::Replace($name, '\{App\}', { param($m) $Application }, 'IgnoreCase')
+    $name = [regex]::Replace($name, '\{Role\}', { param($m) $Role }, 'IgnoreCase')
+    $name = [regex]::Replace($name, '\{Version\}', { param($m) $Version }, 'IgnoreCase')
+    return $name.Trim()
+}
+
+function Test-RolloutName {
+    <#
+    .SYNOPSIS
+        Returns the reason that a collection name is not usable, or an empty string when it is.
+    #>
+    param([AllowEmptyString()][string]$Name)
+    $n = [string]$Name
+    if ($n.Trim().Length -eq 0) { return 'The collection name is empty.' }
+    if ($n -match '\{[A-Za-z]*\}') { return ("The collection name '{0}' still has a placeholder. Use {{App}}, {{Role}} and {{Version}}." -f $n) }
+    if ($n.Length -gt $script:RolloutNameMaxLength) { return ("The collection name is longer than {0} characters." -f $script:RolloutNameMaxLength) }
+    if ($n -match '[\x00-\x1F]') { return 'The collection name has a control character.' }
+    return ''
+}
+
+function Get-RolloutSettingDefault {
+    <#
+    .SYNOPSIS
+        Returns the default of every rollout setting. The window keeps the values in the preferences file.
+    #>
+    return @{
+        RolloutNameTemplate          = $script:RolloutDefaultName
+        RolloutLimitingServer        = 'All Systems'
+        RolloutLimitingWorkstation   = 'All Systems'
+        RolloutLimitingTest          = 'All Systems'
+        RolloutTestCollection        = ''
+        RolloutDefaultRole           = 'Both'
+        RolloutFolder                = ''
+        RolloutRefreshDays           = 1
+        RolloutAvailableDelayHours   = 0
+        RolloutTestDeadlineHours     = 24
+        RolloutProdDeadlineHours     = 72
+        RolloutNotification          = 'DisplayAll'
+        RolloutRunPath               = ''
+    }
+}
+
+function ConvertTo-RolloutSettings {
+    <#
+    .SYNOPSIS
+        Reads the rollout settings from a preferences table. A missing or invalid value takes its default.
+    #>
+    param($Prefs = @{})
+    $s = Get-RolloutSettingDefault
+    if ($Prefs -isnot [System.Collections.IDictionary]) {
+        $table = @{}
+        if ($null -ne $Prefs) { foreach ($pp in $Prefs.PSObject.Properties) { $table[$pp.Name] = $pp.Value } }
+        $Prefs = $table
+    }
+    foreach ($k in @($s.Keys)) {
+        if (-not $Prefs.Contains($k)) { continue }
+        $v = $Prefs[$k]
+        if ($null -eq $v) { continue }
+        if ($s[$k] -is [int]) {
+            $i = 0
+            if ([int]::TryParse(([string]$v), [ref]$i) -and $i -ge 0 -and $i -le 8760) { $s[$k] = $i }
+        }
+        else {
+            $s[$k] = ([string]$v).Trim()
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($s.RolloutNameTemplate)) { $s.RolloutNameTemplate = $script:RolloutDefaultName }
+    if ($s.RolloutDefaultRole -notin $script:RolloutRoles) { $s.RolloutDefaultRole = 'Both' }
+    if ($s.RolloutNotification -notin $script:RolloutNotification) { $s.RolloutNotification = 'DisplayAll' }
+    return $s
+}
+
+# ---- Rows: input, import ---------------------------------------------------
+
+function ConvertTo-RolloutRole {
+    param([AllowEmptyString()][AllowNull()][string]$Text, [string]$Default = 'Both')
+    $t = ([string]$Text).Trim()
+    if ($t.Length -eq 0) { return $Default }
+    switch -Regex ($t) {
+        '^(?i)servers?$'                          { return 'Server' }
+        '^(?i)(workstations?|clients?|desktops?)$' { return 'Workstation' }
+        '^(?i)(both|all|server/workstation|workstation/server)$' { return 'Both' }
+    }
+    return $null
+}
+
+function New-RolloutRow {
+    <#
+    .SYNOPSIS
+        Makes one input row of the rollout grid.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Builds an object in memory.')]
+    param(
+        [Parameter(Mandatory)][string]$Application,
+        [string]$NewVersion = '',
+        [string]$SoftwareName = '',
+        [string]$Role = 'Both',
+        [string]$TestCollection = '',
+        [string]$CurrentVersion = ''
+    )
+    return [PSCustomObject]@{
+        Application    = $Application.Trim()
+        NewVersion     = $NewVersion.Trim()
+        SoftwareName   = $SoftwareName.Trim()
+        Role           = $Role
+        TestCollection = $TestCollection.Trim()
+        CurrentVersion = $CurrentVersion.Trim()
+    }
+}
+
+function ConvertFrom-RolloutList {
+    <#
+    .SYNOPSIS
+        Reads a pasted list or a CSV text into rollout rows.
+    .DESCRIPTION
+        With a header line (Application, NewVersion, optional InstalledSoftwareName, Role, TestCollection), the text is a CSV
+        with a comma, a semicolon or a tab. Without a header, every line is 'Application, Version' with one of those
+        separators, or 'Application Version' with a space. Returns Rows and Errors (one text per refused line).
+    #>
+    param([AllowEmptyString()][string]$Text, [string]$DefaultRole = 'Both')
+    $rows = New-Object System.Collections.Generic.List[object]
+    $errors = New-Object System.Collections.Generic.List[string]
+    $lines = @(([string]$Text) -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 })
+    if ($lines.Count -eq 0) { return @{ Rows = @(); Errors = @('The list is empty.') } }
+    $delim = ','
+    foreach ($d in "`t", ';', ',') { if ($lines[0].Contains($d)) { $delim = $d; break } }
+    $first = @($lines[0].Split($delim) | ForEach-Object { $_.Trim().Trim('"') })
+    $hasHeader = ($first -contains 'Application') -or ($first -contains 'App') -or ($first -contains 'Name')
+    if ($hasHeader) {
+        $names = @{}
+        for ($i = 0; $i -lt $first.Count; $i++) { $names[$first[$i].ToLowerInvariant()] = $i }
+        $col = {
+            param($keys)
+            foreach ($k in $keys) { if ($names.ContainsKey($k)) { return $names[$k] } }
+            return -1
+        }
+        $iApp = & $col @('application', 'app', 'name')
+        $iVer = & $col @('newversion', 'version', 'new version')
+        $iSw  = & $col @('installedsoftwarename', 'installed software name', 'softwarename', 'displayname', 'installedsoftware')
+        $iRole = & $col @('role')
+        $iTest = & $col @('testcollection', 'test collection')
+        if ($iVer -lt 0) { return @{ Rows = @(); Errors = @('The header has no NewVersion column.') } }
+        $number = 1
+        foreach ($line in @($lines | Select-Object -Skip 1)) {
+            $number++
+            $f = @($line.Split($delim) | ForEach-Object { $_.Trim().Trim('"') })
+            $get = { param($i) if ($i -ge 0 -and $i -lt $f.Count) { return $f[$i] }; return '' }
+            $app = & $get $iApp
+            $ver = & $get $iVer
+            $roleText = & $get $iRole
+            $role = ConvertTo-RolloutRole -Text $roleText -Default $DefaultRole
+            if (-not $app) { $errors.Add(('Line {0}: the application name is empty.' -f $number)); continue }
+            if ($null -eq (ConvertTo-RolloutVersionPart -Version $ver)) { $errors.Add(('Line {0}: version ''{1}'' is not a dotted number.' -f $number, $ver)); continue }
+            if (-not $role) { $errors.Add(('Line {0}: role ''{1}'' is not Server, Workstation or Both.' -f $number, $roleText)); continue }
+            $rows.Add((New-RolloutRow -Application $app -NewVersion $ver -SoftwareName (& $get $iSw) -Role $role -TestCollection (& $get $iTest)))
+        }
+        return @{ Rows = $rows.ToArray(); Errors = $errors.ToArray() }
+    }
+    $number = 0
+    foreach ($line in $lines) {
+        $number++
+        $app = ''; $ver = ''
+        $lineDelim = $delim
+        foreach ($d in "`t", ';', ',') { if ($line.Contains($d)) { $lineDelim = $d; break } }
+        $parts = @($line.Split($lineDelim) | ForEach-Object { $_.Trim().Trim('"') })
+        if ($parts.Count -ge 2) { $app = $parts[0]; $ver = $parts[1] }
+        elseif ($line.Trim() -match '^(.*\S)\s+[vV]?(\d+(\.\d+)*)$') { $app = $Matches[1]; $ver = $Matches[2] }
+        if (-not $app -or $null -eq (ConvertTo-RolloutVersionPart -Version $ver)) {
+            $errors.Add(('Line {0}: expected an application name and a dotted version.' -f $number)); continue
+        }
+        $rows.Add((New-RolloutRow -Application $app -NewVersion $ver -Role $DefaultRole))
+    }
+    return @{ Rows = $rows.ToArray(); Errors = $errors.ToArray() }
+}
+
+# ---- The plan --------------------------------------------------------------
+
+function New-RolloutPlan {
+    <#
+    .SYNOPSIS
+        Expands the input rows into the items of the run plan: for every row one test item, and one production item per role.
+    .DESCRIPTION
+        A test item is an existing collection (the row's TestCollection, or the TestCollection setting), or, when
+        both are empty, a collection named by the template with the role Test and the test limiting collection.
+        A production item is a collection named by the template with the role Server or Workstation, limited by
+        the limiting collection of that role. Returns Items and Errors. A plan with an error is not run.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Builds a plan in memory.')]
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][array]$Rows,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Settings
+    )
+    $items = New-Object System.Collections.Generic.List[object]
+    $errors = New-Object System.Collections.Generic.List[string]
+    $template = [string]$Settings.RolloutNameTemplate
+    $index = 0
+    foreach ($r in @($Rows)) {
+        $label = ('{0} {1}' -f $r.Application, $r.NewVersion).Trim()
+        if ([string]::IsNullOrWhiteSpace([string]$r.Application)) { $errors.Add('A row has no application name.'); continue }
+        $parts = ConvertTo-RolloutVersionPart -Version ([string]$r.NewVersion)
+        if ($null -eq $parts) { $errors.Add(("{0}: version '{1}' is not a dotted number such as 24.8 or 1.2.3.4." -f $r.Application, $r.NewVersion)); continue }
+        $version = $parts -join '.'
+        $shown = ([string]$r.NewVersion).Trim() -replace '^[vV]', ''
+        $role = ConvertTo-RolloutRole -Text ([string]$r.Role) -Default ([string]$Settings.RolloutDefaultRole)
+        if (-not $role) { $errors.Add(("{0}: role '{1}' is not Server, Workstation or Both." -f $label, $r.Role)); continue }
+        $software = ([string]$r.SoftwareName).Trim()
+        if (-not $software) { $errors.Add(("{0}: the name of the installed software is empty." -f $label)); continue }
+
+        $make = {
+            param($Stage, $RoleName, $LimitName, $Existing, $ExistingName)
+            $name = if ($Existing) { $ExistingName } else { Expand-RolloutName -Template $template -Application ([string]$r.Application) -Role $RoleName -Version $shown }
+            $query = ''
+            if (-not $Existing) { $query = New-RolloutQuery -SoftwareName $software -Version $shown }
+            [PSCustomObject]@{
+                Index          = 0
+                Key            = ('{0}|{1}|{2}' -f $r.Application, $version, $RoleName)
+                Stage          = $Stage
+                Application    = [string]$r.Application
+                Version        = $shown
+                SoftwareName   = $software
+                Role           = $RoleName
+                CollectionName = $name
+                CollectionId   = ''
+                UseExisting    = [bool]$Existing
+                LimitingName   = $LimitName
+                Query          = $query
+                Exists         = $false
+                MemberCount    = $null
+                Status         = 'Planned'
+                Message        = ''
+                DeploymentId   = ''
+            }
+        }
+        $testExisting = if (-not [string]::IsNullOrWhiteSpace([string]$r.TestCollection)) { ([string]$r.TestCollection).Trim() } else { ([string]$Settings.RolloutTestCollection).Trim() }
+        if ($testExisting) { $items.Add((& $make 'Test' 'Test' '' $true $testExisting)) }
+        else               { $items.Add((& $make 'Test' 'Test' ([string]$Settings.RolloutLimitingTest) $false '')) }
+        if ($role -in 'Server', 'Both')      { $items.Add((& $make 'Prod' 'Server' ([string]$Settings.RolloutLimitingServer) $false '')) }
+        if ($role -in 'Workstation', 'Both') { $items.Add((& $make 'Prod' 'Workstation' ([string]$Settings.RolloutLimitingWorkstation) $false '')) }
+    }
+    $seen = @{}
+    foreach ($it in $items) {
+        $index++
+        $it.Index = $index
+        $why = Test-RolloutName -Name $it.CollectionName
+        if ($why) { $errors.Add(('{0} ({1}): {2}' -f $it.Application, $it.Role, $why)) }
+        # One existing test collection serves every application; two items of one application must not share a collection.
+        $k = ('{0}|{1}' -f $it.Stage, $it.CollectionName.ToLowerInvariant())
+        if ($it.UseExisting) { $k += ('|' + $it.Application.ToLowerInvariant() + '|' + $it.Version) }
+        if ($seen.ContainsKey($k)) { $errors.Add(("Two items have the collection name '{0}'. Change the name template or the rows." -f $it.CollectionName)) }
+        $seen[$k] = $true
+        if (-not $it.UseExisting -and [string]::IsNullOrWhiteSpace($it.LimitingName)) { $errors.Add(('{0} ({1}): the limiting collection is empty.' -f $it.Application, $it.Role)) }
+    }
+    return @{ Items = $items.ToArray(); Errors = $errors.ToArray() }
+}
+
+function Get-RolloutSchedule {
+    <#
+    .SYNOPSIS
+        Returns the available time and the deadline of one stage, counted from the given time.
+    #>
+    param(
+        [Parameter(Mandatory)][ValidateSet('Test', 'Prod')][string]$Stage,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Settings,
+        [datetime]$Now = (Get-Date)
+    )
+    $available = $Now.AddHours([int]$Settings.RolloutAvailableDelayHours)
+    $hours = if ($Stage -eq 'Test') { [int]$Settings.RolloutTestDeadlineHours } else { [int]$Settings.RolloutProdDeadlineHours }
+    return @{ Available = $available; Deadline = $available.AddHours($hours); DeadlineHours = $hours }
+}
+
+function Test-RolloutSchedule {
+    <#
+    .SYNOPSIS
+        Applies the schedule rules of a Required deployment to one stage: the deadline must be later than the available time.
+        Returns the reason that blocks the run, or an empty string.
+    #>
+    param([Parameter(Mandatory)]$Schedule)
+    if ([int]$Schedule.DeadlineHours -lt 1) {
+        return 'The deadline must be at least 1 hour after the available time. A Required deployment with a deadline on or before its available time would run at once on every device.'
+    }
+    if ($Schedule.Deadline -le $Schedule.Available) { return 'The deadline must be after the available time.' }
+    return ''
+}
+
+# ---- Reads from the site ---------------------------------------------------
+
+function Get-RolloutApplicationList {
+    <#
+    .SYNOPSIS
+        Returns the applications of the site with the version and the revision of the newest revision.
+        One provider read; the window filters the rows.
+    #>
+    $rows = @(Get-CMApplication -Fast -ErrorAction Stop |
+        Select-Object LocalizedDisplayName, SoftwareVersion, CIVersion, CI_ID, DateLastModified, IsExpired |
+        Where-Object { -not $_.IsExpired } | Sort-Object LocalizedDisplayName)
+    Write-Log "Rollout application list: $($rows.Count) application(s)"
+    return ,$rows
+}
+
+function Get-RolloutBaseName {
+    <#
+    .SYNOPSIS
+        Cuts the version and what follows from the display name of a software title ('7-Zip 24.08 (x64)' becomes '7-Zip').
+    #>
+    param([AllowEmptyString()][string]$Name)
+    $n = ([string]$Name).Trim()
+    $cut = [regex]::Replace($n, '\s+[vV]?\d+(\.\d+)*\b.*$', '')
+    if ($cut.Trim().Length -eq 0) { return $n }
+    return $cut.Trim()
+}
+
+function Get-RolloutSoftwareNameSuggestion {
+    <#
+    .SYNOPSIS
+        Suggests the installed-software name (the ARP display name) of an application.
+    .DESCRIPTION
+        Two reads of the inventory classes of installed software. The first looks up the MSI product code of the
+        application's deployment types in ProdID; the second searches the display names for the application name
+        without its version. The result is the display name without its version, and the candidates found.
+        With no inventory hit the base name of the application is the suggestion.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$ApplicationName,
+        [string]$ProductCode
+    )
+    $base = Get-RolloutBaseName -Name $ApplicationName
+    $found = @()
+    $source = 'Application name'
+    try {
+        if ($ProductCode -match '^[^''"\\<>]{1,200}$') {
+            foreach ($class in $script:RolloutArpClasses) {
+                $found += @(Invoke-CMWmiQuery -Query ("select DisplayName from {0} where ProdID = '{1}'" -f $class, $ProductCode) -Option Fast -ErrorAction Stop |
+                    ForEach-Object { [string]$_.DisplayName })
+            }
+            if ($found.Count -gt 0) { $source = 'Product code' }
+        }
+        if ($found.Count -eq 0) {
+            $like = ConvertTo-RolloutLikeText -Text $base
+            foreach ($class in $script:RolloutArpClasses) {
+                $found += @(Invoke-CMWmiQuery -Query ("select DisplayName from {0} where DisplayName like '%{1}%'" -f $class, $like) -Option Fast -ErrorAction Stop |
+                    ForEach-Object { [string]$_.DisplayName })
+            }
+            if ($found.Count -gt 0) { $source = 'Inventory' }
+        }
+    }
+    catch {
+        Write-Log ("Software name lookup for '{0}' failed: {1}" -f $ApplicationName, $_.Exception.Message) -Level WARN
+        $found = @()
+        $source = 'Application name'
+    }
+    $names = @($found | Where-Object { $_ } | ForEach-Object { Get-RolloutBaseName -Name $_ } | Group-Object | Sort-Object Count -Descending)
+    if ($names.Count -eq 0) { return @{ Name = $base; Source = 'Application name'; Candidates = @() } }
+    return @{ Name = [string]$names[0].Name; Source = $source; Candidates = @($names | Select-Object -First 5 | ForEach-Object { [string]$_.Name }) }
+}
+
+function Get-RolloutApplicationProductCode {
+    <#
+    .SYNOPSIS
+        Reads the name of the uninstall key (the MSI product code, or the key name of a registry detection rule) from the detection data of the deployment types of an application, or returns an empty string.
+    #>
+    param([Parameter(Mandatory)][string]$ApplicationName)
+    try {
+        foreach ($dt in @(Get-CMDeploymentType -ApplicationName $ApplicationName -ErrorAction Stop)) {
+            $xml = [string]$dt.SDMPackageXML
+            if ($xml -match '(?is)Uninstall\\([^<\\''"]{1,200})</Key>') { return $Matches[1].Trim() }
+            if ($xml -match '(?is)ProductCode[^{]{0,120}(\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\})') { return $Matches[1].ToUpperInvariant() }
+        }
+    }
+    catch { Write-Log ("Product code lookup for '{0}' failed: {1}" -f $ApplicationName, $_.Exception.Message) -Level WARN }
+    return ''
+}
+
+function Get-RolloutMemberPreview {
+    <#
+    .SYNOPSIS
+        Counts the devices that a rollout query finds inside its limiting collection, without making a collection.
+        One provider query. Returns @{ Count; Error }.
+    #>
+    param([Parameter(Mandatory)][string]$Query, [Parameter(Mandatory)][string]$LimitingCollectionId)
+    try {
+        if ($LimitingCollectionId -notmatch '^[A-Za-z0-9]{8}$') { throw 'The limiting collection ID is not valid.' }
+        $full = $Query + (" and SMS_R_System.ResourceId in (select ResourceID from SMS_CM_RES_COLL_{0})" -f $LimitingCollectionId.ToUpperInvariant())
+        $rows = @(Invoke-CMWmiQuery -Query $full -Option Fast -ErrorAction Stop)
+        return @{ Count = $rows.Count; Error = '' }
+    }
+    catch {
+        Write-Log ("Rollout member preview failed: {0}" -f $_.Exception.Message) -Level WARN
+        return @{ Count = $null; Error = 'The member count could not be read. The log file has the reason.' }
+    }
+}
+
+function Test-RolloutFolder {
+    <#
+    .SYNOPSIS
+        Returns $true when the console folder exists. The path is relative to the Device Collections node,
+        for example 'Updates\2026'. An empty path means the root.
+    #>
+    param([AllowEmptyString()][string]$Folder)
+    $f = ([string]$Folder).Trim().Trim('\')
+    if ($f.Length -eq 0) { return $true }
+    $info = Get-CMConnectionInfo
+    if ($null -eq $info) { return $false }
+    return [bool](Test-Path -LiteralPath ('{0}:\DeviceCollection\{1}' -f $info.SiteCode, $f))
+}
+
+function Resolve-RolloutCollection {
+    <#
+    .SYNOPSIS
+        Finds a device collection by name or by CollectionID. Returns the collection or $null.
+    #>
+    param([Parameter(Mandatory)][string]$Reference)
+    $ref = $Reference.Trim()
+    if ($ref -match '^[A-Za-z0-9]{3}[0-9A-Fa-f]{5}$') {
+        $c = Test-CollectionValid -CollectionId $ref.ToUpperInvariant()
+        if ($null -ne $c) { return $c }
+    }
+    return (Test-CollectionValid -CollectionName $ref)
+}
+
+function Test-RolloutPlanOnSite {
+    <#
+    .SYNOPSIS
+        Runs the checks of one stage of the run plan against the site and previews the member count of every query.
+        Changes nothing. Returns Ok and the items, each with Status, Message, CollectionId, MemberCount and Exists.
+    .DESCRIPTION
+        -Cache is a hashtable that several calls share, so that the application, limiting collection and folder reads run
+        once for a whole plan.
+        Per application: the application exists and its content is fully distributed (the first two of the five
+        checks of Deployment Helper). Per item: the limiting collection is a device collection, the console folder
+        exists, a collection of that name already exists (the item then reuses it and creates nothing), the
+        collection is not a built-in collection, and no deployment of the application exists on it. For an item that
+        creates a collection the member count comes from the query inside its limiting collection.
+    #>
+    param(
+        [Parameter(Mandatory)][array]$Items,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Settings,
+        [hashtable]$Cache = @{}
+    )
+    if (-not $Cache.ContainsKey('Apps')) { $Cache['Apps'] = @{} }
+    if (-not $Cache.ContainsKey('Limits')) { $Cache['Limits'] = @{} }
+    if (-not $Cache.ContainsKey('FolderOk')) { $Cache['FolderOk'] = Test-RolloutFolder -Folder ([string]$Settings.RolloutFolder) }
+    $apps = $Cache['Apps']
+    $limits = $Cache['Limits']
+    $folderOk = $Cache['FolderOk']
+    $allOk = $true
+    foreach ($it in @($Items)) {
+        $it.Status = 'Checking'; $it.Message = ''
+        $problem = ''
+        $warn = ''
+        if (-not $apps.ContainsKey($it.Application)) {
+            $app = Test-ApplicationExists -ApplicationName $it.Application
+            $dist = $null
+            if ($null -ne $app) { $dist = Test-ContentDistributed -Application $app }
+            $apps[$it.Application] = @{ App = $app; Dist = $dist }
+        }
+        $a = $apps[$it.Application]
+        if ($null -eq $a.App) { $problem = ("Application '{0}' was not found." -f $it.Application) }
+        elseif (-not $a.Dist.IsFullyDistributed) { $problem = ('Content is not fully distributed: {0}/{1} distribution point(s) succeeded.' -f $a.Dist.NumberSuccess, $a.Dist.Targeted) }
+        elseif ($a.App.SoftwareVersion -and ([string]$a.App.SoftwareVersion).Trim() -and
+                $null -ne (ConvertTo-RolloutVersionPart -Version ([string]$a.App.SoftwareVersion)) -and
+                (Compare-RolloutVersion -Left ([string]$a.App.SoftwareVersion) -Right $it.Version) -ne 0) {
+            $warn = ("The application has version {0}, the row says {1}." -f $a.App.SoftwareVersion, $it.Version)
+        }
+
+        $existing = $null
+        if (-not $problem) {
+            $existing = Test-CollectionValid -CollectionName $it.CollectionName
+            if ($it.UseExisting) {
+                $existing = Resolve-RolloutCollection -Reference $it.CollectionName
+                if ($null -eq $existing) { $problem = ("The test collection '{0}' was not found, or it is not a device collection." -f $it.CollectionName) }
+            }
+        }
+        if (-not $problem -and $null -ne $existing) {
+            $it.Exists = $true
+            $it.CollectionId = [string]$existing.CollectionID
+            $it.CollectionName = [string]$existing.Name
+            $it.MemberCount = $existing.MemberCount
+            $safe = Test-CollectionSafe -Collection $existing
+            if (-not $safe.IsSafe) { $problem = $safe.Reason }
+            else {
+                $dup = Test-DuplicateDeployment -ApplicationName $a.App.LocalizedDisplayName -CollectionName $existing.Name
+                $dupFailure = Get-DuplicateCheckFailure -Result $dup
+                if ($dupFailure) { $problem = ('Could not check for an existing deployment: {0}' -f $dupFailure.Error) }
+                elseif ($null -ne $dup) { $problem = ("A deployment of this application to '{0}' already exists." -f $existing.Name) }
+            }
+        }
+        elseif (-not $problem) {
+            $it.Exists = $false
+            if (-not $folderOk) { $problem = ("The console folder '{0}' does not exist." -f $Settings.RolloutFolder) }
+            if (-not $problem) {
+                if (-not $limits.ContainsKey($it.LimitingName)) { $limits[$it.LimitingName] = Resolve-RolloutCollection -Reference $it.LimitingName }
+                $lim = $limits[$it.LimitingName]
+                if ($null -eq $lim) { $problem = ("The limiting collection '{0}' was not found, or it is not a device collection." -f $it.LimitingName) }
+                else {
+                    $p = Get-RolloutMemberPreview -Query $it.Query -LimitingCollectionId ([string]$lim.CollectionID)
+                    if ($null -eq $p.Count) { $problem = $p.Error } else { $it.MemberCount = $p.Count }
+                }
+            }
+        }
+        if ($problem) { $it.Status = 'Blocked'; $it.Message = $problem; $allOk = $false }
+        elseif ($it.Exists) { $it.Status = 'Exists'; $it.Message = ('Collection exists; it is reused and nothing is created. {0}' -f $warn).Trim() }
+        else { $it.Status = 'Ready'; $it.Message = $warn }
+    }
+    return @{ Ok = ($allOk -and @($Items).Count -gt 0); Items = @($Items) }
+}
+
+# ---- Execution -------------------------------------------------------------
+
+function Add-RolloutAudit {
+    <#
+    .SYNOPSIS
+        Writes the audit record of one rollout object (a collection or a deployment) with Write-DeploymentLog.
+        The outcome is the result table of the step that made the object.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Writes the audit record; it is the only write.')]
+    param(
+        [Parameter(Mandatory)][string]$LogPath,
+        [Parameter(Mandatory)]$Item,
+        [Parameter(Mandatory)][ValidateSet('Collection', 'Application')][string]$Kind,
+        [Parameter(Mandatory)][string]$RunId,
+        [Parameter(Mandatory)][hashtable]$Outcome,
+        [string]$DeploymentId = '',
+        $Deadline = $null,
+        [string]$Version = ''
+    )
+    $record = @{
+        DeploymentType     = $Kind
+        ApplicationName    = [string]$Item.Application
+        ApplicationVersion = $(if ($Version) { $Version } else { [string]$Item.Version })
+        CollectionName     = [string]$Item.CollectionName
+        CollectionID       = [string]$Item.CollectionId
+        MemberCount        = $Item.MemberCount
+        DeployPurpose      = $(if ($Kind -eq 'Application') { 'Required' } else { '' })
+        DeadlineDateTime   = $(if ($null -ne $Deadline) { ([datetime]$Deadline).ToString('yyyy-MM-ddTHH:mm:ss') } else { $null })
+        DeploymentID       = $(if ($DeploymentId) { $DeploymentId } else { $null })
+        Result             = $(if ($Outcome.Success) { 'Success' } else { ('Failed: {0}' -f $(if ($Outcome.ErrorDetail) { $Outcome.ErrorDetail } else { $Outcome.Error })) })
+        PlanName           = $script:RolloutPlanName
+        RingIndex          = [int]$Item.Index
+        RingName           = [string]$Item.Stage
+        RunId              = $RunId
+    }
+    return (Write-DeploymentLog -LogPath $LogPath -Record $record)
+}
+
+function New-RolloutCollection {
+    <#
+    .SYNOPSIS
+        Creates one rollout device collection: the collection, its refresh schedule, its query rule, its console folder,
+        and a first membership update. When a step after the create fails, the new collection is removed again: it
+        is an object of this run. Returns a table with Success, CollectionId, Error and the raw text for the audit record.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='The window confirms the run plan before this function runs.')]
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$LimitingCollectionId,
+        [Parameter(Mandatory)][string]$Query,
+        [int]$RefreshDays = 1,
+        [string]$Folder = ''
+    )
+    $col = $null
+    try {
+        $p = @{ Name = $Name; LimitingCollectionId = $LimitingCollectionId; ErrorAction = 'Stop' }
+        if ($RefreshDays -gt 0) {
+            $p['RefreshType'] = 'Periodic'
+            $p['RefreshSchedule'] = New-CMSchedule -RecurInterval Days -RecurCount $RefreshDays -ErrorAction Stop
+        }
+        else { $p['RefreshType'] = 'Manual' }
+        $col = New-CMDeviceCollection @p
+        Write-Log ("Rollout collection created: {0} ({1})" -f $Name, $col.CollectionID)
+        Add-CMDeviceCollectionQueryMembershipRule -CollectionId $col.CollectionID -RuleName $script:RolloutRuleName -QueryExpression $Query -ErrorAction Stop | Out-Null
+        $f = ([string]$Folder).Trim().Trim('\')
+        if ($f.Length -gt 0) {
+            $info = Get-CMConnectionInfo
+            Move-CMObject -FolderPath ('{0}:\DeviceCollection\{1}' -f $info.SiteCode, $f) -InputObject $col -ErrorAction Stop
+        }
+        Invoke-CMCollectionUpdate -CollectionId $col.CollectionID -ErrorAction Stop
+        return @{ Success = $true; CollectionId = [string]$col.CollectionID; Error = $null }
+    }
+    catch {
+        $failure = @{ Success = $false; CollectionId = $(if ($null -ne $col) { [string]$col.CollectionID } else { '' }); Error = (Get-UserErrorText -ErrorRecord $_ -Fallback 'The collection could not be created. See the log file.'); ErrorDetail = (Get-ErrorDetailText -ErrorRecord $_) }
+        Write-Log ("Rollout collection FAILED: {0}" -f $_.Exception.Message) -Level ERROR
+        if ($null -ne $col) {
+            try { Remove-CMCollection -Id $col.CollectionID -Force -ErrorAction Stop; $failure.Error += ' The new collection was removed again.' }
+            catch { $failure.Error += ' The new collection could not be removed again; remove it by hand.'; Write-Log ("Rollback of {0} failed: {1}" -f $col.CollectionID, $_.Exception.Message) -Level ERROR }
+        }
+        return $failure
+    }
+}
+
+function Invoke-RolloutItem {
+    <#
+    .SYNOPSIS
+        Runs one item of the run plan: creates the collection when it does not exist, checks it again, creates the
+        Required deployment of the application, and writes one audit record for each object.
+    .DESCRIPTION
+        Fail closed: when the audit log cannot be written, nothing is created. The collection guardrail and the
+        duplicate check run again right before the deployment, as in every deployment of this tool.
+        -DryRun creates nothing and writes no audit record; the result says what the run would do.
+        Returns @{ Success; CollectionId; DeploymentId; Error; Created }.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='The window confirms the run plan before this function runs; -DryRun creates nothing.')]
+    param(
+        [Parameter(Mandatory)]$Item,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Settings,
+        [Parameter(Mandatory)]$Schedule,
+        [Parameter(Mandatory)][string]$RunId,
+        [Parameter(Mandatory)][string]$AuditLogPath,
+        [switch]$DryRun
+    )
+    $result = @{ Success = $false; CollectionId = [string]$Item.CollectionId; DeploymentId = ''; Error = ''; Created = $false }
+    if ($DryRun) {
+        $result.Success = $true
+        $result.Error = $(if ($Item.Exists) { 'Dry run: would deploy to the existing collection.' } else { 'Dry run: would create the collection and deploy to it.' })
+        return $result
+    }
+    $gate = Test-DeploymentLogWritable -LogPath $AuditLogPath
+    if (-not $gate.Success) { $result.Error = ('Audit log unavailable; nothing was created: {0}' -f $gate.Error); return $result }
+
+    $app = Test-ApplicationExists -ApplicationName $Item.Application
+    if ($null -eq $app) { $result.Error = ("Application '{0}' was not found." -f $Item.Application); return $result }
+
+    if (-not $Item.Exists) {
+        $limit = Resolve-RolloutCollection -Reference $Item.LimitingName
+        if ($null -eq $limit) { $result.Error = ("The limiting collection '{0}' was not found." -f $Item.LimitingName); return $result }
+        $clash = Test-CollectionValid -CollectionName $Item.CollectionName
+        if ($null -ne $clash) { $result.Error = ("A collection named '{0}' now exists. Nothing was created." -f $Item.CollectionName); return $result }
+        $made = New-RolloutCollection -Name $Item.CollectionName -LimitingCollectionId ([string]$limit.CollectionID) -Query $Item.Query `
+            -RefreshDays ([int]$Settings.RolloutRefreshDays) -Folder ([string]$Settings.RolloutFolder)
+        $Item.CollectionId = [string]$made.CollectionId
+        $audit = Add-RolloutAudit -LogPath $AuditLogPath -Item $Item -Kind Collection -RunId $RunId -Outcome $made
+        if (-not $made.Success) { $result.Error = [string]$made.Error; return $result }
+        $result.Created = $true
+        $result.CollectionId = [string]$made.CollectionId
+        if (-not $audit.Success) { $result.Error = ('The collection {0} was created, but its audit record failed: {1}. No deployment was created.' -f $made.CollectionId, $audit.Error); return $result }
+    }
+
+    $col = Test-CollectionValid -CollectionId $Item.CollectionId
+    if ($null -eq $col) { $result.Error = ("Collection {0} was not found after the create." -f $Item.CollectionId); return $result }
+    $dup = Test-DuplicateDeployment -ApplicationName $app.LocalizedDisplayName -CollectionName $col.Name
+    $dupFailure = Get-DuplicateCheckFailure -Result $dup
+    if ($dupFailure) { $result.Error = ('Could not recheck for an existing deployment: {0}. No deployment was created.' -f $dupFailure.Error); return $result }
+    if ($null -ne $dup) { $result.Error = ("A deployment of this application to '{0}' now exists. No duplicate was created." -f $col.Name); return $result }
+    $gate = Test-DeploymentLogWritable -LogPath $AuditLogPath
+    if (-not $gate.Success) { $result.Error = ('Audit log unavailable; the deployment was not created: {0}' -f $gate.Error); return $result }
+
+    $dep = Invoke-ApplicationDeployment -Application $app -Collection $col -DeployPurpose Required `
+        -AvailableDateTime $Schedule.Available -DeadlineDateTime $Schedule.Deadline `
+        -UserNotification ([string]$Settings.RolloutNotification)
+    $Item.MemberCount = $col.MemberCount
+    $audit = Add-RolloutAudit -LogPath $AuditLogPath -Item $Item -Kind Application -RunId $RunId -Outcome $dep `
+        -DeploymentId ([string]$dep.DeploymentID) -Deadline $Schedule.Deadline -Version ([string]$app.SoftwareVersion)
+    if (-not $dep.Success) { $result.Error = [string]$dep.Error; return $result }
+    $result.DeploymentId = [string]$dep.DeploymentID
+    $result.Success = $true
+    if (-not $audit.Success) { $result.Error = ('Deployment {0} was created, but its audit record failed: {1}' -f $dep.DeploymentID, $audit.Error) }
+    return $result
+}
+
+# ---- Run file --------------------------------------------------------------
+
+function New-RolloutRunId {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Returns a text; changes nothing.')]
+    param()
+    return ('RO-{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), ([guid]::NewGuid().ToString('N').Substring(0, 4)))
+}
+
+function Save-RolloutRun {
+    <#
+    .SYNOPSIS
+        Writes the run file: the run plan with the status of every item. Returns the file path.
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Writes the run file of this tool.')]
+    param([Parameter(Mandatory)][string]$Folder, [Parameter(Mandatory)]$Run)
+    if (-not (Test-Path -LiteralPath $Folder)) { New-Item -ItemType Directory -Path $Folder -Force -ErrorAction Stop | Out-Null }
+    $path = Join-Path $Folder ('Rollout-{0}.json' -f $Run.RunId)
+    $json = $Run | ConvertTo-Json -Depth 6
+    $tmp = $path + '.tmp'
+    Set-Content -LiteralPath $tmp -Value $json -Encoding UTF8 -ErrorAction Stop
+    Move-Item -LiteralPath $tmp -Destination $path -Force -ErrorAction Stop
+    return $path
+}
+
+function Read-RolloutRun {
+    <#
+    .SYNOPSIS
+        Reads a run file. Returns the run with its Items as objects, or throws a message for the user.
+    #>
+    param([Parameter(Mandatory)][string]$Path)
+    try { $run = Get-Content -LiteralPath $Path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+    catch { throw ("The run file '{0}' could not be read." -f $Path) }
+    if (-not $run.RunId -or $null -eq $run.Items) { throw ("The run file '{0}' is not a rollout run." -f $Path) }
+    $run.Items = @($run.Items)
+    return $run
+}
+
+function Get-RolloutRunList {
+    <#
+    .SYNOPSIS
+        Lists the run files of a folder, newest first. A closed run is left out unless -IncludeClosed is set.
+    #>
+    param([Parameter(Mandatory)][string]$Folder, [switch]$IncludeClosed)
+    if (-not (Test-Path -LiteralPath $Folder)) { return @() }
+    $list = foreach ($f in @(Get-ChildItem -LiteralPath $Folder -Filter 'Rollout-*.json' -File | Sort-Object LastWriteTime -Descending)) {
+        try { $run = Read-RolloutRun -Path $f.FullName } catch { continue }
+        if (-not $IncludeClosed -and [string]$run.State -eq 'Closed') { continue }
+        [PSCustomObject]@{ Path = $f.FullName; RunId = [string]$run.RunId; State = [string]$run.State; Created = [string]$run.Created; Items = @($run.Items).Count }
+    }
+    return @($list)
+}
+
+function Get-RolloutProdItem {
+    <#
+    .SYNOPSIS
+        Returns the production items of a run that Step 2 may run: the test deployment of the application
+        and version succeeded, and the item is not done yet.
+    #>
+    param([Parameter(Mandatory)]$Run)
+    $items = @($Run.Items)
+    $ready = foreach ($p in @($items | Where-Object { $_.Stage -eq 'Prod' })) {
+        $tests = @($items | Where-Object { $_.Stage -eq 'Test' -and $_.Application -eq $p.Application -and $_.Version -eq $p.Version })
+        $tested = ($tests.Count -gt 0) -and (@($tests | Where-Object { $_.Status -ne 'Done' }).Count -eq 0)
+        if ($tested -and $p.Status -ne 'Done') { $p }
+    }
+    return @($ready)
+}
+
+function Get-RolloutCheckResultPath {
+    <#
+    .SYNOPSIS
+        Returns the places where the two packager apps write the result file of Check ConfigMgr.
+    #>
+    $paths = New-Object System.Collections.Generic.List[string]
+    $local = [string]$env:LOCALAPPDATA
+    $root = [string]$env:APP_PACKAGER_DATA_ROOT
+    if ($root) {
+        try { $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; $paths.Add((Join-Path (Join-Path (Join-Path $root 'Users') $sid) 'SRLPackr\CheckConfigMgrResult.csv')) } catch { $null = $_ }
+    }
+    if ($local) {
+        $paths.Add((Join-Path $local 'SRLPackr\CheckConfigMgrResult.csv'))
+        $paths.Add((Join-Path $local 'AppPackager\CheckConfigMgrResult.csv'))
+    }
+    return $paths.ToArray()
+}
+
+function Import-RolloutCheckResult {
+    <#
+    .SYNOPSIS
+        Reads the CSV result files of Check ConfigMgr (APD and App Packager) and returns the rows whose status is
+        UpdateAvailable as rollout rows. Of two rows for one application the newer check wins.
+    .DESCRIPTION
+        The new version is LatestVersion. The software name is the first Add/Remove Programs name of the result
+        row without its wildcards. A row without a dotted LatestVersion is left out. Returns Rows and Errors.
+    #>
+    param([string[]]$Path = (Get-RolloutCheckResultPath), [string]$DefaultRole = 'Both')
+    $best = @{}
+    $errors = New-Object System.Collections.Generic.List[string]
+    foreach ($f in $Path) {
+        if (-not (Test-Path -LiteralPath $f)) { continue }
+        try { $data = @(Import-Csv -LiteralPath $f -Encoding UTF8 -ErrorAction Stop) }
+        catch { $errors.Add(("The result file '{0}' could not be read." -f $f)); continue }
+        foreach ($r in $data) {
+            if ([string]$r.Status -ne 'UpdateAvailable') { continue }
+            if ($null -eq (ConvertTo-RolloutVersionPart -Version ([string]$r.LatestVersion))) { continue }
+            $name = if ([string]$r.CMName) { [string]$r.CMName } else { [string]$r.Application }
+            if (-not $name) { continue }
+            if ($best.ContainsKey($name) -and [string]$best[$name].CheckedAtUtc -ge [string]$r.CheckedAtUtc) { continue }
+            $best[$name] = $r
+        }
+    }
+    $rows = foreach ($k in ($best.Keys | Sort-Object)) {
+        $r = $best[$k]
+        $sw = ([string]$r.InstalledSoftwareName -split '\|')[0].Trim() -replace '[*?]', ''
+        New-RolloutRow -Application $k -NewVersion ([string]$r.LatestVersion) -SoftwareName $sw -Role $DefaultRole -CurrentVersion ([string]$r.ConfigMgrVersion)
+    }
+    return @{ Rows = @($rows); Errors = $errors.ToArray() }
 }

@@ -1,5 +1,5 @@
 {
-  "Count": 32,
+  "Count": 38,
   "Images": [
     "apps-empty.png",
     "apps-filled.png",
@@ -13,6 +13,9 @@
     "dialog-browse-collection.png",
     "dialog-confirm-deployment.png",
     "dialog-dp-groups.png",
+    "dialog-rollout-add.png",
+    "dialog-rollout-import.png",
+    "dialog-rollout-step1.png",
     "light-apps.png",
     "light-dialog-browse-application.png",
     "light-options.png",
@@ -29,6 +32,9 @@
     "rings-plan-list.png",
     "rings-runs.png",
     "rings-type-list.png",
+    "rollout-empty.png",
+    "rollout-plan.png",
+    "rollout-rows.png",
     "start-first-run.png",
     "start-reopen.png",
     "sug-form.png",
