@@ -61,6 +61,10 @@ The AppPackager Suite launcher chooses the site. Deployment Helper keeps its dat
 - The first start after an update copies the old data into the site folder. The tool keeps the old files where they were.
 - A path that you type on the **Logging** page stays your choice and is used for every site.
 
+![The read-only Site Code box with its tooltip](../images/options-site.png)
+
+![The footer note after the launcher chose another site](../images/footer-site-note.png)
+
 ### Theme
 
 The **Dark Theme** switch at the bottom of the sidebar changes the theme. The tool keeps the choice. The theme changes colors only. Font size, weight and style stay the same. Every blue background has white text, and the titles of fields are bold.

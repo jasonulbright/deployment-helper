@@ -150,7 +150,7 @@ Section 'site' {
   Import-Module (Join-Path $appDir 'Lib\SuiteCommon\SuiteCommon.psd1') -DisableNameChecking
   [void](Set-SuiteActiveSite -SiteCode 'CD2' -DataRoot (Get-SuiteDataRoot))
   Start-Sleep -Seconds 8
-  Shot $win 'footer-site-note'
+  Shot-Strip $win 'footer-site-note' 40
   Stop-App 'start-deploymenthelper.ps1'; Start-Sleep -Seconds 2
   Remove-Item -LiteralPath Env:APP_PACKAGER_SITE -ErrorAction SilentlyContinue
 }
