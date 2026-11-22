@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [2026.11.22.0031] - 2026-11-22
+
+## 1 change: data is kept for each site
+
 ### Changed
 
 - Keep the audit log, ring plans, run files and site settings per site.
