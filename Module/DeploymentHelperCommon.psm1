@@ -4059,20 +4059,31 @@ function ConvertTo-DhPathPref {
         Returns the path value that the tool keeps in its prefs: empty for "use the default", else the path the user chose.
     .DESCRIPTION
         An older version wrote the computed default path into the prefs. A value that equals the old default under the
-        tool folder is stale after the move to the site folder, so it counts as empty. Any other value is a choice of the user.
+        tool folder is stale after the move to the site folder, so it counts as empty. A value that equals the default of the
+        site (-SitePath) counts as empty too: the Browse dialog starts there, and accepting it is not a choice. Any other value is a choice of the user.
     #>
     [CmdletBinding()]
     [OutputType([string])]
     param(
         $Value,
-        [Parameter(Mandatory)][string]$LegacyPath
+        [Parameter(Mandatory)][string]$LegacyPath,
+        [string]$SitePath
     )
     $text = ([string]$Value).Trim()
     if (-not $text) { return '' }
-    $a = $text.TrimEnd('\', '/')
-    $b = $LegacyPath.TrimEnd('\', '/')
-    if ($a.Equals($b, [StringComparison]::OrdinalIgnoreCase)) { return '' }
+    $a = Get-DhComparablePath -Path $text
+    foreach ($default in @($LegacyPath, $SitePath)) {
+        if ($default -and $a.Equals((Get-DhComparablePath -Path $default), [StringComparison]::OrdinalIgnoreCase)) { return '' }
+    }
     return $text
+}
+
+function Get-DhComparablePath {
+    # A path without a trailing separator, with the separators and dot segments of the full path, for a comparison only.
+    param([Parameter(Mandatory)][string]$Path)
+    $full = $Path
+    try { $full = [IO.Path]::GetFullPath($Path) } catch { $full = $Path }
+    return $full.TrimEnd('\', '/')
 }
 
 function Resolve-DhStorePath {

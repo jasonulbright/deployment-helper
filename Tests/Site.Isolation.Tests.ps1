@@ -270,6 +270,17 @@ Describe 'Store paths of the user' {
         ConvertTo-DhPathPref -Value 'C:\y' -LegacyPath 'C:\x' | Should -Be 'C:\y'
     }
 
+    It 'treats the default of the site as empty, so that an unchanged Browse dialog saves no path' {
+        $siteDefault = Resolve-DhStorePath -Store RingRuns -ToolRoot $script:Root -Pref '' -Site $script:Site
+        ConvertTo-DhPathPref -Value $siteDefault -LegacyPath (Get-DhLegacyStorePath -Store RingRuns -ToolRoot $script:Root) -SitePath $siteDefault | Should -Be ''
+        ConvertTo-DhPathPref -Value ($siteDefault.Replace('\', '/') + '/') -LegacyPath 'C:\x' -SitePath $siteDefault | Should -Be ''
+        ConvertTo-DhPathPref -Value (Join-Path $script:Root 'other') -LegacyPath 'C:\x' -SitePath $siteDefault | Should -Be (Join-Path $script:Root 'other')
+    }
+
+    It 'compares paths with mixed separators and dot segments' {
+        ConvertTo-DhPathPref -Value 'C:/x/sub/../' -LegacyPath 'C:\x' | Should -Be ''
+    }
+
     It 'refuses nothing and creates the site folder only with -Create' {
         $p = Resolve-DhStorePath -Store RingPlans -ToolRoot $script:Root -Site $script:Site
         Test-Path -LiteralPath $p | Should -BeFalse
@@ -290,9 +301,14 @@ Describe 'Static guard: no site store is built from the script folder' {
         $script:ShellText | Should -Not -Match "RolloutRunPath\s*=\s*Join-Path"
     }
 
-    It 'sends every audit log, ring and rollout path through Resolve-DhStorePath' {
-        foreach ($s in 'AuditLog', 'RingPlans', 'RingRuns', 'Rollouts') {
-            $script:ShellText | Should -Match ("Resolve-DhStorePath -Store $s ") -Because $s
+    It 'assigns every store path from Resolve-DhStorePath (syntax tree)' {
+        foreach ($target in 'DeploymentAuditLog', 'RingPlanDir', 'RingRunStatePath') {
+            $assign = $script:Ast.FindAll({ param($x) $x -is [System.Management.Automation.Language.AssignmentStatementAst] -and $x.Left.Extent.Text -eq ('$script:' + $target) }, $true)
+            @($assign | Where-Object { $_.Right.Extent.Text -ne '$NewPath' }).Count | Should -BeGreaterThan 0 -Because $target
+            # The Options handlers assign the path that they resolved with Resolve-DhStorePath a line before.
+            foreach ($a in @($assign | Where-Object { $_.Right.Extent.Text -ne '$NewPath' })) { $a.Right.Extent.Text | Should -Match 'Resolve-DhStorePath' -Because ('$script:' + $target + ' at line ' + $a.Extent.StartLineNumber) }
         }
+        $def = $script:Ast.Find({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $x.Name -eq 'Get-RolloutRunFolder' }, $true)
+        $def.Extent.Text | Should -Match 'Resolve-DhStorePath -Store Rollouts'
     }
 }

@@ -572,14 +572,14 @@ Describe 'Preferences file' {
         $json = [ordered]@{
             SiteCode               = 'AB1'
             DeploymentAuditLogPath = (Join-Path $script:AppRoot 'Logs\deployment-audit.jsonl')
-            RingRunStatePath       = '\files.example.com\share\runs'
+            RingRunStatePath       = '\\files.example.com\share\runs'
             RolloutRunPath         = ((Join-Path $script:AppRoot 'Rollouts') + '\')
         } | ConvertTo-Json
         Set-Content -LiteralPath $global:PrefsPath -Value $json
         $p = Get-DhPreferences
         $p.SiteCode | Should -Be 'AB1'
         $p.DeploymentAuditLogPath | Should -Be ''
-        $p.RingRunStatePath | Should -Be '\files.example.com\share\runs'
+        $p.RingRunStatePath | Should -Be '\\files.example.com\share\runs'
         $p.RolloutRunPath | Should -Be ''
     }
 

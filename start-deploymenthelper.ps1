@@ -2405,13 +2405,13 @@ function New-LoggingPanel {
         Name    = 'Logging'
         Element = $grid
         Commit  = {
-            # An empty box, or the old default under the tool folder, means the default place. Only a path of the user is saved.
-            $newPath = ConvertTo-DhPathPref -Value $auditTxt.Text -LegacyPath (Get-DhLegacyStorePath -Store AuditLog -ToolRoot $dhRoot)
+            # An empty box, the old default under the tool folder and the default of the site all mean the default place. Only a path of the user is saved.
+            $newPath = ConvertTo-DhPathPref -Value $auditTxt.Text -LegacyPath (Get-DhLegacyStorePath -Store AuditLog -ToolRoot $dhRoot) -SitePath (Resolve-DhStorePath -Store AuditLog -ToolRoot $dhRoot -Pref '' -Site $dhSite)
             if ($newPath -ne [string]$global:Prefs['DeploymentAuditLogPath']) {
                 $global:Prefs['DeploymentAuditLogPath'] = $newPath
                 & $applyAuditPathChange -NewPath (Resolve-DhStorePath -Store AuditLog -ToolRoot $dhRoot -Pref $newPath -Site $dhSite -Create)
             }
-            $newRuns = ConvertTo-DhPathPref -Value $runsTxt.Text -LegacyPath (Get-DhLegacyStorePath -Store RingRuns -ToolRoot $dhRoot)
+            $newRuns = ConvertTo-DhPathPref -Value $runsTxt.Text -LegacyPath (Get-DhLegacyStorePath -Store RingRuns -ToolRoot $dhRoot) -SitePath (Resolve-DhStorePath -Store RingRuns -ToolRoot $dhRoot -Pref '' -Site $dhSite)
             if ($newRuns -ne [string]$global:Prefs['RingRunStatePath']) {
                 $global:Prefs['RingRunStatePath'] = $newRuns
                 & $applyRingRunsPathChange -NewPath (Resolve-DhStorePath -Store RingRuns -ToolRoot $dhRoot -Pref $newRuns -Site $dhSite)
