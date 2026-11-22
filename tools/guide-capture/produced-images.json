@@ -1,5 +1,5 @@
 {
-  "Count": 38,
+  "Count": 40,
   "Images": [
     "apps-empty.png",
     "apps-filled.png",
@@ -16,6 +16,7 @@
     "dialog-rollout-add.png",
     "dialog-rollout-import.png",
     "dialog-rollout-step1.png",
+    "footer-site-note.png",
     "light-apps.png",
     "light-dialog-browse-application.png",
     "light-options.png",
@@ -25,6 +26,7 @@
     "options-empty.png",
     "options-history.png",
     "options-logging.png",
+    "options-site.png",
     "options-templates.png",
     "packages-form.png",
     "rings-empty.png",

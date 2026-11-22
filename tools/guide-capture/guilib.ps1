@@ -103,6 +103,18 @@ function Shot($Win, [string]$Name, [switch]$Hover) {
     $bmp.Save((Join-Path $OutDir ($Name + '.png')), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
     Log ('shot {0} {1}x{2}' -f $Name, $w, $h)
 }
+# The bottom strip of a window (the footer), full width. It shows the footer and nothing else of the window.
+function Shot-Strip($Win, [string]$Name, [int]$Height = 40) {
+    Move-MouseAway $Win
+    Start-Sleep -Milliseconds 1300
+    $r = $Win.Current.BoundingRectangle
+    $x = [int][Math]::Max(0, $r.X); $y = [int][Math]::Max(0, $r.Y + $r.Height - $Height)
+    $w = [int][Math]::Min($r.Width, [System.Windows.Forms.SystemInformation]::VirtualScreen.Width - $x)
+    $bmp = New-Object System.Drawing.Bitmap $w, $Height; $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.CopyFromScreen($x, $y, 0, 0, (New-Object System.Drawing.Size $w, $Height)); $g.Dispose()
+    $bmp.Save((Join-Path $OutDir ($Name + '.png')), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+    Log ('shot {0} {1}x{2}' -f $Name, $w, $Height)
+}
 function Shot-Screen([string]$Name) {
     $s = [System.Windows.Forms.SystemInformation]::VirtualScreen
     $b = New-Object System.Drawing.Bitmap $s.Width, $s.Height; $g = [System.Drawing.Graphics]::FromImage($b); $g.CopyFromScreen(0, 0, 0, 0, $b.Size); $g.Dispose()

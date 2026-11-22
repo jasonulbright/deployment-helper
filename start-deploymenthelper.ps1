@@ -122,53 +122,82 @@ if (-not (Get-Command Initialize-Logging -ErrorAction SilentlyContinue)) {
 # =============================================================================
 $global:PrefsPath = Join-Path $PSScriptRoot 'DeploymentHelper.prefs.json'
 
+# The site is chosen in the suite launcher. With a site, the first start copies the old site data into
+# sites\<SITE>\tools\deployment-helper (old files stay). With no site the tool keeps its old paths.
+$script:Site = Resolve-SuiteToolSite -Tool 'deployment-helper' -ToolRoot $PSScriptRoot -LegacyPrefsPath $global:PrefsPath
+$global:DhSite = $script:Site
+
 function Get-DhPreferences {
     # Plain hashtable (NOT [ordered]) -- PS 5.1 doesn't expose OrderedDictionary
     # entries as properties, so `$prefs.SiteCode = 'X'` assignments fail.
+    # The three path keys default to empty: empty means the site store (or the old place with no site).
     $defaults = @{
         SiteCode                = ''
         SMSProvider             = ''
-        DeploymentAuditLogPath  = Join-Path $PSScriptRoot 'Logs\deployment-audit.jsonl'
-        RingRunStatePath        = Join-Path $PSScriptRoot 'Rings\runs'
-        RolloutRunPath          = Join-Path $PSScriptRoot 'Rollouts'
+        DeploymentAuditLogPath  = ''
+        RingRunStatePath        = ''
+        RolloutRunPath          = ''
     }
     foreach ($__kv in (Get-RolloutSettingDefault).GetEnumerator()) { if (-not $defaults.ContainsKey($__kv.Key)) { $defaults[$__kv.Key] = $__kv.Value } }
-    if (Test-Path -LiteralPath $global:PrefsPath) {
-        try {
-            $loaded = Get-Content -LiteralPath $global:PrefsPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-            foreach ($k in @($defaults.Keys)) {
-                $val = $loaded.$k
-                if ($null -ne $val -and -not [string]::IsNullOrWhiteSpace([string]$val)) {
-                    $defaults[$k] = $val
+    $site = if ($script:Site) { $script:Site } else { [pscustomobject]@{ Active = $false } }
+    if ($site.Active) {
+        # The site keys come from the site's prefs file, and a key that file lacks takes the default, so one site never shows
+        # the values of another. The other keys come from the old file beside the script.
+        $prefs = Read-SuiteToolPrefs -Path $global:PrefsPath -Defaults $defaults -Site $site -SiteKeys @('SiteCode', 'SMSProvider')
+    }
+    else {
+        $prefs = @{}
+        foreach ($__kv in $defaults.GetEnumerator()) { $prefs[$__kv.Key] = $__kv.Value }
+        if (Test-Path -LiteralPath $global:PrefsPath) {
+            try {
+                $loaded = Get-Content -LiteralPath $global:PrefsPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                foreach ($k in @($defaults.Keys)) {
+                    $val = $loaded.$k
+                    if ($null -ne $val -and -not [string]::IsNullOrWhiteSpace([string]$val)) {
+                        $prefs[$k] = $val
+                    }
                 }
+            } catch {
+                # The saved defaults are optional. The built-in defaults stay in use.
+                $null = $_
             }
-        } catch {
-            # The saved defaults are optional. The built-in defaults stay in use.
-            $null = $_
         }
     }
-    return $defaults
+    # A path that an older version saved as the default under the tool folder is stale: it counts as empty.
+    foreach ($__pair in @(@('DeploymentAuditLogPath', 'AuditLog'), @('RingRunStatePath', 'RingRuns'), @('RolloutRunPath', 'Rollouts'))) {
+        $prefs[$__pair[0]] = ConvertTo-DhPathPref -Value $prefs[$__pair[0]] -LegacyPath (Get-DhLegacyStorePath -Store $__pair[1] -ToolRoot $PSScriptRoot)
+    }
+    return $prefs
 }
 
 function Save-DhPreferences {
     param([hashtable]$Prefs)
-    $null = Save-SuiteSettings -Path $global:PrefsPath -Settings $Prefs
+    $site = if ($script:Site) { $script:Site } else { [pscustomobject]@{ Active = $false } }
+    $ok = Save-SuiteToolPrefs -Path $global:PrefsPath -Settings $Prefs -Site $site -SiteKeys @('SiteCode', 'SMSProvider')
+    if (-not $ok) { Write-Log 'The settings could not be saved.' -Level WARN }
 }
 
 $global:Prefs = Get-DhPreferences
 
-# The suite launcher hands its site code and provider to each tool it starts.
-# A value saved in this tool wins; the launcher value fills an empty one.
-if (-not $global:Prefs.SiteCode    -and $env:SUITE_CM_SITECODE) { $global:Prefs.SiteCode    = [string]$env:SUITE_CM_SITECODE }
-if (-not $global:Prefs.SMSProvider -and $env:SUITE_CM_PROVIDER) { $global:Prefs.SMSProvider = [string]$env:SUITE_CM_PROVIDER }
+# The suite launcher hands its site code and provider to each tool it starts. With a site, the site decides and
+# these two variables are ignored here. With no site, a value saved in this tool wins and the variable fills an empty one.
+if (-not $script:Site.Active) {
+    if (-not $global:Prefs.SiteCode    -and $env:SUITE_CM_SITECODE) { $global:Prefs.SiteCode    = [string]$env:SUITE_CM_SITECODE }
+    if (-not $global:Prefs.SMSProvider -and $env:SUITE_CM_PROVIDER) { $global:Prefs.SMSProvider = [string]$env:SUITE_CM_PROVIDER }
+}
 
 # Script params override prefs only when non-empty. Empty-by-default
 # means the shipped app reads from DeploymentHelper.prefs.json (user-
 # supplied on first run via Options > Connection) and any CLI override
 # overrides that. Never auto-populates a site code or provider the
 # user hasn't configured.
-if (-not [string]::IsNullOrWhiteSpace($SiteCode))    { $global:Prefs['SiteCode']    = $SiteCode }
+if (-not [string]::IsNullOrWhiteSpace($SiteCode) -and -not $script:Site.Active) { $global:Prefs['SiteCode'] = $SiteCode }
 if (-not [string]::IsNullOrWhiteSpace($SMSProvider)) { $global:Prefs['SMSProvider'] = $SMSProvider }
+
+# A -SiteCode on the command line cannot move the data to another site: the site is chosen in the launcher.
+if ($script:Site.Active -and -not [string]::IsNullOrWhiteSpace($SiteCode) -and $SiteCode.Trim() -ne $script:Site.SiteCode) {
+    $__siteCodeIgnored = $SiteCode
+}
 
 # Initialize tool log
 $toolLogDir = Join-Path $PSScriptRoot 'Logs'
@@ -177,13 +206,15 @@ if (-not (Test-Path -LiteralPath $toolLogDir)) {
 }
 $toolLogPath = Join-Path $toolLogDir ('DeploymentHelper-{0}.log' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 Initialize-Logging -LogPath $toolLogPath
+if ($script:Site.Active) {
+    Write-Log ('Site {0}; data in {1}' -f $script:Site.SiteFolder, $script:Site.ToolFolder)
+    if ($__siteCodeIgnored) { Write-Log ('The parameter -SiteCode {0} is ignored. The site is chosen in the AppPackager Suite launcher.' -f $__siteCodeIgnored) -Level WARN }
+}
+elseif ($script:Site.Reason) { Write-Log ('No site data folder: {0}' -f $script:Site.Reason) }
 
 # Deployment audit log (JSONL) -- drive off prefs so the Options window can change it
-$script:DeploymentAuditLog = $global:Prefs['DeploymentAuditLogPath']
-if ([string]::IsNullOrWhiteSpace($script:DeploymentAuditLog)) {
-    $script:DeploymentAuditLog = Join-Path $toolLogDir 'deployment-audit.jsonl'
-    $global:Prefs['DeploymentAuditLogPath'] = $script:DeploymentAuditLog
-}
+# An empty pref means the site store. The default is never written to the prefs.
+$script:DeploymentAuditLog = Resolve-DhStorePath -Store AuditLog -ToolRoot $PSScriptRoot -Pref $global:Prefs['DeploymentAuditLogPath'] -Site $script:Site -Create
 
 # =============================================================================
 # First-run template seed. Writes four default deployment templates to
@@ -262,14 +293,15 @@ if (-not (Get-ChildItem -LiteralPath $__templatesDir -Filter '*.json' -ErrorActi
 }
 
 # =============================================================================
-# Ring plans: Rings\*.json beside Templates\. First run writes two seed plans
-# that name no collection. Run state for held rings lives in the folder set
-# in Options > Logging (default Rings\runs; a UNC path lets a team share it).
+# Ring plans: *.json in the rings store of the site (old place: Rings\ beside the script).
+# First run writes two seed plans that name no collection. Run state for held rings
+# lives in the folder set in Options > Logging (default: rings\runs in the site store;
+# a UNC path lets a team share it).
 # =============================================================================
-$script:RingPlanDir = Join-Path $PSScriptRoot 'Rings'
+$script:RingPlanDir = Resolve-DhStorePath -Store RingPlans -ToolRoot $PSScriptRoot -Site $script:Site -Create
 try { [void](Initialize-RingPlanFolder -Path $script:RingPlanDir) }
 catch { Write-Log ('Ring plan seed failed: {0}' -f $_.Exception.Message) -Level WARN }
-$script:RingRunStatePath = [string]$global:Prefs['RingRunStatePath']
+$script:RingRunStatePath = Resolve-DhStorePath -Store RingRuns -ToolRoot $PSScriptRoot -Pref $global:Prefs['RingRunStatePath'] -Site $script:Site
 
 # =============================================================================
 # Deployment type state
@@ -2087,6 +2119,11 @@ function New-ConnectionPanel {
     $txtSite.Margin = '0,4,0,4'
     $txtSite.Width = 80
     $txtSite.HorizontalAlignment = 'Left'
+    if ($global:DhSite.Active) {
+        # The launcher chooses the site. A tool that is open keeps its site until it restarts.
+        $txtSite.IsReadOnly = $true
+        $txtSite.ToolTip = 'The site is chosen in the AppPackager Suite launcher. Restart this tool after you change it.'
+    }
     [System.Windows.Controls.Grid]::SetRow($txtSite, 0)
     [System.Windows.Controls.Grid]::SetColumn($txtSite, 1)
     [void]$g.Children.Add($txtSite)
@@ -2191,6 +2228,7 @@ function New-ConnectionPanel {
         Element = $grid
         Commit  = {
             $newSite = $txtSite.Text.Trim().ToUpper()
+            if ($global:DhSite.Active) { $newSite = [string]$global:Prefs['SiteCode'] }
             $newProv = $txtProv.Text.Trim()
             # Site codes are 3 alphanumerics; anything else could corrupt the
             # WMI namespace path "root\SMS\site_$SiteCode" in downstream queries.
@@ -2262,7 +2300,10 @@ function New-LoggingPanel {
     [void]$row.Children.Add($auditBtn)
     $auditTxt = New-Object System.Windows.Controls.TextBox
     $auditTxt.Name = 'txtAuditLog'
+    $dhRoot = $PSScriptRoot
+    $dhSite = $global:DhSite
     $auditTxt.Text = [string]$global:Prefs['DeploymentAuditLogPath']
+    $auditTxt.ToolTip = 'Leave the box empty to use the default place. The line below shows the path in use.'
     $auditTxt.FontSize = 11
     $auditTxt.FontFamily = 'Cascadia Code, Consolas, Courier New'
     $auditTxt.Height = 32
@@ -2270,12 +2311,25 @@ function New-LoggingPanel {
     [void]$row.Children.Add($auditTxt)
     [void]$grid.Children.Add($row)
 
+    $auditHint = New-Object System.Windows.Controls.TextBlock
+    $auditHint.Name = 'lblAuditInUse'
+    $auditHint.Text = ('In use: {0}' -f (Resolve-DhStorePath -Store AuditLog -ToolRoot $dhRoot -Pref $auditTxt.Text -Site $dhSite))
+    $auditHint.FontSize = 11
+    $auditHint.TextWrapping = 'Wrap'
+    $auditHint.Margin = '0,4,0,0'
+    $auditHint.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'MahApps.Brushes.Gray1')
+    [void]$grid.Children.Add($auditHint)
+    $auditTxt.Add_TextChanged({
+        $auditHint.Text = ('In use: {0}' -f (Resolve-DhStorePath -Store AuditLog -ToolRoot $dhRoot -Pref $auditTxt.Text -Site $dhSite))
+    }.GetNewClosure())
+
     $auditBtn.Add_Click({
         $dlg = New-Object System.Windows.Forms.SaveFileDialog
         $dlg.Title = 'Deployment Audit Log Location'
         $dlg.Filter = 'JSONL files (*.jsonl)|*.jsonl|All files (*.*)|*.*'
-        $dlg.FileName = Split-Path -Path $auditTxt.Text -Leaf
-        $dir = Split-Path -Path $auditTxt.Text -Parent
+        $inUse = Resolve-DhStorePath -Store AuditLog -ToolRoot $dhRoot -Pref $auditTxt.Text -Site $dhSite
+        $dlg.FileName = Split-Path -Path $inUse -Leaf
+        $dir = Split-Path -Path $inUse -Parent
         if ($dir) { $dlg.InitialDirectory = $dir }
         if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             $auditTxt.Text = $dlg.FileName
@@ -2301,7 +2355,7 @@ function New-LoggingPanel {
     [void]$runsRow.Children.Add($runsBtn)
     $runsTxt = New-Object System.Windows.Controls.TextBox
     $runsTxt.Name = 'txtRingRuns'
-    $runsTxt.ToolTip = 'Use a local path or a UNC share for a team.'
+    $runsTxt.ToolTip = 'Leave the box empty to use the default place. Use a UNC share for a team.'
     $runsTxt.Text = [string]$global:Prefs['RingRunStatePath']
     $runsTxt.FontSize = 11
     $runsTxt.FontFamily = 'Cascadia Code, Consolas, Courier New'
@@ -2310,10 +2364,23 @@ function New-LoggingPanel {
     [void]$runsRow.Children.Add($runsTxt)
     [void]$grid.Children.Add($runsRow)
 
+    $runsHint = New-Object System.Windows.Controls.TextBlock
+    $runsHint.Name = 'lblRingRunsInUse'
+    $runsHint.Text = ('In use: {0}' -f (Resolve-DhStorePath -Store RingRuns -ToolRoot $dhRoot -Pref $runsTxt.Text -Site $dhSite))
+    $runsHint.FontSize = 11
+    $runsHint.TextWrapping = 'Wrap'
+    $runsHint.Margin = '0,4,0,0'
+    $runsHint.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, 'MahApps.Brushes.Gray1')
+    [void]$grid.Children.Add($runsHint)
+    $runsTxt.Add_TextChanged({
+        $runsHint.Text = ('In use: {0}' -f (Resolve-DhStorePath -Store RingRuns -ToolRoot $dhRoot -Pref $runsTxt.Text -Site $dhSite))
+    }.GetNewClosure())
+
     $runsBtn.Add_Click({
         $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
         $dlg.Description = 'Folder for ring run-state files'
-        if (Test-Path -LiteralPath $runsTxt.Text) { $dlg.SelectedPath = $runsTxt.Text }
+        $inUse = Resolve-DhStorePath -Store RingRuns -ToolRoot $dhRoot -Pref $runsTxt.Text -Site $dhSite
+        if (Test-Path -LiteralPath $inUse) { $dlg.SelectedPath = $inUse }
         if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             $runsTxt.Text = $dlg.SelectedPath
         }
@@ -2338,15 +2405,16 @@ function New-LoggingPanel {
         Name    = 'Logging'
         Element = $grid
         Commit  = {
-            $newPath = $auditTxt.Text.Trim()
-            if ($newPath -and $newPath -ne [string]$global:Prefs['DeploymentAuditLogPath']) {
+            # An empty box, the old default under the tool folder and the default of the site all mean the default place. Only a path of the user is saved.
+            $newPath = ConvertTo-DhPathPref -Value $auditTxt.Text -LegacyPath (Get-DhLegacyStorePath -Store AuditLog -ToolRoot $dhRoot) -SitePath (Resolve-DhStorePath -Store AuditLog -ToolRoot $dhRoot -Pref '' -Site $dhSite)
+            if ($newPath -ne [string]$global:Prefs['DeploymentAuditLogPath']) {
                 $global:Prefs['DeploymentAuditLogPath'] = $newPath
-                & $applyAuditPathChange -NewPath $newPath
+                & $applyAuditPathChange -NewPath (Resolve-DhStorePath -Store AuditLog -ToolRoot $dhRoot -Pref $newPath -Site $dhSite -Create)
             }
-            $newRuns = $runsTxt.Text.Trim()
-            if ($newRuns -and $newRuns -ne [string]$global:Prefs['RingRunStatePath']) {
+            $newRuns = ConvertTo-DhPathPref -Value $runsTxt.Text -LegacyPath (Get-DhLegacyStorePath -Store RingRuns -ToolRoot $dhRoot) -SitePath (Resolve-DhStorePath -Store RingRuns -ToolRoot $dhRoot -Pref '' -Site $dhSite)
+            if ($newRuns -ne [string]$global:Prefs['RingRunStatePath']) {
                 $global:Prefs['RingRunStatePath'] = $newRuns
-                & $applyRingRunsPathChange -NewPath $newRuns
+                & $applyRingRunsPathChange -NewPath (Resolve-DhStorePath -Store RingRuns -ToolRoot $dhRoot -Pref $newRuns -Site $dhSite)
             }
         }.GetNewClosure()
     }
@@ -4070,9 +4138,7 @@ function Get-RolloutPrefTable {
 }
 
 function Get-RolloutRunFolder {
-    $p = [string]$global:Prefs['RolloutRunPath']
-    if ([string]::IsNullOrWhiteSpace($p)) { $p = Join-Path $PSScriptRoot 'Rollouts' }
-    return $p
+    return (Resolve-DhStorePath -Store Rollouts -ToolRoot $PSScriptRoot -Pref $global:Prefs['RolloutRunPath'] -Site $script:Site)
 }
 
 function Update-RolloutSettingsUi {
@@ -5071,6 +5137,7 @@ $window.Add_Loaded({
     }
     catch { Add-LogLine -Message 'The footer was not set up.' }
     Update-FooterSite
+    $null = Start-SuiteSiteWatch -Window $window -Site $script:Site
     if ($script:SavedType -eq 'Rings') {
         & $script:SetCurrentType 'Apps'
         & $script:ShowRingView
@@ -5088,6 +5155,7 @@ $window.Add_Loaded({
     & $script:RefreshApplyTemplateCombo
     Add-LogLine -Message ('Deployment Helper loaded. Site={0} Provider={1}' -f $global:Prefs['SiteCode'], $global:Prefs['SMSProvider'])
     Add-LogLine -Message ('Tool log: {0}' -f $toolLogPath)
+    if ($script:Site.Active) { Add-LogLine -Message ('Site {0}; data in {1}' -f $script:Site.SiteFolder, $script:Site.ToolFolder) }
     Set-StatusText -Text 'Ready.'
 })
 

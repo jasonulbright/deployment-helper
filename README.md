@@ -144,17 +144,24 @@ The run-state folder is set in **Options > Logging**. The default is `Rings\runs
 
 Before creating a deployment, the tool checks that the configured audit log can be opened for writing. Every ring deployment then writes one audit record with `PlanName`, `RingIndex`, `RingName`, and `RunId`. If the append still fails after Configuration Manager creates a deployment, the tool reports its ID and stops before creating later rings.
 
+## Sites
+
+The AppPackager Suite launcher chooses the site. Deployment Helper keeps the audit log, the ring plans, the ring runs, the rollout runs, the site code and the SMS Provider per site in `%LOCALAPPDATA%\AppPackagerData\sites\<SITE>\tools\deployment-helper`, and the first start after an update copies the old data and keeps the old files.
+
 ## Files written on disk
+
+The site items in the table are in the site data folder when a site is chosen. They are beside the script when no site is chosen.
 
 | File | Purpose |
 |------|---------|
-| `DeploymentHelper.prefs.json` | Site code, SMS Provider, audit log path, ring run-state folder |
+| `DeploymentHelper.prefs.json` | Global settings, and the site code and SMS Provider when no site is chosen |
 | `DeploymentHelper.windowstate.json` | Window size, position, theme, last-used deployment type |
 | `Logs\DeploymentHelper-*.log` | Per-session tool log |
-| `Logs\deployment-audit.jsonl` | Immutable deployment audit trail |
+| `deployment-audit.jsonl` (site data folder) | Immutable deployment audit trail |
 | `Templates\*.json` | Deployment templates |
-| `Rings\*.json` | Ring plans |
-| `Rings\runs\*.json` | Run state of held ring runs (`closed\` holds finished runs); folder set in Options |
+| `rings\*.json` (site data folder) | Ring plans |
+| `rings\runs\*.json` (site data folder) | Run state of held ring runs (`closed\` holds finished runs); folder set in Options |
+| `rollouts\*.json` (site data folder) | Run files of the update rollout |
 | `Reports\*.csv` / `Reports\*.html` | History exports |
 
 ## Testing

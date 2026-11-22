@@ -155,6 +155,11 @@
         'Get-RolloutProdItem'
         'Get-RolloutCheckResultPath'
         'Import-RolloutCheckResult'
+
+        # Per-site stores (Q-112f)
+        'Get-DhLegacyStorePath'
+        'ConvertTo-DhPathPref'
+        'Resolve-DhStorePath'
     )
 
     CmdletsToExport   = @()

@@ -101,7 +101,7 @@ Select **Step 1: Deploy to Test**. The confirmation lists each test item, whethe
 
 ![The Step 1 confirmation](../images/dialog-rollout-step1.png)
 
-Step 1 creates the test collections that do not exist and deploys the new versions to them. It saves the whole plan, with the production items, in a run file in the `Rollouts` folder. A step stops at the first failed item. The objects that it created stay.
+Step 1 creates the test collections that do not exist and deploys the new versions to them. It saves the whole plan, with the production items, in a run file in the `rollouts` folder of the site data folder. A step stops at the first failed item. The objects that it created stay.
 
 ### Step 2: create production
 
@@ -143,7 +143,7 @@ Limits of the compare:
 | **Preview Plan** | Check the plan and count the members. |
 | **Step 1: Deploy to Test**, **Step 2: Create Production** | Run a step after a confirmation. |
 
-The settings are in `DeploymentHelper.prefs.json`. The run files are in the `Rollouts` folder beside the script.
+The settings are in `DeploymentHelper.prefs.json`. The run files are in the `rollouts` folder of the site data folder (`Rollouts` beside the script when no site is chosen).
 
 ## Limits
 
