@@ -20,14 +20,14 @@ Use it when you want a checked, logged deployment, or a ring deployment with one
 
 ### Start the tool
 
-1. Extract the release zip to a folder that you can write to. The tool saves its settings, logs, templates and ring plans in that folder.
+1. Extract the release zip to a folder that you can write to. The tool saves its global settings, logs and templates in that folder. It saves the audit log, the ring plans and the run files in the site data folder (see [Options dialog](core/options.md#sites)).
 2. Right-click `start-deploymenthelper.ps1` and select **Run with PowerShell**. Or run this command:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File start-deploymenthelper.ps1
 ```
 
-The window opens on **Apps**. At the first start the tool writes four deployment templates to `Templates` and two ring plans to `Rings`.
+The window opens on **Apps**. At the first start the tool writes four deployment templates to `Templates` and two ring plans to the `rings` folder of the site data folder.
 
 ![The window at the first start](images/start-first-run.png)
 

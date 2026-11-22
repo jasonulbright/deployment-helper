@@ -4022,3 +4022,85 @@ function Import-RolloutCheckResult {
     }
     return @{ Rows = @($rows); Errors = $errors.ToArray() }
 }
+
+# ---------------------------------------------------------------------------
+# Per-site stores (Q-112f)
+# ---------------------------------------------------------------------------
+# The audit log, the ring plans, the ring run files and the rollout run files belong to the site. With an active site
+# they live in sites\<SITE>\tools\deployment-helper (store names: deployment-audit.jsonl, rings, rings\runs, rollouts).
+# With no site the tool keeps the old paths beside the script. A path that the user typed in Options always wins.
+
+function Get-DhLegacyStorePath {
+    <#
+    .SYNOPSIS
+        Returns the old path of a store: the place beside the script, as the tool used before the per-site layout.
+    .PARAMETER Store
+        AuditLog, RingPlans, RingRuns or Rollouts.
+    .PARAMETER ToolRoot
+        The folder of the tool (the folder of the start script).
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)][ValidateSet('AuditLog', 'RingPlans', 'RingRuns', 'Rollouts')][string]$Store,
+        [Parameter(Mandatory)][string]$ToolRoot
+    )
+    switch ($Store) {
+        'AuditLog'  { return (Join-Path $ToolRoot 'Logs\deployment-audit.jsonl') }
+        'RingPlans' { return (Join-Path $ToolRoot 'Rings') }
+        'RingRuns'  { return (Join-Path $ToolRoot 'Rings\runs') }
+        'Rollouts'  { return (Join-Path $ToolRoot 'Rollouts') }
+    }
+}
+
+function ConvertTo-DhPathPref {
+    <#
+    .SYNOPSIS
+        Returns the path value that the tool keeps in its prefs: empty for "use the default", else the path the user chose.
+    .DESCRIPTION
+        An older version wrote the computed default path into the prefs. A value that equals the old default under the
+        tool folder is stale after the move to the site folder, so it counts as empty. Any other value is a choice of the user.
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        $Value,
+        [Parameter(Mandatory)][string]$LegacyPath
+    )
+    $text = ([string]$Value).Trim()
+    if (-not $text) { return '' }
+    $a = $text.TrimEnd('\', '/')
+    $b = $LegacyPath.TrimEnd('\', '/')
+    if ($a.Equals($b, [StringComparison]::OrdinalIgnoreCase)) { return '' }
+    return $text
+}
+
+function Resolve-DhStorePath {
+    <#
+    .SYNOPSIS
+        Returns the path in use for a store: the path of the user, else the site store, else the old path.
+    .PARAMETER Pref
+        The saved path value of the store. Empty or the stale old default means "use the default".
+    .PARAMETER Site
+        The result of Resolve-SuiteToolSite, or $null for no site.
+    .PARAMETER Create
+        Create the folder of the site store (the parent folder for the audit log).
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)][ValidateSet('AuditLog', 'RingPlans', 'RingRuns', 'Rollouts')][string]$Store,
+        [Parameter(Mandatory)][string]$ToolRoot,
+        $Pref,
+        $Site,
+        [switch]$Create
+    )
+    $legacy = Get-DhLegacyStorePath -Store $Store -ToolRoot $ToolRoot
+    if ($Store -ne 'RingPlans') {
+        $chosen = ConvertTo-DhPathPref -Value $Pref -LegacyPath $legacy
+        if ($chosen) { return $chosen }
+    }
+    if (-not $Site -or -not $Site.Active) { return $legacy }
+    $name = switch ($Store) { 'AuditLog' { 'deployment-audit.jsonl' } 'RingPlans' { 'rings' } 'RingRuns' { 'rings\runs' } 'Rollouts' { 'rollouts' } }
+    return (Resolve-SuiteToolPath -Site $Site -Name $name -LegacyPath $legacy -File:($Store -eq 'AuditLog') -Create:$Create)
+}

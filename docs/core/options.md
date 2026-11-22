@@ -20,17 +20,17 @@ None.
 
 | Field | Meaning |
 |---|---|
-| **Site Code** | The site code, for example `MCM`. The title is bold at 14 pt in both themes. |
+| **Site Code** | The site code, for example `MCM`. The title is bold at 14 pt in both themes. The box is read-only when the launcher chose a site. |
 | **SMS Provider** | The server with the SMS Provider role. The title is bold at 14 pt in both themes. |
 | **Reload DP Groups** | Loads the distribution point groups again. |
 
-The footer of the window shows the saved site code and SMS Provider. **Options** is the only place where you change them. **OK** disconnects the current connection when the site code or the provider changed. The next action that needs a connection connects again with the saved settings.
+The footer of the window shows the saved site code and SMS Provider. **Options** is the only place where you change the SMS Provider. The AppPackager Suite launcher chooses the site code. See [Sites](#sites). **OK** disconnects the current connection when the site code or the provider changed. The next action that needs a connection connects again with the saved settings.
 
 ![The Connection page](../images/options-connection.png)
 
 ### Logging
 
-The page shows the path of the current tool log, the path of the deployment audit log (JSONL) and the ring run-state folder. Select **Browse...** to change the last two. A UNC path for the run-state folder lets a team share runs.
+The page shows the path of the current tool log, the path of the deployment audit log (JSONL) and the ring run-state folder. Select **Browse...** to change the last two. Leave a box empty to use the default place. The line below each box shows the path in use. A UNC path for the run-state folder lets a team share runs.
 
 ![The Logging page](../images/options-logging.png)
 
@@ -51,6 +51,15 @@ The list shows the deployment templates. **New**, **Duplicate** and **Delete** c
 The page shows the version and a short description.
 
 ![The About page](../images/options-about.png)
+
+### Sites
+
+The AppPackager Suite launcher chooses the site. Deployment Helper keeps its data for each site in `%LOCALAPPDATA%\AppPackagerData\sites\<SITE>\tools\deployment-helper`, for example `sites\AB1\tools\deployment-helper` and `sites\CD2\tools\deployment-helper`. This covers the audit log, the ring plans, the ring run files, the rollout run files, the site code and the SMS Provider. The templates, the theme and the window state stay global.
+
+- The **Site Code** box is read-only. Hover over it to read why. Choose another site in the launcher and restart this tool.
+- A tool that is open keeps its site until you restart it. The footer shows a note when the launcher chose another site, for example: The launcher now uses site CD2. This window keeps site AB1 until you restart it.
+- The first start after an update copies the old data into the site folder. The tool keeps the old files where they were.
+- A path that you type on the **Logging** page stays your choice and is used for every site.
 
 ### Theme
 

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Keep the audit log, ring plans, run files and site settings per site.
+- Store no default path in the settings. An empty path means the site folder.
+
 ## [2026.11.21.0030] - 2026-11-21
 
 ## 1 new view: update 43 applications in two steps

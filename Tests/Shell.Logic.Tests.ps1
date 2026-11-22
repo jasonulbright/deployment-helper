@@ -559,12 +559,28 @@ Describe 'Preferences file' {
     BeforeEach { $global:PrefsPath = Join-Path $TestDrive ('prefs-{0}.json' -f [guid]::NewGuid().ToString('N')) }
     AfterAll { Remove-Variable -Name PrefsPath -Scope Global -ErrorAction SilentlyContinue }
 
-    It 'gives the defaults on first run, with the audit log and the ring runs beside the script' {
+    It 'gives the defaults on first run, with no stored path (empty means the default place)' {
         $p = Get-DhPreferences
         $p.SiteCode | Should -Be ''
         $p.SMSProvider | Should -Be ''
-        $p.DeploymentAuditLogPath | Should -BeLike '*\Logs\deployment-audit.jsonl'
-        $p.RingRunStatePath | Should -BeLike '*\Rings\runs'
+        $p.DeploymentAuditLogPath | Should -Be ''
+        $p.RingRunStatePath | Should -Be ''
+        $p.RolloutRunPath | Should -Be ''
+    }
+
+    It 'treats a saved old default under the tool folder as empty, and keeps a path that the user chose' {
+        $json = [ordered]@{
+            SiteCode               = 'AB1'
+            DeploymentAuditLogPath = (Join-Path $script:AppRoot 'Logs\deployment-audit.jsonl')
+            RingRunStatePath       = '\files.example.com\share\runs'
+            RolloutRunPath         = ((Join-Path $script:AppRoot 'Rollouts') + '\')
+        } | ConvertTo-Json
+        Set-Content -LiteralPath $global:PrefsPath -Value $json
+        $p = Get-DhPreferences
+        $p.SiteCode | Should -Be 'AB1'
+        $p.DeploymentAuditLogPath | Should -Be ''
+        $p.RingRunStatePath | Should -Be '\files.example.com\share\runs'
+        $p.RolloutRunPath | Should -Be ''
     }
 
     It 'gives the defaults for a <Case> file' -ForEach @(
@@ -575,7 +591,7 @@ Describe 'Preferences file' {
         Set-Content -LiteralPath $global:PrefsPath -Value $Content
         $p = Get-DhPreferences
         $p.SiteCode | Should -Be ''
-        $p.DeploymentAuditLogPath | Should -BeLike '*deployment-audit.jsonl'
+        $p.DeploymentAuditLogPath | Should -Be ''
     }
 
     It 'ignores a key that it does not know, and a blank value' {
