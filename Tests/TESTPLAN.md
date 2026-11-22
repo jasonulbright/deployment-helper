@@ -27,6 +27,7 @@ Window tests: the `*.Window.Tests.ps1` files open windows only when `SUITE_ALLOW
 | Theme guards | `Theme.Guard.Tests.ps1`, `Theme.Source.Guard.Tests.ps1`, `ButtonStyle.Guard.Tests.ps1`, `FontWeight.Guard.Tests.ps1`, `Footer.Guard.Tests.ps1` | White text on blue, fonts independent of the theme, banned words, one themed button style (also in the vendored SuiteCommon dialogs), Title Case, the footer |
 | Encoding | `Encoding.Guard.Tests.ps1` | Plain ASCII in every PowerShell file and every file that PowerShell reads |
 | Documents and images | `Documentation.Tests.ps1`, `Readme.Images.Guard.Tests.ps1`, `GuideImages.Guard.Tests.ps1` | Index and links, every README image is a guide image, every guide image was produced by a capture run |
+| View data | `Ring.View.Tests.ps1` | The rows that reach the controls, counted on real WPF controls that are not shown: the ring preview grid from a plan file, and the Open Runs grid from run files (also a run file that cannot be read) |
 | Capture tool | `GuideCapture.Tests.ps1` | The capture scripts parse, take the lab lock and clean up after themselves |
 
 ## Not covered, and why
