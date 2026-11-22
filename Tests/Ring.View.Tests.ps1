@@ -173,7 +173,15 @@ Describe 'The ring grids bind to properties that the rows have' {
             param([string]$GridName)
             $node = $script:Xaml.SelectSingleNode(('//w:DataGrid[@x:Name=''{0}'']' -f $GridName), $script:XamlNs)
             if (-not $node) { throw "grid $GridName not found in MainWindow.xaml" }
-            @([regex]::Matches($node.OuterXml, '\{Binding\s+(?:Path=)?([A-Za-z_][A-Za-z0-9_]*)') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+            $columns = $node.SelectSingleNode('*[contains(local-name(), ''Columns'')]')
+            $text = if ($columns) { $columns.OuterXml } else { '' }
+            # One {Binding ...} body at a time (one level of nested braces). A binding to the item of another element is not a row property.
+            @($(foreach ($m in [regex]::Matches($text, '\{Binding((?:[^{}]|\{[^{}]*\})*)\}')) {
+                    $body = $m.Groups[1].Value
+                    if ($body -match 'RelativeSource|ElementName|Source=') { continue }
+                    if ($body -match '^\s*(?:Path=)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:[,}]|$)') { $Matches[1] }
+                    elseif ($body -match 'Path=([A-Za-z_][A-Za-z0-9_]*)') { $Matches[1] }
+                }) | Sort-Object -Unique)
         }
     }
 
@@ -189,7 +197,9 @@ Describe 'The ring grids bind to properties that the rows have' {
         Update-RingPreview
         $paths = @(Get-GridBindingPath -GridName 'dgRingPreview')
         $paths.Count | Should -BeGreaterThan 3
-        foreach ($path in $paths) { $null -ne $dgRingPreview.Items[0].PSObject.Properties[$path] | Should -BeTrue -Because "the column binds to $path" }
+        $dgRingPreview.Items.Count | Should -BeGreaterThan 0
+        $names = @($dgRingPreview.Items[0].PSObject.Properties.Name)
+        foreach ($path in $paths) { ($names -ccontains $path) | Should -BeTrue -Because "the column binds to $path" }
     }
 
     It 'gives the Open Runs grid a property for every column binding' {
@@ -203,6 +213,8 @@ Describe 'The ring grids bind to properties that the rows have' {
         Update-RingRunsGrid
         $paths = @(Get-GridBindingPath -GridName 'dgRingRuns')
         $paths.Count | Should -BeGreaterThan 3
-        foreach ($path in $paths) { $null -ne $dgRingRuns.Items[0].PSObject.Properties[$path] | Should -BeTrue -Because "the column binds to $path" }
+        $dgRingRuns.Items.Count | Should -BeGreaterThan 0
+        $names = @($dgRingRuns.Items[0].PSObject.Properties.Name)
+        foreach ($path in $paths) { ($names -ccontains $path) | Should -BeTrue -Because "the column binds to $path" }
     }
 }
