@@ -155,6 +155,12 @@
         'Get-RolloutProdItem'
         'Get-RolloutCheckResultPath'
         'Import-RolloutCheckResult'
+        'Format-RolloutSourceText'
+        'ConvertTo-DhStaleHours'
+        'Get-DhHandoffPlan'
+        'Get-RingPlanUpdate'
+        'Copy-DhHandoffPlan'
+        'Format-DhHandoffText'
 
         # Per-site stores (Q-112f)
         'Get-DhLegacyStorePath'

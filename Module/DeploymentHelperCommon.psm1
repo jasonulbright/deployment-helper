@@ -3975,9 +3975,22 @@ function Get-RolloutProdItem {
 function Get-RolloutCheckResultPath {
     <#
     .SYNOPSIS
-        Returns the places where the two packager apps write the result file of Check ConfigMgr.
+        Returns the places where the packager apps write the result file of Check ConfigMgr, the newest layout first.
+    .DESCRIPTION
+        With a site folder name (AB1 or AB1~2) the first path is results\ of that site in the data root. The older
+        places follow: SRLPackr under APP_PACKAGER_DATA_ROOT, SRLPackr and AppPackager under the local app data folder.
+        A file in an older place does not record its site.
     #>
+    param([string]$SiteFolder, [string]$DataRoot)
     $paths = New-Object System.Collections.Generic.List[string]
+    if ($SiteFolder) {
+        try {
+            $args2 = @{ SiteCode = $SiteFolder; Area = 'results' }
+            if ($DataRoot) { $args2['DataRoot'] = $DataRoot }
+            $paths.Add((Join-Path (Get-SuiteSiteFolder @args2) 'CheckConfigMgrResult.csv'))
+        }
+        catch { $null = $_ }
+    }
     $local = [string]$env:LOCALAPPDATA
     $root = [string]$env:APP_PACKAGER_DATA_ROOT
     if ($root) {
@@ -3990,6 +4003,12 @@ function Get-RolloutCheckResultPath {
     return $paths.ToArray()
 }
 
+function ConvertTo-RolloutCheckTime {
+    # Parses the CheckedAtUtc text of a result row (yyyy-MM-ddTHH:mm:ssZ). Returns a UTC [datetime] or $null.
+    param([AllowNull()]$Value)
+    return (ConvertFrom-SuiteUtcText -Value $Value)
+}
+
 function Import-RolloutCheckResult {
     <#
     .SYNOPSIS
@@ -3997,30 +4016,237 @@ function Import-RolloutCheckResult {
         UpdateAvailable as rollout rows. Of two rows for one application the newer check wins.
     .DESCRIPTION
         The new version is LatestVersion. The software name is the first Add/Remove Programs name of the result
-        row without its wildcards. A row without a dotted LatestVersion is left out. Returns Rows and Errors.
+        row without its wildcards. A row without a dotted LatestVersion is left out. Returns Rows, Errors and Sources.
+        Sources has one entry for each file that gave a row: Path, Source (the tool that wrote it), SiteCode (from the
+        site folder of the path, empty for an older place), CheckedAtUtc (the newest row of the file), AgeText, IsStale,
+        SiteMismatch (the file is for another site than -ActiveSite) and Rows (the rows taken from the file).
+        A file that has no valid CheckedAtUtc has an empty AgeText and counts as stale: its age is not known.
+    .PARAMETER StaleAfterHours
+        A file whose newest row is older than this is flagged stale. The rows are still returned.
+    .PARAMETER ActiveSite
+        The site folder name that this window uses. A file for another site is flagged.
     #>
-    param([string[]]$Path = (Get-RolloutCheckResultPath), [string]$DefaultRole = 'Both')
+    param(
+        [string[]]$Path = (Get-RolloutCheckResultPath),
+        [string]$DefaultRole = 'Both',
+        [double]$StaleAfterHours = 72,
+        [string]$ActiveSite,
+        [datetime]$NowUtc
+    )
+    if (-not $PSBoundParameters.ContainsKey('NowUtc')) { $NowUtc = [datetime]::UtcNow }
     $best = @{}
     $errors = New-Object System.Collections.Generic.List[string]
+    $files = New-Object System.Collections.Generic.List[object]
     foreach ($f in $Path) {
         if (-not (Test-Path -LiteralPath $f)) { continue }
         try { $data = @(Import-Csv -LiteralPath $f -Encoding UTF8 -ErrorAction Stop) }
         catch { $errors.Add(("The result file '{0}' could not be read." -f $f)); continue }
+        $siteCode = ''
+        $m = [regex]::Match($f, '[\\/]sites[\\/]([^\\/]+)[\\/]results[\\/]', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if ($m.Success) { $parsed = ConvertFrom-SuiteSiteFolderName -Name $m.Groups[1].Value; if ($parsed) { $siteCode = $parsed.SiteCode } }
+        $newest = $null
+        $sourceNames = @{}
+        foreach ($r in $data) {
+            $t = ConvertTo-RolloutCheckTime -Value $r.CheckedAtUtc
+            if ($t -and (-not $newest -or $t -gt $newest)) { $newest = $t }
+            if ([string]$r.Source) { $sourceNames[[string]$r.Source] = $true }
+        }
+        $entry = [pscustomobject]@{ Path = $f; Source = (@($sourceNames.Keys | Sort-Object) -join ', '); SiteCode = $siteCode; CheckedAtUtc = $newest; AgeText = ''; IsStale = $true; SiteMismatch = $false; Rows = 0 }
+        if ($newest) { $age = Get-SuiteDataAge -CreatedUtc $newest -StaleAfterHours $StaleAfterHours -NowUtc $NowUtc; $entry.AgeText = $age.AgeText; $entry.IsStale = $age.IsStale }
+        if ($ActiveSite -and $siteCode) { $pa = ConvertFrom-SuiteSiteFolderName -Name $ActiveSite; $entry.SiteMismatch = ($pa -and $pa.SiteCode -ne $siteCode) }
+        $files.Add($entry)
         foreach ($r in $data) {
             if ([string]$r.Status -ne 'UpdateAvailable') { continue }
             if ($null -eq (ConvertTo-RolloutVersionPart -Version ([string]$r.LatestVersion))) { continue }
             $name = if ([string]$r.CMName) { [string]$r.CMName } else { [string]$r.Application }
             if (-not $name) { continue }
-            if ($best.ContainsKey($name) -and [string]$best[$name].CheckedAtUtc -ge [string]$r.CheckedAtUtc) { continue }
-            $best[$name] = $r
+            if ($best.ContainsKey($name) -and [string]$best[$name].Row.CheckedAtUtc -ge [string]$r.CheckedAtUtc) { continue }
+            $best[$name] = @{ Row = $r; File = $entry }
         }
     }
+    foreach ($k in $best.Keys) { $best[$k].File.Rows++ }
     $rows = foreach ($k in ($best.Keys | Sort-Object)) {
-        $r = $best[$k]
+        $r = $best[$k].Row
         $sw = ([string]$r.InstalledSoftwareName -split '\|')[0].Trim() -replace '[*?]', ''
         New-RolloutRow -Application $k -NewVersion ([string]$r.LatestVersion) -SoftwareName $sw -Role $DefaultRole -CurrentVersion ([string]$r.ConfigMgrVersion)
     }
-    return @{ Rows = @($rows); Errors = $errors.ToArray() }
+    $sources = @($files | Where-Object { $_.Rows -gt 0 })
+    return @{ Rows = @($rows); Errors = $errors.ToArray(); Sources = $sources }
+}
+
+function Format-RolloutSourceText {
+    <#
+    .SYNOPSIS
+        Returns the text that shows where the imported rows came from: the tool, the site, the file and the age, with a stale mark.
+    .PARAMETER Source
+        One entry of the Sources list that Import-RolloutCheckResult returns.
+    #>
+    param([Parameter(Mandatory)]$Source)
+    $tool = if ($Source.Source) { $Source.Source } else { 'unknown tool' }
+    $site = if ($Source.SiteCode) { 'site ' + $Source.SiteCode } else { 'site not recorded' }
+    $age = if ($Source.AgeText) { $Source.AgeText } else { 'age not known' }
+    $text = ('{0}, {1}, {2}, {3}' -f $tool, $site, $Source.Path, $age)
+    if ($Source.IsStale) { $text += ' - STALE' }
+    if ($Source.SiteMismatch) { $text += ' - for another site than this window' }
+    return $text
+}
+
+function ConvertTo-DhStaleHours {
+    <#
+    .SYNOPSIS
+        Returns the stale limit of the user in hours from the prefs: HandoffStaleValue and HandoffStaleUnit (hours or days).
+        The default is 3 days.
+    #>
+    param($Prefs)
+    $value = 3; $unit = 'days'
+    if ($Prefs) {
+        if ($Prefs -is [System.Collections.IDictionary]) {
+            if ($Prefs.Contains('HandoffStaleValue')) { $value = $Prefs['HandoffStaleValue'] }
+            if ($Prefs.Contains('HandoffStaleUnit')) { $unit = [string]$Prefs['HandoffStaleUnit'] }
+        }
+        else {
+            if ($Prefs.PSObject.Properties['HandoffStaleValue']) { $value = $Prefs.HandoffStaleValue }
+            if ($Prefs.PSObject.Properties['HandoffStaleUnit']) { $unit = [string]$Prefs.HandoffStaleUnit }
+        }
+    }
+    return (ConvertTo-SuiteStaleHours -Value $value -Unit $unit -Default 72)
+}
+
+function Get-DhHandoffPlan {
+    <#
+    .SYNOPSIS
+        Reads the plan that Update Planner left for a site and checks that it loads as a ring plan. Never throws.
+    .DESCRIPTION
+        Returns the result of Read-SuiteHandoff (Status, Message, Path, ProducerName, ProducerVersion, SiteCode, AgeText,
+        IsStale, SiteMismatch) with three more fields: PlanName and RingCount (from the ring plan loader) and Updates
+        (the planned updates, read-only rows). A plan that the ring plan loader refuses gets Status Invalid and the message
+        of the loader. A missing file gives Status Missing. Nothing is written.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$SiteFolder,
+        [double]$StaleAfterHours = 72,
+        [string]$DataRoot,
+        [string]$Path
+    )
+    if (-not $Path) {
+        $args2 = @{ SiteCode = $SiteFolder; Kind = 'ring-plan' }
+        if ($DataRoot) { $args2['DataRoot'] = $DataRoot }
+        $Path = Get-SuiteHandoffPath @args2
+    }
+    $r = Read-SuiteHandoff -Path $Path -ExpectedKind 'SuiteRingPlan' -KnownSchemaVersion 1 -StaleAfterHours $StaleAfterHours -ActiveSite $SiteFolder
+    $r | Add-Member -NotePropertyName PlanName -NotePropertyValue '' -Force
+    $r | Add-Member -NotePropertyName RingCount -NotePropertyValue 0 -Force
+    $r | Add-Member -NotePropertyName Updates -NotePropertyValue @() -Force
+    if ($r.Status -ne 'Ok') { return $r }
+    try {
+        $plan = Import-RingPlan -Path $Path
+        $r.PlanName = [string]$plan.Name
+        $r.RingCount = @($plan.Rings).Count
+        $r.Updates = @(Get-RingPlanUpdate -Plan $r.Data)
+    }
+    catch {
+        $r.Status = 'Invalid'
+        $r.Message = Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The plan is not a valid ring plan. The log file has the details.'
+    }
+    return $r
+}
+
+function Get-RingPlanUpdate {
+    <#
+    .SYNOPSIS
+        Returns the planned updates of a Suite ring plan as flat read-only rows: Wave, Sequence, ArticleId, Title, SeverityName, NeededDevices, CIId.
+    .DESCRIPTION
+        Import-RingPlan keeps no Updates list, so this reads the parsed file (-Plan) or the file (-Path). A ring with no
+        Updates list gives no rows. A plan with no Updates at all gives an empty list.
+    #>
+    param($Plan, [string]$Path)
+    if (-not $Plan -and $Path) {
+        try { $Plan = [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop } catch { return @() }
+    }
+    if (-not $Plan -or -not $Plan.PSObject.Properties['Rings']) { return @() }
+    $rows = New-Object System.Collections.Generic.List[object]
+    foreach ($ring in @($Plan.Rings)) {
+        if (-not $ring.PSObject.Properties['Updates']) { continue }
+        foreach ($u in @($ring.Updates)) {
+            if ($null -eq $u) { continue }
+            $rows.Add([pscustomobject]@{
+                Wave         = [string]$ring.Name
+                Sequence     = [int]$u.Sequence
+                ArticleId    = [string]$u.ArticleId
+                Title        = [string]$u.Title
+                SeverityName = [string]$u.SeverityName
+                NeededDevices = [int]$u.NeededDevices
+                CIId         = [int]$u.CIId
+            })
+        }
+    }
+    return $rows.ToArray()
+}
+
+function Format-DhHandoffText {
+    <#
+    .SYNOPSIS
+        Returns the text that shows the source and the age of a plan file: the tool and its version, the site and the age, with a stale mark.
+    .PARAMETER Handoff
+        The result of Read-SuiteHandoff or Get-DhHandoffPlan.
+    .PARAMETER StaleLimitText
+        The limit of the user as text, for example "3 days". It is shown in the stale mark.
+    #>
+    param([Parameter(Mandatory)]$Handoff, [string]$StaleLimitText)
+    if ($Handoff.Status -ne 'Ok') { return [string]$Handoff.Message }
+    $tool = if ($Handoff.ProducerName) { ('{0} {1}' -f $Handoff.ProducerName, $Handoff.ProducerVersion).Trim() } else { 'unknown tool' }
+    $site = if ($Handoff.SiteCode) { 'site ' + $Handoff.SiteCode } else { 'site not recorded' }
+    $text = ('Source: {0}, {1}, {2}.' -f $tool, $site, $Handoff.AgeText)
+    if ($Handoff.IsStale) {
+        $text += if ($StaleLimitText) { (' STALE: older than {0}.' -f $StaleLimitText) } else { ' STALE.' }
+    }
+    if ($Handoff.SiteMismatch) { $text += ' The plan is for another site than this window.' }
+    return $text
+}
+
+function Copy-DhHandoffPlan {
+    <#
+    .SYNOPSIS
+        Copies the handoff plan into the ring plan folder as <plan name>.json, through a temp file and a swap. Never throws.
+    .DESCRIPTION
+        Returns Status (Imported, AlreadyImported, Exists, Failed), Path and Message. The plan is read with Get-DhHandoffPlan first,
+        so a file that is malformed, too new or not a valid ring plan is not copied. When a plan file of that name exists with other
+        content, Status is Exists and nothing is written, unless -Overwrite is set. The load does not deploy anything.
+    #>
+    param(
+        [Parameter(Mandatory)]$Handoff,
+        [Parameter(Mandatory)][string]$RingPlanDir,
+        [switch]$Overwrite,
+        [switch]$CheckOnly
+    )
+    $result = [pscustomobject]@{ Status = 'Failed'; Path = ''; Message = '' }
+    $temp = $null
+    try {
+        if ($Handoff.Status -ne 'Ok') { $result.Message = [string]$Handoff.Message; return $result }
+        $safe = ([string]$Handoff.PlanName) -replace '[^A-Za-z0-9._-]', '_'
+        if (-not $safe) { $result.Message = 'The plan has no name.'; return $result }
+        if (-not (Test-Path -LiteralPath $RingPlanDir)) { [void](New-Item -ItemType Directory -Path $RingPlanDir -Force -ErrorAction Stop) }
+        $target = Join-Path $RingPlanDir ($safe + '.json')
+        $result.Path = $target
+        $bytes = [IO.File]::ReadAllBytes($Handoff.Path)
+        if (Test-Path -LiteralPath $target -PathType Leaf) {
+            $existing = [IO.File]::ReadAllBytes($target)
+            $same = ($existing.Length -eq $bytes.Length)
+            if ($same) { for ($i = 0; $i -lt $bytes.Length; $i++) { if ($existing[$i] -ne $bytes[$i]) { $same = $false; break } } }
+            if ($same) { $result.Status = 'AlreadyImported'; $result.Message = 'The plan is already in the ring plan folder.'; return $result }
+            if (-not $Overwrite) { $result.Status = 'Exists'; $result.Message = ('A plan file named {0} exists with other content.' -f ($safe + '.json')); return $result }
+        }
+        if ($CheckOnly) { $result.Status = 'Ready'; $result.Message = 'The plan can be imported.'; return $result }
+        $temp = '{0}.{1}.tmp' -f $target, [guid]::NewGuid().ToString('N')
+        [IO.File]::WriteAllBytes($temp, $bytes)
+        if (Test-Path -LiteralPath $target -PathType Leaf) { [IO.File]::Replace($temp, $target, [NullString]::Value) } else { [IO.File]::Move($temp, $target) }
+        $temp = $null
+        $result.Status = 'Imported'
+        $result.Message = 'Imported.'
+    }
+    catch { $result.Message = Get-UserErrorText -ErrorRecord $_ -LogDetail -Fallback 'The plan could not be copied. The log file has the details.' }
+    finally { if ($temp -and (Test-Path -LiteralPath $temp)) { Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue } }
+    return $result
 }
 
 # ---------------------------------------------------------------------------

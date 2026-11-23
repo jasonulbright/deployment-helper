@@ -18,7 +18,7 @@ BeforeDiscovery {
             'chkTsOverrideSW', 'chkTsRebootOutSW', 'chkTsMetered', 'chkShowProgress',
             'chkSugOverrideSW', 'chkSugAllowRestart', 'chkSugMetered', 'chkMSFallback', 'chkBoundaryFallback', 'chkFullScan',
             'btnValidate', 'btnDeploy',
-            'cboRingType', 'txtRingObject', 'btnRingBrowseObject', 'cboRingProgram', 'cboRingPlan', 'btnRingReloadPlans', 'btnRingOpenFolder',
+            'cboRingType', 'txtRingObject', 'btnRingBrowseObject', 'cboRingProgram', 'cboRingPlan', 'btnRingReloadPlans', 'btnRingOpenFolder', 'btnRingPlanUpdates', 'btnRingImportHandoff',
             'dtpRingStart', 'btnRingExpand', 'chkRingHold', 'btnRingPickCollection', 'btnRingValidate', 'btnRingCreate',
             'btnRingRefreshRuns', 'chkRingShowClosed',
             'btnRollout', 'btnRoAdd', 'btnRoImport', 'btnRoLookup', 'btnRoRemove', 'txtRoTemplate', 'txtRoFolder',
@@ -26,7 +26,7 @@ BeforeDiscovery {
             'txtRoTestDeadline', 'txtRoProdDeadline', 'cboRoNotification', 'chkRoDryRun', 'cboRoRuns', 'btnRoOpenRun',
             'btnRoPreview', 'btnRoStep1', 'btnRoStep2'
         )
-        'start-deploymenthelper.ps1' = @('txtFilter', 'btnRefresh', 'btnSelectAll', 'btnSelectNone', 'txtList', 'btnFile', 'btnCheck')
+        'start-deploymenthelper.ps1' = @('txtFilter', 'btnRefresh', 'btnSelectAll', 'btnSelectNone', 'txtList', 'btnFile', 'btnCheck', 'txtSource')
     }
     $script:TtCases = @()
     foreach ($file in $script:TtAudited.Keys) {

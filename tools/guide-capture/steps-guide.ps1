@@ -154,7 +154,54 @@ Section 'site' {
   Stop-App 'start-deploymenthelper.ps1'; Start-Sleep -Seconds 2
   Remove-Item -LiteralPath Env:APP_PACKAGER_SITE -ErrorAction SilentlyContinue
 }
+Section 'handoff' {
+  # A plan that Update Planner left for the chosen site (written here as the producer writes it: header, site, created time),
+  # and a Check ConfigMgr result in the results folder of the site. Fictional lab data only.
+  Stop-App 'start-deploymenthelper.ps1'; Start-Sleep -Seconds 3
+  $env:APP_PACKAGER_SITE = $Capture.SiteCode
+  Import-Module (Join-Path $appDir 'Lib\SuiteCommon\SuiteCommon.psd1') -DisableNameChecking
+  $folder = $Capture.SiteCode
+  [void](Set-SuiteActiveSite -SiteCode $folder -DataRoot (Get-SuiteDataRoot))
+  $created = [datetime]::UtcNow.AddHours(-2).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+  $ring = { param($n, $id, $name, $a, $d, $s, $e, $ups) [ordered]@{ Name = $n; CollectionID = $id; CollectionName = $name; Purpose = 'Required'; AvailableOffsetDays = $a; DeadlineOffsetDays = $d; UserNotification = 'DisplayAll'; OverrideServiceWindow = $false; RebootOutsideServiceWindow = $false; AllowMeteredConnection = $false; DPGroup = ''; SuccessThresholdPercent = $null; MemberCount = 1; MaintenanceWindows = @(); StartDate = $s; DeadlineDate = $e; Updates = $ups } }
+  $u1 = @([ordered]@{ Sequence = 1; CIId = 16777772; ArticleId = '5012170'; Title = '2026-11 Security Update (KB5012170)'; Severity = 10; SeverityName = 'Critical'; NeededDevices = 1 }, [ordered]@{ Sequence = 2; CIId = 16777774; ArticleId = '5012171'; Title = '2026-11 Cumulative Update (KB5012171)'; Severity = 8; SeverityName = 'Important'; NeededDevices = 1 })
+  $u2 = @([ordered]@{ Sequence = 1; CIId = 16777772; ArticleId = '5012170'; Title = '2026-11 Security Update (KB5012170)'; Severity = 10; SeverityName = 'Critical'; NeededDevices = 1 })
+  $doc = [ordered]@{
+    Format = 'SuiteRingPlan'; SchemaVersion = 1; Name = 'UpdatePlanner-a1b2c3d4'; Description = 'Update Planner plan a1b2c3d4, 2 waves, start 2026-12-01.'
+    HoldLaterRings = $false; TimeBasedOn = 'LocalTime'
+    Rings = @((& $ring 'Wave 1 - Pilot' 'MCM00346' 'Pilot' 0 3 '2026-12-01' '2026-12-04' $u1), (& $ring 'Wave 2 - Broad' 'MCM00347' 'Broad' 7 10 '2026-12-08' '2026-12-11' $u2))
+    UpdatePlanner = [ordered]@{ PlanId = 'a1b2c3d4'; GeneratedAt = '2026-11-23 10:00:00'; ComputerName = 'CM01'; SiteCode = $folder }
+    Producer = [ordered]@{ Name = 'UpdatePlanner'; Version = '2026.11.23.0017' }; CreatedUtc = $created; Site = [ordered]@{ SiteCode = $folder }
+  }
+  $w = Write-SuiteHandoff -SiteCode $folder -Kind 'ring-plan' -Json ($doc | ConvertTo-Json -Depth 8)
+  Log ('handoff written: ' + $w.Ok + ' ' + $w.Path)
+  $resDir = Get-SuiteSiteFolder -SiteCode $folder -Area 'results'
+  New-Item -ItemType Directory $resDir -Force | Out-Null
+  $stamp = [datetime]::UtcNow.AddDays(-4).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+  @('"Application","Vendor","CMName","InstalledSoftwareName","Architecture","ConfigMgrVersion","LatestVersion","Status","Source","CheckedAtUtc"', ('"7-Zip","Igor Pavlov","7-Zip (x64 edition)","7-Zip*","x64","26.00","26.03","UpdateAvailable","APD","{0}"' -f $stamp), ('"Notepad++","Don Ho","Notepad++ (x64)","Notepad++*","x64","8.8.1","8.9.0","UpdateAvailable","APD","{0}"' -f $stamp)) | Set-Content (Join-Path $resDir 'CheckConfigMgrResult.csv') -Encoding UTF8
+  $win = Start-App 'start-deploymenthelper.ps1' 'Deployment Helper'
+  Maximize-Win $win
+  $win = Find-Top 'Deployment Helper' 10
+  Invoke-El (Get-El $win 'btnRings'); Start-Sleep -Seconds 3; Shot $win 'rings-handoff'
+  Invoke-El (Get-El $win 'btnRingImportHandoff'); Start-Sleep -Seconds 3; Shot $win 'rings-handoff-imported'
+  Invoke-El (Get-El $win 'btnRingPlanUpdates'); Start-Sleep -Seconds 2
+  $d = Find-Last 'Planned Updates' 10
+  Shot $d 'dialog-planned-updates'; Dump-Tree $d 'dialog-planned-updates'
+  Invoke-El (Get-El $d 'btnClose'); Start-Sleep -Seconds 1
+  Invoke-El (Get-El $win 'btnRollout'); Start-Sleep -Seconds 3
+  Invoke-El (Get-El $win 'btnRoImport'); Start-Sleep -Seconds 2
+  $d = Find-Last 'Import List' 10
+  Invoke-El (Get-El $d 'btnCheck'); Start-Sleep -Seconds 2
+  Shot $d 'dialog-rollout-import-source'
+  Invoke-El (Get-El $d 'btnCancel'); Start-Sleep -Seconds 1
+  Invoke-El (Get-El $win 'btnOptions'); $d = Find-Last 'Options' 10
+  Pick-Nav $d 'Imports'; Shot $d 'options-imports'
+  Invoke-El (Get-El $d 'btnCancel'); Start-Sleep -Seconds 1
+  Stop-App 'start-deploymenthelper.ps1'; Start-Sleep -Seconds 2
+  Remove-Item -LiteralPath Env:APP_PACKAGER_SITE -ErrorAction SilentlyContinue
+}
 Section 'files' {
+  Get-ChildItem (Join-Path $appDir 'Logs') -Filter '*crash*' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -TotalCount 14 | ForEach-Object { Log ('crash: ' + $_) } }
   New-Item -ItemType Directory "$OutDir\files" -Force | Out-Null
   Get-ChildItem $appDir -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName.Substring($appDir.Length) -notmatch '^\\(ui|Lib|Module)\\' -and $_.Extension -in '.json', '.jsonl', '.log', '.csv', '.html', '.txt' } | ForEach-Object { Log ('file: ' + $_.FullName.Substring($appDir.Length) + ' ' + $_.Length); Copy-Item $_.FullName ("$OutDir\files\" + $_.Name) -Force }
 }

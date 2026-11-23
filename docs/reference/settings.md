@@ -22,6 +22,7 @@ None.
 | `SMSProvider` | **SMS Provider** | Empty. |
 | `DeploymentAuditLogPath` | **Deployment Audit Log (JSONL)** | Empty. Empty means `deployment-audit.jsonl` in the site data folder. With no site it means `Logs\deployment-audit.jsonl` beside the script. |
 | `RingRunStatePath` | **Ring Run-State Folder** | Empty. Empty means `rings\runs` in the site data folder. With no site it means `Rings\runs` beside the script. |
+| `HandoffStaleValue`, `HandoffStaleUnit` | **Imports** page: the age after which the plan from Update Planner and the Check ConfigMgr result are marked STALE. | `3` and `days`. The unit is `hours` or `days`. |
 | `RolloutRunPath` | The folder of the update rollout run files. | Empty. Empty means `rollouts` in the site data folder. With no site it means `Rollouts` beside the script. |
 | `RolloutNameTemplate`, `RolloutFolder` | **Name Template** and **Folder** of the Update Rollout view. | `{App} - {Role} - Installed - Version LT {Version}`, empty. |
 | `RolloutLimitingServer`, `RolloutLimitingWorkstation`, `RolloutLimitingTest`, `RolloutTestCollection` | The limiting collections and the test collection of the Update Rollout view. | `All Systems` for the three limits, empty test collection. |

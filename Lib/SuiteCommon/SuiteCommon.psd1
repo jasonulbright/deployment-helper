@@ -1,6 +1,6 @@
 @{
     RootModule        = 'SuiteCommon.psm1'
-    ModuleVersion = '2026.11.22.0109'
+    ModuleVersion = '2026.11.22.0110'
     GUID              = '7c1f2a9e-4b3d-4f8a-9c6e-2d5b8e1a7f40'
     Author            = 'Jason Ulbright'
     Description       = 'Shared core for the Configuration Manager tool suite: logging, CM site connection, settings persistence, window chrome, theming, dialogs.'
@@ -48,6 +48,15 @@
         'Start-SuiteSiteWatch'
         'Invoke-SuiteSiteMigration'
         'Format-SuiteSiteMigrationReport'
+
+        # Handoff files
+        'Get-SuiteHandoffPath'
+        'Write-SuiteHandoff'
+        'Read-SuiteHandoff'
+        'ConvertTo-SuiteStaleHours'
+        'Format-SuiteAge'
+        'Get-SuiteDataAge'
+        'ConvertFrom-SuiteUtcText'
 
         # Window chrome
         'Get-TitleBarDragHeight'
