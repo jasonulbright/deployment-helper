@@ -137,6 +137,8 @@ function Get-DhPreferences {
         DeploymentAuditLogPath  = ''
         RingRunStatePath        = ''
         RolloutRunPath          = ''
+        HandoffStaleValue       = 3
+        HandoffStaleUnit        = 'days'
     }
     foreach ($__kv in (Get-RolloutSettingDefault).GetEnumerator()) { if (-not $defaults.ContainsKey($__kv.Key)) { $defaults[$__kv.Key] = $__kv.Value } }
     $site = if ($script:Site) { $script:Site } else { [pscustomobject]@{ Active = $false } }
@@ -574,6 +576,10 @@ $dtpRingStart       = $window.FindName('dtpRingStart')
 $btnRingExpand      = $window.FindName('btnRingExpand')
 $chkRingHold        = $window.FindName('chkRingHold')
 $txtRingPlanInfo    = $window.FindName('txtRingPlanInfo')
+$pnlRingHandoff     = $window.FindName('pnlRingHandoff')
+$txtRingHandoff     = $window.FindName('txtRingHandoff')
+$btnRingImportHandoff = $window.FindName('btnRingImportHandoff')
+$btnRingPlanUpdates = $window.FindName('btnRingPlanUpdates')
 $dgRingPreview      = $window.FindName('dgRingPreview')
 $btnRingPickCollection = $window.FindName('btnRingPickCollection')
 $btnRingValidate    = $window.FindName('btnRingValidate')
@@ -2420,6 +2426,70 @@ function New-LoggingPanel {
     }
 }
 
+function New-ImportsPanel {
+    $root = New-Object System.Windows.Controls.StackPanel
+    $hdr = New-Object System.Windows.Controls.TextBlock
+    $hdr.Text = 'Imports'
+    $hdr.FontSize = 18
+    $hdr.FontWeight = 'SemiBold'
+    $hdr.Margin = '0,0,0,12'
+    [void]$root.Children.Add($hdr)
+
+    $note = New-Object System.Windows.Controls.TextBlock
+    $note.Text = 'Deployment Helper shows the tool, the site and the age of the plan from Update Planner and of the result of Check ConfigMgr. Data older than the limit is marked STALE. It is shown and not blocked.'
+    $note.TextWrapping = 'Wrap'
+    $note.FontSize = 12
+    $note.Margin = '0,0,0,12'
+    [void]$root.Children.Add($note)
+
+    $row = New-Object System.Windows.Controls.StackPanel
+    $row.Orientation = 'Horizontal'
+    $lbl = New-Object System.Windows.Controls.TextBlock
+    $lbl.Text = 'Mark data as stale after:'
+    $lbl.FontSize = 14
+    $lbl.FontWeight = 'Bold'
+    $lbl.VerticalAlignment = 'Center'
+    $lbl.Margin = '0,0,12,0'
+    [void]$row.Children.Add($lbl)
+
+    $txtValue = New-Object System.Windows.Controls.TextBox
+    $txtValue.Name = 'txtStaleValue'
+    $txtValue.Text = [string]$global:Prefs['HandoffStaleValue']
+    $txtValue.Width = 70
+    $txtValue.Height = 32
+    $txtValue.FontSize = 12
+    $txtValue.MaxLength = 4
+    $txtValue.VerticalContentAlignment = 'Center'
+    $txtValue.Margin = '0,0,8,0'
+    $txtValue.ToolTip = 'A whole number from 1 to 9999.'
+    [void]$row.Children.Add($txtValue)
+
+    $cboUnit = New-Object System.Windows.Controls.ComboBox
+    $cboUnit.Name = 'cboStaleUnit'
+    $cboUnit.Width = 100
+    $cboUnit.Height = 32
+    $cboUnit.FontSize = 12
+    $cboUnit.VerticalContentAlignment = 'Center'
+    foreach ($u in 'hours', 'days') { [void]$cboUnit.Items.Add($u) }
+    $cboUnit.SelectedItem = $(if ([string]$global:Prefs['HandoffStaleUnit'] -eq 'hours') { 'hours' } else { 'days' })
+    $cboUnit.ToolTip = 'The unit of the limit.'
+    [void]$row.Children.Add($cboUnit)
+    [void]$root.Children.Add($row)
+
+    return @{
+        Name    = 'Imports'
+        Element = $root
+        Commit  = {
+            $n = 0
+            if (-not [int]::TryParse($txtValue.Text.Trim(), [ref]$n) -or $n -lt 1 -or $n -gt 9999) {
+                throw 'Imports: the stale limit must be a whole number from 1 to 9999.'
+            }
+            $global:Prefs['HandoffStaleValue'] = $n
+            $global:Prefs['HandoffStaleUnit'] = [string]$cboUnit.SelectedItem
+        }.GetNewClosure()
+    }
+}
+
 function New-HistoryPanel {
     $grid = New-Object System.Windows.Controls.StackPanel
     $hdr = New-Object System.Windows.Controls.TextBlock
@@ -3100,6 +3170,7 @@ function Show-OptionsDialog {
     $panels = @(
         (New-ConnectionPanel),
         (New-LoggingPanel),
+        (New-ImportsPanel),
         (New-HistoryPanel),
         (New-TemplatesPanel),
         (New-AboutPanel)
@@ -3310,6 +3381,56 @@ function Update-RingPreview {
     Update-RingPreviewGrid
 }
 
+# Handoff: the plan that Update Planner leaves for the site (H-1). The offer shows the source and the age.
+# A load never acts: Import Plan copies the file into the plan list, and a deployment keeps Validate and its confirm.
+function Get-DhSiteFolder {
+    # The site folder name that this window uses (AB1 or AB1~2), or '' when no site is set.
+    if ($global:DhSite -and $global:DhSite.Active -and $global:DhSite.SiteFolder) { return [string]$global:DhSite.SiteFolder }
+    $code = [string]$global:Prefs['SiteCode']
+    if (Test-SuiteSiteCode -SiteCode $code) { return $code.ToUpperInvariant() }
+    return ''
+}
+
+function Get-DhStaleLimitText {
+    $v = $global:Prefs['HandoffStaleValue']; $u = [string]$global:Prefs['HandoffStaleUnit']
+    $hours = ConvertTo-DhStaleHours -Prefs $global:Prefs
+    if ($u -eq 'hours' -and $hours -le 9999 -and ([string]$v) -match '^\d+$' -and [double]$v -eq $hours) { return ('{0} hour{1}' -f [int]$hours, $(if ($hours -eq 1) { '' } else { 's' })) }
+    $days = $hours / 24
+    if ($days -eq [math]::Floor($days)) { return ('{0} day{1}' -f [int]$days, $(if ($days -eq 1) { '' } else { 's' })) }
+    return ('{0} hours' -f [int]$hours)
+}
+
+$script:RingHandoff = $null
+function Update-RingHandoffPanel {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
+    param()
+    $script:RingHandoff = $null
+    $folder = Get-DhSiteFolder
+    $lines = New-Object System.Collections.Generic.List[string]
+    $canImport = $false
+    if ($folder) {
+        $h = Get-DhHandoffPlan -SiteFolder $folder -StaleAfterHours (ConvertTo-DhStaleHours -Prefs $global:Prefs)
+        $script:RingHandoff = $h
+        if ($h.Status -eq 'Ok') {
+            $state = Copy-DhHandoffPlan -Handoff $h -RingPlanDir $script:RingPlanDir -CheckOnly
+            $line = ('Update Planner plan for site {0}: {1}, {2} rings. {3}' -f $folder, $h.PlanName, $h.RingCount, (Format-DhHandoffText -Handoff $h -StaleLimitText (Get-DhStaleLimitText)))
+            if ($state.Status -eq 'AlreadyImported') { $line += ' It is in the plan list.' } else { $canImport = $true }
+            $lines.Add($line)
+        }
+        elseif ($h.Status -ne 'Missing') {
+            $lines.Add(('The plan from Update Planner was refused. {0}' -f $h.Message))
+            Add-LogLine -Message ('Handoff plan refused: ' + ($h.Message -replace "`r?`n", ' '))
+        }
+    }
+    $plan = Get-RingSelectedPlan
+    $hasUpdates = $false
+    if ($plan -and $plan.FilePath) { $hasUpdates = (@(Get-RingPlanUpdate -Path $plan.FilePath).Count -gt 0) }
+    $txtRingHandoff.Text = ($lines -join ' ')
+    $btnRingImportHandoff.Visibility = if ($canImport) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+    $btnRingPlanUpdates.Visibility = if ($hasUpdates) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+    $pnlRingHandoff.Visibility = if ($lines.Count -gt 0 -or $hasUpdates) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+}
+
 function Update-RingPlanSelection {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Updates window controls only.')]
     param()
@@ -3323,14 +3444,18 @@ function Update-RingPlanSelection {
         }
         Reset-RingValidation
         $script:RingPreviewRows.Clear()
+        Update-RingHandoffPanel
         return
     }
     $info = ('{0} File: {1}. Time basis: {2}.' -f $plan.Description, $plan.FilePath, $plan.TimeBasedOn).Trim()
     if ($plan.TimeBasedOn -eq 'Utc') { $info += ' Enter the plan start and the preview times in UTC.' }
     if ($refused -gt 0) { $info += (' {0} other plan file(s) were refused; see the log.' -f $refused) }
+    $src = Read-SuiteHandoff -Path $plan.FilePath -ExpectedKind 'SuiteRingPlan' -StaleAfterHours (ConvertTo-DhStaleHours -Prefs $global:Prefs) -ActiveSite (Get-DhSiteFolder)
+    if ($src.Status -eq 'Ok') { $info += (' ' + (Format-DhHandoffText -Handoff $src -StaleLimitText (Get-DhStaleLimitText))) }
     $txtRingPlanInfo.Text = $info
     $chkRingHold.IsChecked = [bool]$plan.HoldLaterRings
     Update-RingPreview
+    Update-RingHandoffPanel
 }
 
 function Update-RingPlanCombo {
@@ -4035,6 +4160,105 @@ $cboRingPlan.Add_SelectionChanged({
 
 $btnRingReloadPlans.Add_Click({ Update-RingPlanCombo })
 
+function Show-PlannedUpdatesDialog {
+    <#
+    .SYNOPSIS
+        Shows the updates that a plan lists for each ring. The list is read only: it changes nothing and does not drive a deployment.
+    #>
+    param([Parameter(Mandatory)]$Owner, [Parameter(Mandatory)][string]$Title, [Parameter(Mandatory)][string]$Info, [Parameter(Mandatory)]$Rows)
+    $dlgXaml = @"
+<Controls:MetroWindow
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:Controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+    Title="Planned Updates"
+    Width="860" Height="480"
+    MinWidth="640" MinHeight="320"
+    WindowStartupLocation="CenterOwner"
+    TitleCharacterCasing="Normal"
+    ShowIconOnTitleBar="False"
+    GlowBrush="{DynamicResource MahApps.Brushes.Accent}"
+    BorderThickness="1">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Steel.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <!--SHARED_STYLES-->
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid Margin="16,12,16,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock x:Name="txtInfo" Grid.Row="0" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,8"/>
+        <DataGrid x:Name="dgUpdates" Grid.Row="1" Style="{StaticResource ViewDataGrid}" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+                  RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
+                  SelectionMode="Single" SelectionUnit="FullRow" GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0" FontSize="12">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Ring" Binding="{Binding Wave}" Width="150"/>
+                <DataGridTextColumn Header="#" Binding="{Binding Sequence}" Width="40"/>
+                <DataGridTextColumn Header="Article" Binding="{Binding ArticleId}" Width="90"/>
+                <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*"/>
+                <DataGridTextColumn Header="Severity" Binding="{Binding SeverityName}" Width="90"/>
+                <DataGridTextColumn Header="Needed" Binding="{Binding NeededDevices}" Width="80"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="btnClose" Content="Close" IsCancel="True" IsDefault="True" Margin="0" Style="{StaticResource DialogButton}"/>
+        </StackPanel>
+    </Grid>
+</Controls:MetroWindow>
+"@
+    [xml]$xml = $dlgXaml.Replace($script:SharedStyleMarker, (Get-SharedStyleXaml))
+    $reader = New-Object System.Xml.XmlNodeReader $xml
+    $dlg = [System.Windows.Markup.XamlReader]::Load($reader)
+    Install-TitleBarDragFallback -Window $dlg
+    $dlg.Owner = $Owner
+    $dlg.Title = $Title
+    Set-DialogTheme -Dialog $dlg
+    $dlg.FindName('txtInfo').Text = $Info
+    $dlg.FindName('dgUpdates').ItemsSource = @($Rows)
+    $dlg.FindName('btnClose').Add_Click({ $dlg.Close() })
+    [void]$dlg.ShowDialog()
+}
+
+$btnRingPlanUpdates.Add_Click({
+    $plan = Get-RingSelectedPlan
+    if (-not $plan) { return }
+    $rows = @(Get-RingPlanUpdate -Path $plan.FilePath)
+    $src = Read-SuiteHandoff -Path $plan.FilePath -ExpectedKind 'SuiteRingPlan' -StaleAfterHours (ConvertTo-DhStaleHours -Prefs $global:Prefs) -ActiveSite (Get-DhSiteFolder)
+    $srcText = if ($src.Status -eq 'Ok') { Format-DhHandoffText -Handoff $src -StaleLimitText (Get-DhStaleLimitText) } else { 'Source: not recorded in the file.' }
+    $info = ('Plan {0}, {1} update(s). {2} File: {3}. This list is read only. Each ring deploys the software update group that you choose.' -f $plan.Name, $rows.Count, $srcText, $plan.FilePath)
+    Show-PlannedUpdatesDialog -Owner $window -Title ('Planned Updates - {0}' -f $plan.Name) -Info $info -Rows $rows
+})
+
+$btnRingImportHandoff.Add_Click({
+    $h = $script:RingHandoff
+    if (-not $h -or $h.Status -ne 'Ok') { return }
+    $res = Copy-DhHandoffPlan -Handoff $h -RingPlanDir $script:RingPlanDir
+    if ($res.Status -eq 'Exists') {
+        $ans = Show-ThemedMessage -Owner $window -Title 'Import Plan' -Message ('A plan file named {0} is in the plan list with other content. Replace it with the plan from Update Planner?' -f (Split-Path $res.Path -Leaf)) -Buttons YesNo -Icon Question
+        if ($ans -ne 'Yes') { Set-StatusText -Text 'The plan was not imported.'; return }
+        $res = Copy-DhHandoffPlan -Handoff $h -RingPlanDir $script:RingPlanDir -Overwrite
+    }
+    if ($res.Status -in 'Imported', 'AlreadyImported') {
+        Add-LogLine -Message ('Plan imported from Update Planner: {0}' -f $res.Path)
+        Update-RingPlanCombo
+        for ($i = 0; $i -lt @($script:RingPlans).Count; $i++) { if ($script:RingPlans[$i].Name -eq $h.PlanName) { $cboRingPlan.SelectedIndex = $i; break } }
+        Set-StatusText -Text 'Plan imported. Check the collections, then Validate.'
+    }
+    else {
+        Add-LogLine -Message ('Plan import failed: {0}' -f $res.Message)
+        [void](Show-ThemedMessage -Owner $window -Title 'Import Plan' -Message ('The plan was not imported. {0}' -f $res.Message) -Buttons OK -Icon Error)
+    }
+})
+
 $btnRingOpenFolder.Add_Click({
     if (-not (Test-Path -LiteralPath $script:RingPlanDir)) { New-Item -ItemType Directory -Path $script:RingPlanDir -Force | Out-Null }
     Start-Process -FilePath 'explorer.exe' -ArgumentList ('"{0}"' -f $script:RingPlanDir)
@@ -4410,12 +4634,15 @@ function Show-RolloutImportDialog {
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,8"
                    Text="Paste one application for each line: the name, a comma or a tab, and the new version. A CSV with the header Application, NewVersion and the optional columns InstalledSoftwareName, Role and TestCollection works too."/>
         <TextBox x:Name="txtList" Grid.Row="1" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                  FontFamily="Cascadia Code, Consolas, Courier New" FontSize="12" ToolTip="Paste the list here."/>
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+        <TextBlock x:Name="txtSource" Grid.Row="2" TextWrapping="Wrap" FontSize="11" Margin="0,8,0,0" MaxHeight="64"
+                   ToolTip="Where the rows of Check Results came from: the tool, the site, the file and the age of the data."/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button x:Name="btnFile" Content="Load File..." Style="{StaticResource DialogButton}" ToolTip="Read a CSV or text file into the box."/>
             <Button x:Name="btnCheck" Content="Check Results" Style="{StaticResource DialogButton}" ToolTip="Fill the box with the updates that Check ConfigMgr found in App Packager."/>
             <Button x:Name="btnOK" Content="Import" IsDefault="True" Style="{StaticResource DialogAccentButton}"/>
@@ -4431,6 +4658,7 @@ function Show-RolloutImportDialog {
     $dlg.Owner = $Owner
     Set-DialogTheme -Dialog $dlg
     $txtList   = $dlg.FindName('txtList')
+    $txtSource = $dlg.FindName('txtSource')
     $btnFile   = $dlg.FindName('btnFile')
     $btnCheck  = $dlg.FindName('btnCheck')
     $btnOK     = $dlg.FindName('btnOK')
@@ -4445,9 +4673,14 @@ function Show-RolloutImportDialog {
         }
     })
     $btnCheck.Add_Click({
-        $res = Import-RolloutCheckResult
+        $siteFolder = Get-DhSiteFolder
+        $res = Import-RolloutCheckResult -Path (Get-RolloutCheckResultPath -SiteFolder $siteFolder) -StaleAfterHours (ConvertTo-DhStaleHours -Prefs $global:Prefs) -ActiveSite $siteFolder
         foreach ($e in $res.Errors) { Add-LogLine -Message $e }
-        if (@($res.Rows).Count -eq 0) { [void](Show-ThemedMessage -Owner $dlg -Title 'Import List' -Message 'No update was found. Run Check ConfigMgr in App Packager first.' -Buttons OK -Icon Info); return }
+        if (@($res.Rows).Count -eq 0) { $txtSource.Text = ''; [void](Show-ThemedMessage -Owner $dlg -Title 'Import List' -Message 'No update was found. Run Check ConfigMgr in App Packager first.' -Buttons OK -Icon Info); return }
+        $srcLines = @($res.Sources | ForEach-Object { 'Source: ' + (Format-RolloutSourceText -Source $_) })
+        if (@($res.Sources | Where-Object { $_.IsStale }).Count -gt 0) { $srcLines += ('Some data is older than {0}. It is shown and not blocked.' -f (Get-DhStaleLimitText)) }
+        $txtSource.Text = ($srcLines -join [Environment]::NewLine)
+        foreach ($l in $srcLines) { Add-LogLine -Message ('Check Results: ' + $l) }
         $lines = @('Application,NewVersion,InstalledSoftwareName,Role') + @($res.Rows | ForEach-Object { '"{0}","{1}","{2}","{3}"' -f $_.Application, $_.NewVersion, $_.SoftwareName, $_.Role })
         $txtList.Text = ($lines -join [Environment]::NewLine)
     })
