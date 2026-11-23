@@ -904,7 +904,6 @@ function Show-BrowseLoadingDialog {
     $dlg    = [System.Windows.Markup.XamlReader]::Load($reader)
     Install-TitleBarDragFallback -Window $dlg
     $dlg.Owner = $Owner
-    $dlg.Title = $Title
     Set-DialogTheme -Dialog $dlg
 
     $btnCancel = $dlg.FindName('btnCancel')
@@ -4165,7 +4164,7 @@ function Show-PlannedUpdatesDialog {
     .SYNOPSIS
         Shows the updates that a plan lists for each ring. The list is read only: it changes nothing and does not drive a deployment.
     #>
-    param([Parameter(Mandatory)]$Owner, [Parameter(Mandatory)][string]$Title, [Parameter(Mandatory)][string]$Info, [Parameter(Mandatory)]$Rows)
+    param([Parameter(Mandatory)]$Owner, [Parameter(Mandatory)][string]$Info, [Parameter(Mandatory)]$Rows)
     $dlgXaml = @"
 <Controls:MetroWindow
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -4196,7 +4195,7 @@ function Show-PlannedUpdatesDialog {
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock x:Name="txtInfo" Grid.Row="0" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,8"/>
-        <DataGrid x:Name="dgUpdates" Grid.Row="1" Style="{StaticResource ViewDataGrid}" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+        <DataGrid x:Name="dgUpdates" Grid.Row="1" ColumnHeaderHeight="28" BorderThickness="1" BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
                   RowStyle="{StaticResource GridRowStyle}" CellStyle="{StaticResource GridCellStyle}"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
                   SelectionMode="Single" SelectionUnit="FullRow" GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeaderWidth="0" FontSize="12">
@@ -4220,7 +4219,6 @@ function Show-PlannedUpdatesDialog {
     $dlg = [System.Windows.Markup.XamlReader]::Load($reader)
     Install-TitleBarDragFallback -Window $dlg
     $dlg.Owner = $Owner
-    $dlg.Title = $Title
     Set-DialogTheme -Dialog $dlg
     $dlg.FindName('txtInfo').Text = $Info
     $dlg.FindName('dgUpdates').ItemsSource = @($Rows)
@@ -4235,7 +4233,7 @@ $btnRingPlanUpdates.Add_Click({
     $src = Read-SuiteHandoff -Path $plan.FilePath -ExpectedKind 'SuiteRingPlan' -StaleAfterHours (ConvertTo-DhStaleHours -Prefs $global:Prefs) -ActiveSite (Get-DhSiteFolder)
     $srcText = if ($src.Status -eq 'Ok') { Format-DhHandoffText -Handoff $src -StaleLimitText (Get-DhStaleLimitText) } else { 'Source: not recorded in the file.' }
     $info = ('Plan {0}, {1} update(s). {2} File: {3}. This list is read only. Each ring deploys the software update group that you choose.' -f $plan.Name, $rows.Count, $srcText, $plan.FilePath)
-    Show-PlannedUpdatesDialog -Owner $window -Title ('Planned Updates - {0}' -f $plan.Name) -Info $info -Rows $rows
+    Show-PlannedUpdatesDialog -Owner $window -Info $info -Rows $rows
 })
 
 $btnRingImportHandoff.Add_Click({

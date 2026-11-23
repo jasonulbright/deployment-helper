@@ -24,7 +24,7 @@ None.
 | `Logs\DeploymentHelper-startup-<yyyyMMdd-HHmmss>.txt` | The PowerShell transcript of the start. | At the start. |
 | `deployment-audit.jsonl` in the site data folder | The audit trail. One record for each deployment attempt. Append-only. | You confirm a deployment, a ring is created, or an update rollout creates a collection or a deployment. |
 | `Templates\*.json` | The deployment templates. Four are written at the first start. | You save a template in Options. |
-| `rings\*.json` in the site data folder | The ring plans. Two are written at the first start. | You edit a plan file. |
+| `rings\*.json` in the site data folder | The ring plans. Two are written at the first start. | You edit a plan file, or select **Import Plan** (the file `UpdatePlanner-<ID>.json`). |
 | `rollouts\Rollout-<run ID>.json` in the site data folder | The run plan of an update rollout with the status of every item. | Step 1 and every item of a step. |
 | `rings\runs\*.json` in the site data folder | The run state of held ring runs. `closed\` holds finished runs. | A held ring run changes. |
 | The file that you save in the Save As dialog (CSV or HTML) | The history export. The dialog starts in `Reports`, and you can choose another folder. | **Export CSV...** or **Export HTML...** in Options. |

@@ -37,6 +37,21 @@ Select **Ring Deployment** in the sidebar.
 
 4. Set the **Plan Start**. Select **Hold later rings** to create ring 1 now and promote the others later.
 
+### Import the plan from Update Planner
+
+Update Planner saves its plan for a site in the handoff folder of that site: `sites\<SITE>\handoff\ring-plan.json` in the data folder. You do not copy the file by hand. When a plan is there, the Ring Deployment view shows one line under the plan list. The line names the tool and its version, the site and the age of the plan.
+
+![The offer of the plan from Update Planner](../images/rings-handoff.png)
+
+1. Select **Import Plan**. The tool copies the file into the plan list and selects it. The copy creates nothing on the site.
+2. Select **Planned Updates...** to see the updates that the plan lists for each ring. The list is read only. A ring deploys the software update group that you choose.
+
+![The plan after the import](../images/rings-handoff-imported.png)
+
+![The planned updates](../images/dialog-planned-updates.png)
+
+A plan that is older than the stale limit is marked STALE. The tool shows it and does not block it. Set the limit in [Options dialog](options.md), page **Imports**. A file for another site than the site of the window gets a mark too. The tool refuses a file that is not valid JSON, that has no creation time, that has a schema version above 1, or that does not load as a ring plan. The line names the file and the reason, and the log keeps the same text. A plan with the same name and other content is never replaced without your answer.
+
 ### Expand and check the plan
 
 1. Select **Expand**. The preview lists each ring with the collection ID, the collection, the purpose, the available time, the deadline, the threshold and the checks.
@@ -101,6 +116,7 @@ Every ring deployment writes one audit record with `PlanName`, `RingIndex`, `Rin
 |---|---|
 | **Object Type**, **Object**, **Browse...** | Pick the object. |
 | **Ring Plan**, **Reload**, **Open Folder** | Pick, reload and find the plans. |
+| **Import Plan**, **Planned Updates...** | Copy the plan that Update Planner left for the site into the list. Show the planned updates of the selected plan (read only). |
 | **Plan Start**, **Expand** | Compute the dates of each ring. |
 | **Hold later rings** | Create ring 1 now and promote the others later. |
 | **Set Collection...**, **Validate**, **Create Deployments** | Set the collections, check and create. |

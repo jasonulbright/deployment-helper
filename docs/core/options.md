@@ -40,6 +40,12 @@ The page shows the number of records in the audit log. **Export CSV...** and **E
 
 ![The History page](../images/options-history.png)
 
+### Imports
+
+The page sets when imported data counts as stale. Deployment Helper shows the tool, the site and the age of the plan from Update Planner and of the result of Check ConfigMgr. Data older than the limit is marked STALE. It is shown and not blocked. Enter a whole number from 1 to 9999 and select **hours** or **days**. The default is 3 days.
+
+![The Imports page](../images/options-imports.png)
+
 ### Templates
 
 The list shows the deployment templates. **New**, **Duplicate** and **Delete** change the list. Select a template to edit its name, target collection, purpose, notification, time basis, deadline offset in hours and options, and select **Save Template**. Each template is a JSON file in `Templates`.

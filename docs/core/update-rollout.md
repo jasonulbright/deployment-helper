@@ -41,7 +41,9 @@ Add rows in one of two ways.
 ![The application list](../images/dialog-rollout-add.png)
 
 2. Select **Import List...**. Paste one application for each line (the name, a comma or a tab, and the new version), or load a CSV file. A CSV has the header `Application`, `NewVersion` and the optional columns `InstalledSoftwareName`, `Role` and `TestCollection`. The dialog refuses a line without a dotted version and names the line.
-Select **Check Results** to fill the box with the updates that Check ConfigMgr found in App Packager or APD.
+Select **Check Results** to fill the box with the updates that Check ConfigMgr found in App Packager or APD. The dialog shows where the rows came from: the tool, the site, the file and the age of the data. Data older than the stale limit is marked STALE. It is shown and not blocked. Set the limit in [Options dialog](options.md), page **Imports**.
+
+![The import dialog with the source of the Check Results](../images/dialog-rollout-import-source.png)
 
 ![The import dialog](../images/dialog-rollout-import.png)
 
@@ -147,7 +149,7 @@ The settings are in `DeploymentHelper.prefs.json`. The run files are in the `rol
 
 ## Limits
 
-- **Check Results** in the import dialog reads the result files of Check ConfigMgr that App Packager and APD write (`CheckConfigMgrResult.csv`). It lists the rows with the status UpdateAvailable. A tool version that does not write the file shows the message that no update was found.
+- **Check Results** in the import dialog reads the result files of Check ConfigMgr that App Packager and APD write (`CheckConfigMgrResult.csv`). It lists the rows with the status UpdateAvailable. The file of the site (`results\CheckConfigMgrResult.csv` in the site data folder) comes first. The files in the older places do not record a site, and the dialog says so. A tool version that does not write the file shows the message that no update was found.
 - The members of a collection are known to the site only after it updates the collection. The member count of the preview comes from the inventory at the time of the preview.
 - A run file keeps the plan of Step 1. A change of the settings later does not change an open run.
 
