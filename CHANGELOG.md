@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [2026.11.23.0032] - 2026-11-23
+
+## 4 changes: the plan from Update Planner, and the source and age of both imports
+
+### Added
+
+- Offer the plan that Update Planner sends for the site, and import it with one button.
+- Show the updates of a plan in a read-only list.
+- Show the tool, site, file and age of the plan and of the Check Results.
+- Mark old data as stale. Set the limit in hours or days in Options.
+
 ## [2026.11.22.0031] - 2026-11-22
 
 ## 1 change: data is kept for each site
