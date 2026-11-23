@@ -1,6 +1,6 @@
 # Ring plan files from Update Planner
 
-Update Planner writes its plan as a Suite ring plan. Deployment Helper loads the file as a ring plan with no change. Update Planner (**Send to Deployment Helper**) saves the plan in the handoff folder of the site, `sites\<SITE>\handoff\ring-plan.json`, and Deployment Helper offers it in the Ring Deployment view with **Import Plan**. You do not copy the file by hand. The view shows the tool, its version, the site and the age of the plan, and marks a plan that is older than the stale limit (Options, page **Imports**). **Planned Updates...** shows the `Updates` list of the selected plan. The list is read only.
+Update Planner writes its plan as a Suite ring plan. Deployment Helper loads the file as a ring plan with no change. Update Planner (**Send Plan**) saves the plan in the handoff folder of the site, `sites\<SITE>\handoff\ring-plan.json`, and Deployment Helper offers it in the Ring Deployment view with **Import Plan**. You do not copy the file by hand. The view shows the tool, its version, the site and the age of the plan, and marks a plan that is older than the stale limit (Options, page **Imports**). **Planned Updates...** shows the `Updates` list of the selected plan. The list is read only.
 
 The file has the fields of a Deployment Helper ring plan (`Name`, `Description`, `HoldLaterRings`, `TimeBasedOn`, and `Rings[]` with the ring fields). It also has extra fields that Deployment Helper ignores:
 
